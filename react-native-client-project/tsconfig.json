@@ -1,0 +1,39 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    /* 🔒 STRICT MODE */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
+    /* 🧹 CODE QUALITY */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    /* 📦 MODULE RESOLUTION */
+    "baseUrl": "./src",
+    "paths": {
+      "@app/*": ["app/*"],
+      "@modules/*": ["modules/*"],
+      "@components/*": ["components/*"],
+      "@services/*": ["services/*"],
+      "@store/*": ["store/*"],
+      "@utils/*": ["utils/*"],
+      "@config/*": ["config/*"],
+      "@types/*": ["types/*"]
+    },
+
+    /* 🧪 TESTING */
+    "types": ["jest"],
+
+    /* ⚙️ RN SAFETY */
+    "isolatedModules": true,
+    "resolveJsonModule": true
+  },
+  "include": ["src", "App.tsx"],
+  "exclude": ["node_modules", "Pods"]
+}

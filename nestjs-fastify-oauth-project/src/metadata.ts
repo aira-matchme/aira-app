@@ -1,0 +1,7 @@
+/* eslint-disable */
+export default async () => {
+    const t = {
+        ["./user/schemas/user.schema"]: await import("./user/schemas/user.schema")
+    };
+    return { "@nestjs/swagger": { "models": [[import("./user/dto/create-user.dto"), { "CreateUserDto": { name: { required: true, type: () => String }, email: { required: true, type: () => String, format: "email" }, profilePicture: { required: false, type: () => String }, phoneNumber: { required: false, type: () => String }, provider: { required: true, type: () => String }, providerId: { required: true, type: () => String }, appleUserIdentifier: { required: false, type: () => String }, googleId: { required: false, type: () => String } } }], [import("./user/dto/update-user.dto"), { "UpdateUserDto": {} }]], "controllers": [[import("./app.controller"), { "AppController": { "getHello": { type: String } } }], [import("./auth/auth.controller"), { "AuthController": { "googleAuth": {}, "googleAuthRedirect": {}, "getProfile": {} } }], [import("./user/user.controller"), { "UserController": { "create": { type: t["./user/schemas/user.schema"].User }, "findAll": { type: [t["./user/schemas/user.schema"].User] }, "findOne": { type: t["./user/schemas/user.schema"].User }, "update": { type: t["./user/schemas/user.schema"].User }, "remove": {} } }]] } };
+};

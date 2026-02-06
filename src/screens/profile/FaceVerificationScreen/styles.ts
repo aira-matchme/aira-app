@@ -1,0 +1,170 @@
+import { StyleSheet } from 'react-native';
+import { colors, spacing, typography } from '../../../theme';
+
+export const styles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  backgroundGlow: {
+    position: 'absolute',
+    width: '100%',
+    height: 600,
+    alignSelf: 'center',
+    top: '15%',
+  },
+  headerContainer: {
+  // Align back arrow with other profile screens
+  paddingTop: 16,
+  paddingHorizontal: 20,
+  },
+  content: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm * 2,
+    paddingBottom: spacing.xl,
+  },
+  iconContainer: {
+    alignItems: 'flex-start',
+    marginBottom: spacing.xl * 2,
+  },
+  iconWrapper: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2,
+    borderColor: '#7742F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  textContainer: {
+    gap: spacing.md,
+  },
+  title: {
+    fontSize: 28,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.black,
+    lineHeight: 36,
+    marginBottom: spacing.md,
+  },
+  description: {
+    fontSize: 14,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.neutral[600],
+    lineHeight: 20,
+    letterSpacing: 0.28,
+    marginBottom: spacing.sm,
+  },
+  bulletPointsContainer: {
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  bulletPoint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  bulletDot: {
+    fontSize: 14,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.neutral[600],
+    lineHeight: 20,
+    marginRight: spacing.xs,
+  },
+  bulletText: {
+    fontSize: 14,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.neutral[600],
+    lineHeight: 20,
+    flex: 1,
+  },
+  buttonContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl * 1.5,
+  },
+  button: {
+    width: '100%',
+    height: 54,
+    borderRadius: 100,
+  },
+  bottomSheetBackground: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+  },
+  permissionSheetContent: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
+    gap: spacing.xl,
+  },
+  permissionTitle: {
+    fontSize: 24,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.black,
+    textAlign: 'center',
+    lineHeight: 32,
+  },
+  permissionDescription: {
+    fontSize: 16,
+    fontWeight: '400',
+    fontFamily: typography.fontFamily.regular,
+    color: colors.neutral[500],
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  permissionButtons: {
+    gap: spacing.sm,
+    width: '100%',
+  },
+  allowButtonWrapper: {
+    borderRadius: 100,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  allowButton: {
+    height: 54,
+    borderRadius: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  allowButtonInner: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  allowButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.white,
+    letterSpacing: 0.32,
+    lineHeight: 24,
+  },
+  dontAllowButton: {
+    height: 54,
+    borderRadius: 100,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dontAllowButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.black,
+    letterSpacing: 0.32,
+    lineHeight: 24,
+  },
+});
+

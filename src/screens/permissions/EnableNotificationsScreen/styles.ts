@@ -1,0 +1,157 @@
+import { StyleSheet, Platform } from 'react-native';
+import { colors, spacing, typography } from '../../../theme';
+
+export const styles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+    backgroundColor: '#7742F0',
+    zIndex: 1,
+  },
+  gradientBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  mockupContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  content: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? spacing.xl * 3 : spacing.xl * 2,
+    left: spacing.lg,
+    right: spacing.lg,
+    zIndex: 10,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.black,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  subtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    color: colors.neutral[700],
+    lineHeight: 20,
+    marginBottom: spacing.xl,
+  },
+  actions: {
+    width: '100%',
+    alignItems: 'center',
+    gap: spacing.md,
+    zIndex: 20,
+  },
+  primaryButton: {
+    width: '100%',
+    height: 54,
+  },
+  maybeLaterButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    minHeight: 44, // iOS minimum touch target
+  },
+  secondaryText: {
+    fontSize: 14,
+    color: colors.neutral[500],
+    textAlign: 'center',
+  },
+  bottomSheetBackground: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+  },
+  permissionSheetContent: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
+    gap: spacing.xl,
+  },
+  permissionTitle: {
+    fontSize: 24,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.text.dark,
+    textAlign: 'center',
+    lineHeight: 32,
+    textTransform: 'capitalize',
+  },
+  permissionDescription: {
+    fontSize: 16,
+    fontWeight: '400',
+    fontFamily: typography.fontFamily.regular,
+    color: colors.neutral[500],
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  permissionButtons: {
+    gap: spacing.sm,
+    width: '100%',
+  },
+  allowButtonWrapper: {
+    borderRadius: 100,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  allowButton: {
+    height: 54,
+    borderRadius: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  allowButtonInner: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  allowButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.white,
+    letterSpacing: 0.32,
+    lineHeight: 24,
+  },
+  dontAllowButton: {
+    height: 54,
+    borderRadius: 100,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dontAllowButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.text.dark,
+    letterSpacing: 0.32,
+    lineHeight: 24,
+  },
+});
+

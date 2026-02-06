@@ -1,0 +1,66 @@
+# -------------------------------------------------
+# React Native
+# -------------------------------------------------
+
+# Metro
+.metro-health-check*
+
+# Watchman
+.env
+.watchmanconfig
+
+# Buck
+buck-out/
+\.buckd/
+*.keystore
+
+# Hermes
+*.hbc
+
+# Android
+android/.gradle
+android/.idea
+android/.cxx
+android/local.properties
+android/**/build
+android/app/debug.keystore
+
+# iOS
+ios/Pods
+ios/build
+ios/*.xcworkspace
+ios/xcuserdata
+ios/DerivedData
+ios/.symlinks
+
+# CocoaPods
+Pods/
+
+# Android NDK / CMake
+android/**/.cxx/
+android/**/.cxx/**
+
+# Android Gradle / native build junk
+android/**/cmake-build-*/
+android/**/obj/
+
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# Expo
+.expo
+.expo-shared
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+node_modules
