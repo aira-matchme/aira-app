@@ -11,11 +11,8 @@ export interface ProfileSetupData {
     year: number | null;
   } | null;
   
-  // Step 3: Weight
-  weight: {
-    value: number | null;
-    unit: 'kg' | 'lbs';
-  } | null;
+  // Step 3: Gender
+  gender: string | null;
   
   // Step 4: Height
   height: {
@@ -43,7 +40,7 @@ interface ProfileState extends ProfileSetupData {
   // Actions
   setName: (name: string) => void;
   setDateOfBirth: (day: number, month: number, year: number) => void;
-  setWeight: (value: number, unit: 'kg' | 'lbs') => void;
+  setGender: (gender: string) => void;
   setHeight: (value: number, unit: 'cm' | 'ft') => void;
   setEducation: (education: string) => void;
   setEmployment: (employment: string) => void;
@@ -57,7 +54,7 @@ interface ProfileState extends ProfileSetupData {
 const initialState: ProfileSetupData = {
   name: null,
   dateOfBirth: null,
-  weight: null,
+  gender: null,
   height: null,
   education: null,
   employment: null,
@@ -75,8 +72,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   setDateOfBirth: (day, month, year) =>
     set({ dateOfBirth: { day, month, year } }),
   
-  setWeight: (value, unit) =>
-    set({ weight: { value, unit } }),
+  setGender: (gender) => set({ gender }),
   
   setHeight: (value, unit) =>
     set({ height: { value, unit } }),
@@ -105,7 +101,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
           state.dateOfBirth?.year
         );
       case 3:
-        return !!state.weight?.value && state.weight.value > 0;
+        return !!state.gender && state.gender.trim().length > 0;
       case 4:
         return !!state.height?.value && state.height.value > 0;
       case 5:

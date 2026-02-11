@@ -17,6 +17,7 @@ import { BasicDetailsReligionScreen } from '../screens/profile/BasicDetailsRelig
 import { BasicDetailsPincodeScreen } from '../screens/profile/BasicDetailsPincodeScreen';
 import { FaceVerificationScreen } from '../screens/profile/FaceVerificationScreen';
 import { SelfieCameraScreen } from '../screens/profile/SelfieCameraScreen';
+import { VideoVerificationScreen } from '../screens/profile/VideoVerificationScreen';
 import { OnboardingIntroScreen } from '../screens/onboarding/OnboardingIntroScreen';
 import { OnboardingRadioQuestionScreen } from '../screens/onboarding/OnboardingRadioQuestionScreen';
 import { OnboardingMultiSelectQuestionScreen } from '../screens/onboarding/OnboardingMultiSelectQuestionScreen';
@@ -42,13 +43,20 @@ const profileScreenOptions = {
 };
 
 export const AuthNavigator = () => {
-  const { isAuthenticated } = useAuthStore();
-  
-  // Set initial route based on auth state, but SplashScreen will override with navigation
+  const { isAuthenticated, user } = useAuthStore();
+
+  // Decide initial route based on auth state and profile completion
+  const initialRouteName: keyof AuthStackParamList = !isAuthenticated
+    ? 'Welcome'
+    : user?.isProfileComplete
+    ? 'FaceVerification'
+    : 'ProfileIntro';
+
+  // Set initial route based on auth state, but SplashScreen/AuthProvider will override with navigation
   return (
-    <Stack.Navigator 
+    <Stack.Navigator
       screenOptions={{ headerShown: false }}
-      initialRouteName={isAuthenticated ? 'ProfileIntro' : 'Welcome'}
+      initialRouteName={initialRouteName}
     >
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
@@ -114,6 +122,11 @@ export const AuthNavigator = () => {
       <Stack.Screen
         name="SelfieCamera"
         component={SelfieCameraScreen}
+        options={profileScreenOptions}
+      />
+      <Stack.Screen
+        name="VideoVerification"
+        component={VideoVerificationScreen}
         options={profileScreenOptions}
       />
       <Stack.Screen

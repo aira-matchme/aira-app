@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   Dimensions,
   Alert,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -15,8 +17,12 @@ import LinearGradient from 'react-native-linear-gradient';
 
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { Button } from '../../../components/Button';
+import { CameraIcon } from '../../../assets/icons/common/CameraIcon';
+import { VerifiedIcon } from '../../../assets/icons/common/VerifiedIcon';
 import { STRINGS } from '../../../constants/strings';
+import { colors } from '../../../theme';
 import type { AuthStackParamList } from '../../../navigation/types';
+import { uploadSelfieApi } from '../../../modules/auth/api';
 import { styles } from './styles';
 
 type NavigationProp = NativeStackNavigationProp<
@@ -24,10 +30,14 @@ type NavigationProp = NativeStackNavigationProp<
   'SelfieCamera'
 >;
 
+type ScreenState = 'camera' | 'verifying' | 'verified';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const SelfieCameraScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const [screenState, setScreenState] = useState<ScreenState>('camera');
+  const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const camera = useRef<Camera>(null);
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -49,30 +59,39 @@ export const SelfieCameraScreen: React.FC = () => {
       Alert.alert('Permission Required', 'Camera permission is required to take a photo.');
       return;
     }
-
     setIsCapturing(true);
-    
     try {
-      const photo = await camera.current.takePhoto({
-        // qualityPrioritization: 'speed',
-        flash: 'off',
-      });
-      
-      // TODO: Process the photo for face verification
-      console.log('Photo captured:', photo.path);
-      
-      // Navigate to next screen after successful capture
-      // navigation.navigate('OnboardingIntro');
+      const photo = await camera.current.takePhoto({ flash: 'off' });
+      setIsCapturing(false);
+      const photoUri = photo.path.startsWith('file://') ? photo.path : `file://${photo.path}`;
+      setCapturedPhotoUri(photoUri);
+      setScreenState('verifying');
+      try {
+        await uploadSelfieApi(photo.path);
+        setScreenState('verified');
+      } catch (err: unknown) {
+        const message =
+          (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data
+            ?.message ||
+          (err as { message?: string })?.message ||
+          'Verification failed. Please try again.';
+        Alert.alert('Verification Failed', message, [
+          { text: 'OK', onPress: () => { setScreenState('camera'); setCapturedPhotoUri(null); } },
+        ]);
+      }
     } catch (error) {
+      setIsCapturing(false);
       console.error('Error capturing photo:', error);
       Alert.alert(
         'Error',
         'Failed to capture photo. Please try again.',
         [{ text: 'OK' }]
       );
-    } finally {
-      setIsCapturing(false);
     }
+  };
+
+  const handleContinue = () => {
+    navigation.navigate('VideoVerification');
   };
 
   if (!hasPermission) {
@@ -111,6 +130,99 @@ export const SelfieCameraScreen: React.FC = () => {
     );
   }
 
+  // Verifying screen (after selfie taken, show user's selfie + verifying state)
+  if (screenState === 'verifying' && capturedPhotoUri) {
+    return (
+      <View style={styles.wrapper}>
+        <LinearGradient
+          colors={[
+            'rgba(221, 170, 249, 0)',
+            'rgba(221, 170, 249, 0.18)',
+            'rgba(221, 170, 249, 0.18)',
+            'rgba(221, 170, 249, 0)',
+          ]}
+          locations={[0, 0.38, 0.62, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.backgroundGlow}
+        />
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+          <View style={styles.headerContainer}>
+            {/* <TouchableOpacity onPress={() => { setScreenState('camera'); setCapturedPhotoUri(null); }}>
+              <BackArrowIcon size={48} backgroundColor="rgba(255, 255, 255, 0.2)" strokeColor="white" />
+            </TouchableOpacity> */}
+          </View>
+          <View style={styles.verifyingContent}>
+            <View style={styles.verifyingSelfieCircle}>
+              <Image
+                source={{ uri: capturedPhotoUri }}
+                style={styles.verifyingSelfieImage}
+                resizeMode="cover"
+              />
+            </View>
+            <View style={styles.verifyingPill}>
+              <ActivityIndicator size="small" color={colors.white} />
+              <Text style={styles.verifyingPillText}>Verifying...</Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  // Verified success screen (Figma 886-3849: blurred selfie, green circle + checkmark, green Verified button)
+  if (screenState === 'verified') {
+    return (
+      <View style={styles.wrapper}>
+        {capturedPhotoUri ? (
+          <>
+            <Image
+              source={{ uri: capturedPhotoUri }}
+              style={styles.verifiedBackgroundImage}
+              resizeMode="cover"
+            />
+            <View style={styles.verifiedBackgroundOverlay} />
+          </>
+        ) : (
+          <LinearGradient
+            colors={[
+              'rgba(221, 170, 249, 0)',
+              'rgba(221, 170, 249, 0.18)',
+              'rgba(221, 170, 249, 0.18)',
+              'rgba(221, 170, 249, 0)',
+            ]}
+            locations={[0, 0.38, 0.62, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={styles.backgroundGlow}
+          />
+        )}
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+          <View style={styles.verifiedContent}>
+            <View style={styles.verifiedGreenCircle}>
+              <View style={styles.verifiedCheckmarkWrapper}>
+                <VerifiedIcon size={48} color={colors.white} />
+              </View>
+            </View>
+          </View>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleContinue}
+              style={styles.verifiedButton}
+            >
+              <VerifiedIcon size={24} color={colors.white} />
+              <Text style={styles.verifiedButtonText}>Verified</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  // Camera screen with default camera icon overlay
   return (
     <View style={styles.wrapper}>
       <LinearGradient
@@ -136,15 +248,11 @@ export const SelfieCameraScreen: React.FC = () => {
         </View>
 
         <View style={styles.content}>
-          <Text style={styles.title}>
-            {STRINGS.PROFILE_SETUP.SELFIE_CAMERA.TITLE}
-          </Text>
           <Text style={styles.subtitle}>
             {STRINGS.PROFILE_SETUP.SELFIE_CAMERA.SUBTITLE}
           </Text>
 
           <View style={styles.cameraContainer}>
-            {/* Camera preview area with circular frame overlay */}
             <View style={styles.cameraFrame}>
               <Camera
                 ref={camera}
@@ -153,11 +261,12 @@ export const SelfieCameraScreen: React.FC = () => {
                 isActive={true}
                 photo={true}
               />
-              {/* Circular frame guide overlay */}
               <View style={styles.circleFrame}>
                 <View style={styles.circleBorder} />
+                <View style={styles.defaultCameraIconOverlay} pointerEvents="none">
+                  <CameraIcon size={80} color="rgba(255, 255, 255, 0.9)" />
+                </View>
               </View>
-              {/* Overlay outside the circle */}
               <View style={styles.overlayTop} />
               <View style={styles.overlayBottom} />
               <View style={styles.overlayLeft} />
@@ -180,4 +289,3 @@ export const SelfieCameraScreen: React.FC = () => {
     </View>
   );
 };
-

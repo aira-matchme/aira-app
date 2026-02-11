@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StatusBar, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StatusBar, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,7 +9,10 @@ import LinearGradient from 'react-native-linear-gradient';
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { ForwardArrowIcon } from '../../../assets/icons/common/ForwardArrowIcon';
 import type { AuthStackParamList } from '../../../navigation/types';
-import { navigateToNextQuestion } from '../../../modules/onboarding/questionManager';
+import {
+  navigateToNextQuestion,
+  navigateToPreviousQuestion,
+} from '../../../modules/onboarding/questionManager';
 import { useOnboardingStore } from '../../../store/onboarding.store';
 import { styles } from './styles';
 
@@ -34,11 +37,16 @@ export const OnboardingMultiSelectQuestionScreen: React.FC = () => {
     maxSelections,
   } = route.params;
 
-  // Load saved answer if exists
-  const savedAnswer = getAnswer(questionOrder);
-  const [selectedOptions, setSelectedOptions] = useState<number[]>(
-    (savedAnswer?.answer as number[]) ?? [],
-  );
+  const scrollRef = useRef<ScrollView | null>(null);
+  const [selectedOptions, setSelectedOptions] = useState<number[]>([]);
+
+  useEffect(() => {
+    // Reset scroll to top when question changes
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+
+    const saved = getAnswer(questionOrder);
+    setSelectedOptions(((saved?.answer as number[]) ?? []) as number[]);
+  }, [questionOrder, getAnswer]);
 
   const toggleOption = (value: number) => {
     setSelectedOptions(prev => {
@@ -82,60 +90,68 @@ export const OnboardingMultiSelectQuestionScreen: React.FC = () => {
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <View style={styles.headerContainer}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            onPress={() => navigateToPreviousQuestion(navigation, questionOrder)}
+          >
             <BackArrowIcon size={48} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.content}>
           <View style={styles.card}>
-            <View style={styles.stepRow}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>
-                  {step}/{totalSteps}
-                </Text>
+            <ScrollView
+              ref={scrollRef}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 16 }}
+            >
+              <View style={styles.stepRow}>
+                <View style={styles.stepBadge}>
+                  <Text style={styles.stepBadgeText}>
+                    {step}/{totalSteps}
+                  </Text>
+                </View>
+                <View style={styles.stepDotLarge} />
+                <View style={styles.stepDotLarge} />
+                <View style={styles.stepDotSmall} />
+                <View style={styles.stepDotSmall} />
               </View>
-              <View style={styles.stepDotLarge} />
-              <View style={styles.stepDotLarge} />
-              <View style={styles.stepDotSmall} />
-              <View style={styles.stepDotSmall} />
-            </View>
 
-            <Text style={styles.title}>{question.questionText}</Text>
+              <Text style={styles.title}>{question.questionText}</Text>
 
-            <View style={styles.optionsContainer}>
-              {question.options.map((option) => {
-                const selected = selectedOptions.includes(option.value);
-                return (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={[
-                      styles.option,
-                      selected && styles.optionSelected,
-                    ]}
-                    activeOpacity={0.85}
-                    onPress={() => toggleOption(option.value)}
-                  >
-                    <View
+              <View style={styles.optionsContainer}>
+                {question.options.map((option) => {
+                  const selected = selectedOptions.includes(option.value);
+                  return (
+                    <TouchableOpacity
+                      key={`${questionOrder}-${option.value}`}
                       style={[
-                        styles.checkbox,
-                        selected && styles.checkboxSelected,
+                        styles.option,
+                        selected && styles.optionSelected,
                       ]}
+                      activeOpacity={0.85}
+                      onPress={() => toggleOption(option.value)}
                     >
-                      {selected && <View style={styles.checkboxInner} />}
-                    </View>
-                    <Text
-                      style={[
-                        styles.optionText,
-                        selected && styles.optionTextSelected,
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                      <View
+                        style={[
+                          styles.checkbox,
+                          selected && styles.checkboxSelected,
+                        ]}
+                      >
+                        {selected && <View style={styles.checkboxInner} />}
+                      </View>
+                      <Text
+                        style={[
+                          styles.optionText,
+                          selected && styles.optionTextSelected,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
           </View>
         </View>
 

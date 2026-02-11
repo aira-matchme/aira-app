@@ -7,6 +7,7 @@ export interface QuestionOption {
 }
 
 export interface OnboardingQuestion {
+  id?: string;
   questionText: string;
   questionType: 'radio' | 'boolean' | 'multiSelect' | 'card' | 'photo';
   options: QuestionOption[];
@@ -264,6 +265,19 @@ export const getNextQuestion = (
     return undefined;
   }
   return activeQuestions[currentIndex + 1];
+};
+
+// Helper function to get previous question
+export const getPreviousQuestion = (
+  questions: OnboardingQuestion[],
+  currentOrder: number,
+): OnboardingQuestion | undefined => {
+  const activeQuestions = getActiveQuestions(questions);
+  const currentIndex = activeQuestions.findIndex(q => q.questionOrder === currentOrder);
+  if (currentIndex <= 0) {
+    return undefined;
+  }
+  return activeQuestions[currentIndex - 1];
 };
 
 // Helper function to get total number of active questions

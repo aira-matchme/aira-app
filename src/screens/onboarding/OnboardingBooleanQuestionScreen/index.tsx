@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StatusBar, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -9,7 +9,10 @@ import LinearGradient from 'react-native-linear-gradient';
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { ForwardArrowIcon } from '../../../assets/icons/common/ForwardArrowIcon';
 import type { AuthStackParamList } from '../../../navigation/types';
-import { navigateToNextQuestion } from '../../../modules/onboarding/questionManager';
+import {
+  navigateToNextQuestion,
+  navigateToPreviousQuestion,
+} from '../../../modules/onboarding/questionManager';
 import { useOnboardingStore } from '../../../store/onboarding.store';
 import { styles } from './styles';
 
@@ -31,11 +34,12 @@ export const OnboardingBooleanQuestionScreen: React.FC = () => {
   const yesOption = question.options.find(opt => opt.value === 1);
   const noOption = question.options.find(opt => opt.value === 0);
 
-  // Load saved answer if exists
-  const savedAnswer = getAnswer(questionOrder);
-  const [selected, setSelected] = useState<number | null>(
-    savedAnswer?.answer as number | null ?? null,
-  );
+  const [selected, setSelected] = useState<number | null>(null);
+
+  useEffect(() => {
+    const saved = getAnswer(questionOrder);
+    setSelected((saved?.answer as number | null) ?? null);
+  }, [questionOrder, getAnswer]);
 
   const handleSelect = (value: number) => {
     setSelected(value);
@@ -78,9 +82,11 @@ export const OnboardingBooleanQuestionScreen: React.FC = () => {
 
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      {/* <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}> */}
         <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            onPress={() => navigateToPreviousQuestion(navigation, questionOrder)}
+          >
             <BackArrowIcon size={48} />
           </TouchableOpacity>
           {!question.isRequired && (
@@ -163,7 +169,7 @@ export const OnboardingBooleanQuestionScreen: React.FC = () => {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      {/* </SafeAreaView> */}
     </View>
   );
 };

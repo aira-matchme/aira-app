@@ -24,6 +24,7 @@ interface BottomSheetProps {
   showCloseButton?: boolean;
   enablePanDownToClose?: boolean;
   backgroundStyle?: object;
+  scrollEnabled?: boolean;
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -37,6 +38,7 @@ export const ReusableBottomSheet: React.FC<BottomSheetProps> = ({
   showCloseButton = true,
   enablePanDownToClose = true,
   backgroundStyle,
+  scrollEnabled = true,
 }) => {
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -304,6 +306,7 @@ export const ReusableBottomSheet: React.FC<BottomSheetProps> = ({
               showsVerticalScrollIndicator={false}
               bounces={false}
               nestedScrollEnabled={true}
+              scrollEnabled={scrollEnabled}
             >
               <View style={styles.contentContainer} pointerEvents="box-none">
                 {children}

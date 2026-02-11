@@ -13,6 +13,11 @@ export const endpoints = {
     profile: '/auth/profile',
     update: '/user/update',
     editProfile: '/auth/profile',
+    self: '/auth/self',
+    selfie: '/auth/selfie',
+  },
+  question: {
+    getQuestions: '/questions',
+    answerQuestion: '/questions/answers',
   },
 };
-

@@ -11,9 +11,10 @@ export const styles = StyleSheet.create({
   },
   backgroundGlow: {
     position: 'absolute',
-    top: '32%',
     width: '100%',
-    height: 220,
+    height: 600,
+    alignSelf: 'center',
+    top: '15%',
   },
   content: {
     flex: 1,
@@ -21,7 +22,13 @@ export const styles = StyleSheet.create({
     paddingTop: spacing.sm * 2,
   },
   header: {
-    marginBottom: spacing.xl * 2,
+    marginBottom: spacing.sm * 2,
+  },
+  optionsScrollView: {
+    flex: 1,
+  },
+  optionsScrollContainer: {
+    paddingBottom: spacing.xl,
   },
   title: {
     fontSize: 36,
@@ -36,60 +43,29 @@ export const styles = StyleSheet.create({
     color: colors.neutral[600],
     lineHeight: 22,
   },
-  inputWrapper: {
-    width: '100%',
-    maxWidth: 343,
-    alignSelf: 'center',
+  optionsContainer: {
+    gap: spacing.sm,
   },
-  inputGlow: {
-    height: 120,
+  option: {
+    height: 64,
+    borderRadius: 40,
+    paddingHorizontal: spacing.lg,
     justifyContent: 'center',
-    paddingHorizontal: 16,
-    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+    borderWidth: 1,
+    borderColor: colors.border.light,
   },
-  inputContainer: {
-    height: 52,
-    borderRadius: 26,
+  optionSelected: {
     backgroundColor: colors.white,
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 3,
+    borderWidth: 2,
+    borderColor: colors.primary.purple,
   },
-  input: {
-    height: 52,
-    paddingHorizontal: 20,
-    paddingRight: 96,
+  optionText: {
     fontSize: 16,
+    fontFamily: typography.fontFamily.medium,
     color: colors.black,
   },
-  unitToggle: {
-    position: 'absolute',
-    right: 6,
-    top: 6,
-    bottom: 6,
-    flexDirection: 'row',
-    backgroundColor: colors.neutral[50],
-    borderRadius: 100,
-    padding: 2,
-  },
-  unitButton: {
-    paddingHorizontal: 12,
-    borderRadius: 100,
-    justifyContent: 'center',
-  },
-  unitButtonActive: {
-    backgroundColor: colors.white,
-  },
-  unitText: {
-    fontSize: 14,
-    fontFamily: typography.fontFamily.regular,
-    color: colors.neutral[500],
-  },
-  unitTextActive: {
-    fontFamily: typography.fontFamily.medium,
+  optionTextSelected: {
     color: colors.black,
   },
   buttonContainer: {

@@ -1,16 +1,21 @@
-import type { NavigationProp } from '@react-navigation/native';
+import type { NavigationProp as StackNavigationProp } from '@react-navigation/native';
 import type { AuthStackParamList } from '../../navigation/types';
 import type { OnboardingQuestion } from './questions.data';
 import {
   getActiveQuestions,
   getNextQuestion,
+  getPreviousQuestion,
   getTotalQuestions,
   getQuestionByOrder,
   dummyQuestions,
 } from './questions.data';
 import { useOnboardingStore } from '../../store/onboarding.store';
+import { fetchOnboardingQuestions, submitOnboardingAnswers } from './api';
+import { useQuery } from '@tanstack/react-query';
 
-type NavigationProp = NavigationProp<AuthStackParamList>;
+type NavigationProp = StackNavigationProp<AuthStackParamList>;
+
+let currentQuestions: OnboardingQuestion[] = dummyQuestions;
 
 export interface QuestionAnswer {
   questionOrder: number;
@@ -24,8 +29,8 @@ export { useOnboardingStore };
 export const navigateToQuestion = (
   navigation: NavigationProp,
   question: OnboardingQuestion,
-  allQuestions: OnboardingQuestion[] = dummyQuestions,
 ) => {
+  const allQuestions = currentQuestions;
   const activeQuestions = getActiveQuestions(allQuestions);
   const currentIndex = activeQuestions.findIndex(q => q.questionOrder === question.questionOrder);
   const step = currentIndex + 1;
@@ -64,33 +69,82 @@ export const navigateToQuestion = (
 export const navigateToNextQuestion = (
   navigation: NavigationProp,
   currentQuestionOrder: number,
-  allQuestions: OnboardingQuestion[] = dummyQuestions,
-) => {
+): void => {
   const { setCurrentQuestionOrder } = useOnboardingStore.getState();
+  const allQuestions = currentQuestions;
   const nextQuestion = getNextQuestion(allQuestions, currentQuestionOrder);
   if (nextQuestion) {
     setCurrentQuestionOrder(nextQuestion.questionOrder);
-    navigateToQuestion(navigation, nextQuestion, allQuestions);
+    navigateToQuestion(navigation, nextQuestion);
   } else {
-    // All questions completed - navigate to dashboard or completion screen
+    // All questions completed - submit answers
     const { answers, clearOnboarding } = useOnboardingStore.getState();
-    console.log('All questions completed!', answers);
-    // Clear onboarding state when completed
-    clearOnboarding();
-    // TODO: Navigate to completion screen or dashboard
-    // navigation.navigate('Dashboard');
+    const questionsByOrder = new Map(
+      currentQuestions.map((q) => [q.questionOrder, q]),
+    );
+
+    (async () => {
+      try {
+        const payloadAnswers = answers
+          .map((answer) => {
+            const question = questionsByOrder.get(answer.questionOrder);
+            if (!question?.id || answer.answer === null) {
+              return null;
+            }
+
+            return {
+              questionId: question.id,
+              value: answer.answer,
+              dimension: answer.dimension,
+            };
+          })
+          .filter(
+            (item): item is import('./api').QuestionAnswerPayload =>
+              item !== null,
+          );
+
+        if (payloadAnswers.length > 0) {
+          await submitOnboardingAnswers({ answers: payloadAnswers });
+        }
+      } catch (error) {
+        console.error('Failed to submit onboarding answers', error);
+      } finally {
+        // Clear onboarding state when completed
+        clearOnboarding();
+        // TODO: Navigate to completion screen or dashboard
+        // navigation.navigate('Dashboard');
+      }
+    })();
+  }
+};
+
+export const navigateToPreviousQuestion = (
+  navigation: NavigationProp,
+  currentQuestionOrder: number,
+): void => {
+  const { setCurrentQuestionOrder } = useOnboardingStore.getState();
+  const allQuestions = currentQuestions;
+  const previousQuestion = getPreviousQuestion(allQuestions, currentQuestionOrder);
+
+  if (previousQuestion) {
+    setCurrentQuestionOrder(previousQuestion.questionOrder);
+    navigateToQuestion(navigation, previousQuestion);
+  } else {
+    // If there is no previous question, go back to previous screen (e.g. intro)
+    navigation.goBack();
   }
 };
 
 export const navigateToFirstQuestion = (
   navigation: NavigationProp,
   allQuestions: OnboardingQuestion[] = dummyQuestions,
-) => {
+): void => {
+  currentQuestions = allQuestions;
   const { setCurrentQuestionOrder } = useOnboardingStore.getState();
   const activeQuestions = getActiveQuestions(allQuestions);
   if (activeQuestions.length > 0) {
     setCurrentQuestionOrder(activeQuestions[0].questionOrder);
-    navigateToQuestion(navigation, activeQuestions[0], allQuestions);
+    navigateToQuestion(navigation, activeQuestions[0]);
   }
 };
 
@@ -101,6 +155,7 @@ export const navigateToFirstQuestion = (
 export const getResumeQuestion = (
   allQuestions: OnboardingQuestion[] = dummyQuestions,
 ): OnboardingQuestion | null => {
+  currentQuestions = allQuestions;
   const { answers, getLastAnsweredQuestionOrder } = useOnboardingStore.getState();
   
   if (answers.length === 0) {
@@ -140,15 +195,31 @@ export const getResumeQuestion = (
 export const navigateToResumeQuestion = (
   navigation: NavigationProp,
   allQuestions: OnboardingQuestion[] = dummyQuestions,
-) => {
+): void => {
+  currentQuestions = allQuestions;
   const resumeQuestion = getResumeQuestion(allQuestions);
   if (resumeQuestion) {
     const { setCurrentQuestionOrder } = useOnboardingStore.getState();
     setCurrentQuestionOrder(resumeQuestion.questionOrder);
-    navigateToQuestion(navigation, resumeQuestion, allQuestions);
+    navigateToQuestion(navigation, resumeQuestion);
   } else {
     // No resume point, start from beginning
     navigateToFirstQuestion(navigation, allQuestions);
   }
 };
+
+export const useOnboardingQuestions = () => {
+  const query = useQuery({
+    queryKey: ['onboardingQuestions'],
+    queryFn: fetchOnboardingQuestions,
+  });
+
+  return {
+    questions: query.data ?? dummyQuestions,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
+  };
+};
+
 

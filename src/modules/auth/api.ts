@@ -7,6 +7,8 @@ import {
   SendOtpResponse,
   VerifyOtpRequest,
   SocialLoginRequest,
+  UserProfileResponse,
+  SelfieResponse,
 } from './types';
 
 export const loginApi = async (
@@ -61,4 +63,42 @@ export const socialLoginApi = async (
     payload
   );
   return data;
+};
+
+export const getProfileApi = async (): Promise<UserProfileResponse> => {
+  const { data } = await apiClient.get<UserProfileResponse>(endpoints.user.profile);
+  return data;
+};
+
+export const uploadSelfieApi = async (
+  photoUri: string,
+): Promise<SelfieResponse> => {
+  try {
+    const formData = new FormData();
+
+    formData.append('file', {
+      uri: photoUri.startsWith('file://')
+        ? photoUri
+        : `file://${photoUri}`,
+      type: 'image/jpeg',
+      name: `selfie_${Date.now()}.jpg`,
+    } as any);
+
+    const { data } = await apiClient.post<SelfieResponse>(
+      endpoints.user.selfie,
+      formData,
+      {
+        timeout: 60000,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      },
+    );
+
+    console.log('📥 uploadSelfieApi - Response Data:', data);
+    return data;
+  } catch (error) {
+    console.error('uploadSelfieApi error:', error);
+    throw error;
+  }
 };

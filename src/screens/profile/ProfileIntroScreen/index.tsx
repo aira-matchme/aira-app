@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StatusBar, StyleSheet } from 'react-native';
+import { View, Text, StatusBar, StyleSheet, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -29,15 +29,20 @@ export const ProfileIntroScreen: React.FC = () => {
         <View style={styles.container}>
           {/* Header Video Section */}
           <View style={styles.headerCard}>
-            <Video
-              source={PROFILE_VIDEO}
-              style={styles.headerImage}
-              resizeMode="cover"
-              repeat
-              muted
-              paused={false}
-              controls={false}
-            />
+            {Platform.OS === 'ios' ? (
+              <Video
+                source={PROFILE_VIDEO}
+                style={styles.headerImage}
+                resizeMode="cover"
+                repeat
+                muted
+                paused={false}
+                controls={false}
+              />
+            ) : (
+              // Fallback on Android (avoids RCTVideo native dependency issues)
+              <View style={styles.headerImage} />
+            )}
           </View>
 
           {/* Bottom Gradient Card Section */}

@@ -13,6 +13,7 @@ import { colors } from '../../../theme';
 import { STRINGS } from '../../../constants/strings';
 import type { RootStackParamList, AuthStackParamList } from '../../../navigation/types';
 import { useVerifyOtp, useSendOtp, useResendOtp } from '../../../modules/auth/hooks';
+import { getProfileApi } from '../../../modules/auth/api';
 import { useAuthStore } from '../../../store/auth.store';
 import Toast from 'react-native-toast-message';
 import { styles } from './styles';
@@ -138,18 +139,31 @@ export const OTPVerificationScreen: React.FC = () => {
         otp: data.otp,
       });
 
-      // Store tokens and user data if provided
+      let screenToOpen: 'FaceVerification' | 'ProfileIntro' = 'ProfileIntro';
+
       if (response.data?.accessToken && response.data?.refreshToken) {
         await setTokens(response.data.accessToken, response.data.refreshToken);
-        // Also set user data from response
-        if (response.data?.user) {
-          setUser(response.data.user);
+        // Fetch profile to get isProfileComplete for correct redirection
+        try {
+          const profileResponse = await getProfileApi();
+          if (profileResponse?.data) {
+            setUser(profileResponse.data);
+            screenToOpen = profileResponse.data.isProfileComplete
+              ? 'FaceVerification'
+              : 'ProfileIntro';
+          } else if (response.data?.user) {
+            setUser(response.data.user);
+          }
+        } catch (profileError) {
+          console.warn('Profile fetch after verify failed, using verify response user', profileError);
+          if (response.data?.user) {
+            setUser(response.data.user);
+          }
         }
       }
 
       setIsVerified(true);
-      
-      // Navigate to ProfileIntro after successful login
+
       setTimeout(() => {
         setIsBottomSheetOpen(false);
         setTimeout(() => {
@@ -158,7 +172,7 @@ export const OTPVerificationScreen: React.FC = () => {
             routes: [
               {
                 name: 'AuthStack',
-                params: { screen: 'ProfileIntro' },
+                params: { screen: screenToOpen },
               },
             ],
           });

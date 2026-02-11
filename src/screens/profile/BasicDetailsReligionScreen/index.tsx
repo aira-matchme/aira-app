@@ -92,10 +92,7 @@ export const BasicDetailsReligionScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.title}>What are your religious beliefs?</Text>
             <Text style={styles.subtitle}>
@@ -104,43 +101,49 @@ export const BasicDetailsReligionScreen: React.FC = () => {
             </Text>
           </View>
 
-          <Controller
-            control={control}
-            name="religion"
-            render={({ field: { value } }) => (
-              <View style={styles.optionsContainer}>
-                {RELIGION_OPTIONS.map(option => {
-                  const selected = value === option.key;
+          <ScrollView
+            contentContainerStyle={styles.optionsScrollContainer}
+            showsVerticalScrollIndicator={false}
+            style={styles.optionsScrollView}
+          >
+            <Controller
+              control={control}
+              name="religion"
+              render={({ field: { value } }) => (
+                <View style={styles.optionsContainer}>
+                  {RELIGION_OPTIONS.map(option => {
+                    const selected = value === option.key;
 
-                  return (
-                    <TouchableOpacity
-                      key={option.key}
-                      style={[
-                        styles.option,
-                        selected && styles.optionSelected,
-                      ]}
-                      activeOpacity={0.8}
-                      onPress={() =>
-                        setValue('religion', option.key, {
-                          shouldValidate: true,
-                        })
-                      }
-                    >
-                      <Text
+                    return (
+                      <TouchableOpacity
+                        key={option.key}
                         style={[
-                          styles.optionText,
-                          selected && styles.optionTextSelected,
+                          styles.option,
+                          selected && styles.optionSelected,
                         ]}
+                        activeOpacity={0.8}
+                        onPress={() =>
+                          setValue('religion', option.key, {
+                            shouldValidate: true,
+                          })
+                        }
                       >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-          />
-        </ScrollView>
+                        <Text
+                          style={[
+                            styles.optionText,
+                            selected && styles.optionTextSelected,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            />
+          </ScrollView>
+        </View>
 
         <View style={styles.buttonContainer}>
           <Button

@@ -59,7 +59,7 @@ export const styles = StyleSheet.create({
   actions: {
     width: '100%',
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.lg,
+    // paddingBottom: spacing.lg,
     paddingTop: spacing.xxl,
     zIndex: 20,
   },

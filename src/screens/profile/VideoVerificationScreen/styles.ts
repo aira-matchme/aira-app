@@ -17,9 +17,8 @@ export const styles = StyleSheet.create({
     top: '15%',
   },
   headerContainer: {
-  // Align back arrow with other profile screens
-  paddingTop: 16,
-  paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingHorizontal: 20,
   },
   content: {
     paddingHorizontal: spacing.lg,
@@ -167,4 +166,3 @@ export const styles = StyleSheet.create({
     lineHeight: 24,
   },
 });
-

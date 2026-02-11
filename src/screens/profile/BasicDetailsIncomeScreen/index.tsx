@@ -39,7 +39,7 @@ const INCOME_OPTIONS = [
 ];
 
 const incomeSchema = z.object({
-  income: z.string().min(1),
+  income: z.string().min(1, 'Please select an option'),
 });
 
 type IncomeFormData = z.infer<typeof incomeSchema>;
@@ -90,59 +90,62 @@ export const BasicDetailsIncomeScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.title}>
-              {STRINGS.PROFILE_SETUP.INCOME?.TITLE || STRINGS.PROFILE_SETUP.FINAL.TITLE}
+              {STRINGS.PROFILE_SETUP.FINAL.TITLE}
             </Text>
             <Text style={styles.subtitle}>
-              {STRINGS.PROFILE_SETUP.INCOME?.SUBTITLE || STRINGS.PROFILE_SETUP.FINAL.SUBTITLE}
+              { STRINGS.PROFILE_SETUP.FINAL.SUBTITLE}
             </Text>
             <Text style={styles.subtitlesecondary}>
-              {STRINGS.PROFILE_SETUP.INCOME?.SUBTITLE_SECONDARY || STRINGS.PROFILE_SETUP.FINAL.SUBTITLE_SECONDARY}
+              { STRINGS.PROFILE_SETUP.FINAL.SUBTITLE_SECONDARY}
             </Text>
           </View>
 
-          <Controller
-            control={control}
-            name="income"
-            render={({ field: { value } }) => (
-              <View style={styles.optionsContainer}>
-                {INCOME_OPTIONS.map(option => {
-                  const selected = value === option.key;
+          <ScrollView
+            contentContainerStyle={styles.optionsScrollContainer}
+            showsVerticalScrollIndicator={false}
+            style={styles.optionsScrollView}
+          >
+            <Controller
+              control={control}
+              name="income"
+              render={({ field: { value } }) => (
+                <View style={styles.optionsContainer}>
+                  {INCOME_OPTIONS.map(option => {
+                    const selected = value === option.key;
 
-                  return (
-                    <TouchableOpacity
-                      key={option.key}
-                      style={[
-                        styles.option,
-                        selected && styles.optionSelected,
-                      ]}
-                      activeOpacity={0.8}
-                      onPress={() =>
-                        setValue('income', option.key, {
-                          shouldValidate: true,
-                        })
-                      }
-                    >
-                      <Text
+                    return (
+                      <TouchableOpacity
+                        key={option.key}
                         style={[
-                          styles.optionText,
-                          selected && styles.optionTextSelected,
+                          styles.option,
+                          selected && styles.optionSelected,
                         ]}
+                        activeOpacity={0.8}
+                        onPress={() =>
+                          setValue('income', option.key, {
+                            shouldValidate: true,
+                          })
+                        }
                       >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-          />
-        </ScrollView>
+                        <Text
+                          style={[
+                            styles.optionText,
+                            selected && styles.optionTextSelected,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            />
+          </ScrollView>
+        </View>
 
         <View style={styles.buttonContainer}>
           <Button

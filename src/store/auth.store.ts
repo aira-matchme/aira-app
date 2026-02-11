@@ -9,6 +9,7 @@ export interface User {
   provider?: string;
   profilePicture?: string;
   phoneNumber?: string;
+  isProfileComplete?: boolean;
 }
 
 interface AuthState {

@@ -35,6 +35,7 @@ export type AuthStackParamList = {
   BasicDetailsPincode: undefined;
   FaceVerification: undefined;
   SelfieCamera: undefined;
+  VideoVerification: undefined;
   OnboardingIntro: undefined;
   OnboardingRadioQuestion: {
     question: OnboardingQuestion;

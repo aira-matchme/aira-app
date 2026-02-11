@@ -1,21 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StatusBar,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import LinearGradient from 'react-native-linear-gradient';
 
-import { TextInput } from '../../../components/TextInput';
 import { Button } from '../../../components/Button';
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { STRINGS } from '../../../constants/strings';
@@ -31,62 +26,40 @@ type NavigationProp = NativeStackNavigationProp<
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 3;
 
-const weightSchema = z.object({
-  weight: z
-    .string()
-    .min(1, 'Weight is required')
-    .refine(v => {
-      const n = parseFloat(v);
-      return !isNaN(n) && n > 0;
-    }, 'Weight must be a positive number'),
-  unit: z.enum(['kg', 'lbs']),
-});
-
-type WeightFormData = z.infer<typeof weightSchema>;
+const GENDER_OPTIONS = [
+  STRINGS.PROFILE_SETUP.GENDER.OPTIONS.MAN,
+  STRINGS.PROFILE_SETUP.GENDER.OPTIONS.WOMAN,
+  STRINGS.PROFILE_SETUP.GENDER.OPTIONS.NON_BINARY,
+  STRINGS.PROFILE_SETUP.GENDER.OPTIONS.PREFER_NOT_TO_SAY,
+];
 
 export const BasicDetailsWeightScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { weight, setWeight, setCurrentStep } = useProfileStore();
+  const { gender, setGender, setCurrentStep } = useProfileStore();
+  const [selectedGender, setSelectedGender] = useState<string | null>(gender);
 
-  const {
-    control,
-    handleSubmit,
-    setValue,
-    formState: { isValid },
-  } = useForm<WeightFormData>({
-    resolver: zodResolver(weightSchema),
-    mode: 'onChange',
-    defaultValues: {
-      weight: weight?.value ? weight.value.toString() : '',
-      unit: weight?.unit || 'kg',
-    },
-  });
-
-  const onSubmit = (data: WeightFormData) => {
-    setWeight(parseFloat(data.weight), data.unit);
-    setCurrentStep(CURRENT_STEP + 1);
-    navigation.navigate('BasicDetailsHeight');
+  const onSubmit = () => {
+    if (selectedGender) {
+      setGender(selectedGender);
+      setCurrentStep(CURRENT_STEP + 1);
+      navigation.navigate('BasicDetailsHeight');
+    }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.wrapper}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
-    >
+    <View style={styles.wrapper}>
       <LinearGradient
         colors={[
-          'rgba(221,170,249,0)',
-          'rgba(221,170,249,0.18)',
-          'rgba(221,170,249,0.18)',
-          'rgba(221,170,249,0)',
+          'rgba(221, 170, 249, 0)',
+          'rgba(221, 170, 249, 0.18)',
+          'rgba(221, 170, 249, 0.18)',
+          'rgba(221, 170, 249, 0)',
         ]}
-        locations={[0, 0.38, 0.62, 1]}
+        locations={[0, 0.35, 0.65, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
         style={styles.backgroundGlow}
       />
-
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
@@ -99,76 +72,57 @@ export const BasicDetailsWeightScreen: React.FC = () => {
         <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.title}>
-              {STRINGS.PROFILE_SETUP.WEIGHT.TITLE}
+              {STRINGS.PROFILE_SETUP.GENDER.TITLE}
             </Text>
             <Text style={styles.subtitle}>
-              {STRINGS.PROFILE_SETUP.WEIGHT.SUBTITLE}
+              {STRINGS.PROFILE_SETUP.GENDER.SUBTITLE}
             </Text>
           </View>
 
-          <View style={styles.inputWrapper}>
-            <View style={styles.inputContainer}>
-              <Controller
-                control={control}
-                name="weight"
-                render={({ field: { onChange, value } }) => (
-                  <TextInput
-                    value={value}
-                    onChangeText={onChange}
-                    placeholder={STRINGS.PROFILE_SETUP.WEIGHT.PLACEHOLDER}
-                    keyboardType="numeric"
-                    autoFocus
-                    style={styles.input}
-                  />
-                )}
-              />
-
-              <Controller
-                control={control}
-                name="unit"
-                render={({ field: { value } }) => (
-                  <View style={styles.unitToggle}>
-                    {['kg', 'lbs'].map(unit => (
-                      <TouchableOpacity
-                        key={unit}
-                        style={[
-                          styles.unitButton,
-                          value === unit && styles.unitButtonActive,
-                        ]}
-                        onPress={() =>
-                          setValue('unit', unit as 'kg' | 'lbs', {
-                            shouldValidate: true,
-                          })
-                        }
-                      >
-                        <Text
-                          style={[
-                            styles.unitText,
-                            value === unit && styles.unitTextActive,
-                          ]}
-                        >
-                          {unit}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              />
+          <ScrollView
+            contentContainerStyle={styles.optionsScrollContainer}
+            showsVerticalScrollIndicator={false}
+            style={styles.optionsScrollView}
+          >
+            <View style={styles.optionsContainer}>
+              {GENDER_OPTIONS.map((option, index) => {
+                const isSelected = selectedGender === option;
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.option,
+                      isSelected && styles.optionSelected,
+                    ]}
+                    activeOpacity={0.8}
+                    onPress={() => setSelectedGender(option)}
+                  >
+                    <Text
+                      style={[
+                        styles.optionText,
+                        isSelected && styles.optionTextSelected,
+                      ]}
+                    >
+                      {option}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-          </View>
+          </ScrollView>
         </View>
 
         <View style={styles.buttonContainer}>
           <Button
             title={STRINGS.PROFILE_SETUP.COMMON.CONTINUE}
-            onPress={handleSubmit(onSubmit)}
+            onPress={onSubmit}
             variant="primary"
-            disabled={!isValid}
+            disabled={!selectedGender}
             style={styles.button}
           />
         </View>
       </SafeAreaView>
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 

@@ -2,6 +2,9 @@
 // All user-facing strings should be defined here to avoid hardcoding
 
 export const STRINGS = {
+  GENERAL: {
+    ERROR_TRY_AGAIN: 'Something went wrong. Please try again.',
+  },
   // Email Login Screen
   EMAIL_LOGIN: {
     TITLE: 'Enter your email',
@@ -101,13 +104,16 @@ export const STRINGS = {
         'Used to show age on your profile and improve match relevance.',
       ERROR_MIN_AGE: 'You must be at least 18 years old',
     },
-    WEIGHT: {
-      TITLE: 'Let us know\nyour weight',
+    GENDER: {
+      TITLE: 'What best describes you?',
       SUBTITLE:
-        'Used only for match insights and never shown on your profile.',
-      PLACEHOLDER: 'Enter your weight',
-      UNIT_KG: 'kg',
-      UNIT_LBS: 'lbs',
+        'This helps us personalize your experience. You can change it anytime.',
+      OPTIONS: {
+        MAN: 'Man',
+        WOMAN: 'Woman',
+        NON_BINARY: 'Non-binary',
+        PREFER_NOT_TO_SAY: 'Prefer not to say',
+      },
     },
     HEIGHT: {
       TITLE: 'How tall are you?',
@@ -168,10 +174,25 @@ export const STRINGS = {
       PERMISSION_TITLE: '"Aira" Would Like to Access Your Camera',
       PERMISSION_DESCRIPTION: 'Aira uses your camera to verify your identity and ensure account security. Your selfie is only used for verification and is never shared.',
     },
+    VIDEO_VERIFICATION: {
+      TITLE: 'Quick video\nverification',
+      DESCRIPTION: 'Your video is used only for verification and isn\'t shown on your profile.',
+      BULLET_1: 'Your verification video is securely stored',
+      BULLET_2: "It's never shared with other users",
+      BULLET_3: 'You can re-verify anytime from settings',
+      BUTTON: 'Start Verification',
+      PERMISSION_TITLE: '"Aira" Would Like to Access Your Camera',
+      PERMISSION_DESCRIPTION: 'Aira uses your camera to verify your identity with a short video. Your video is only used for verification and is never shared.',
+    },
     SELFIE_CAMERA: {
       TITLE: 'Selfie verification',
-      SUBTITLE: 'Place your face in the frame',
+      SUBTITLE: 'Keep your face within the frame',
       BUTTON: 'Take Photo',
+      VERIFYING_TITLE: 'Verifying your selfie',
+      VERIFYING_SUBTITLE: 'Please wait while we verify your identity',
+      VERIFIED_TITLE: "You're verified",
+      VERIFIED_SUBTITLE: 'Your identity has been successfully verified.',
+      CONTINUE: 'Continue',
     },
   },
   ONBOARDING_QUESTIONS: {

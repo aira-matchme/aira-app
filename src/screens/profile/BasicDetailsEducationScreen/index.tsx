@@ -34,13 +34,12 @@ const EDUCATION_OPTIONS = [
   { key: 'phd_dr', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.PHD },
   { key: 'masters_or_equivalent', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.MASTER },
   { key: 'degree_or_equivalent', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.A_LEVEL },
-  { key: 'a_level_or_equivalent', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.A_LEVEL },
   { key: 'gcse_or_equivalent', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.GCSE },
   { key: 'other', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.OTHER },
 ];
 
 const educationSchema = z.object({
-  education: z.string().min(1),
+  education: z.string().min(1, 'Please select an option'),
 });
 
 type EducationFormData = z.infer<typeof educationSchema>;
@@ -91,10 +90,7 @@ export const BasicDetailsEducationScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.title}>
               {STRINGS.PROFILE_SETUP.EDUCATION.TITLE}
@@ -104,43 +100,49 @@ export const BasicDetailsEducationScreen: React.FC = () => {
             </Text>
           </View>
 
-          <Controller
-            control={control}
-            name="education"
-            render={({ field: { value } }) => (
-              <View style={styles.optionsContainer}>
-                {EDUCATION_OPTIONS.map(option => {
-                  const selected = value === option.key;
+          <ScrollView
+            contentContainerStyle={styles.optionsScrollContainer}
+            showsVerticalScrollIndicator={false}
+            style={styles.optionsScrollView}
+          >
+            <Controller
+              control={control}
+              name="education"
+              render={({ field: { value } }) => (
+                <View style={styles.optionsContainer}>
+                  {EDUCATION_OPTIONS.map(option => {
+                    const selected = value === option.key;
 
-                  return (
-                    <TouchableOpacity
-                      key={option.key}
-                      style={[
-                        styles.option,
-                        selected && styles.optionSelected,
-                      ]}
-                      activeOpacity={0.8}
-                      onPress={() =>
-                        setValue('education', option.key, {
-                          shouldValidate: true,
-                        })
-                      }
-                    >
-                      <Text
+                    return (
+                      <TouchableOpacity
+                        key={option.key}
                         style={[
-                          styles.optionText,
-                          selected && styles.optionTextSelected,
+                          styles.option,
+                          selected && styles.optionSelected,
                         ]}
+                        activeOpacity={0.8}
+                        onPress={() =>
+                          setValue('education', option.key, {
+                            shouldValidate: true,
+                          })
+                        }
                       >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-          />
-        </ScrollView>
+                        <Text
+                          style={[
+                            styles.optionText,
+                            selected && styles.optionTextSelected,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            />
+          </ScrollView>
+        </View>
 
         <View style={styles.buttonContainer}>
           <Button

@@ -16,10 +16,10 @@ import { styles } from './styles';
 
 type NavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
-  'FaceVerification'
+  'VideoVerification'
 >;
 
-export const FaceVerificationScreen: React.FC = () => {
+export const VideoVerificationScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const [showPermissionSheet, setShowPermissionSheet] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
@@ -29,19 +29,15 @@ export const FaceVerificationScreen: React.FC = () => {
   };
 
   const handleAllow = async () => {
-    // navigation.navigate('OnboardingIntro');
     setIsRequesting(true);
     try {
       const status = await requestCameraPermission();
-      console.log('status', status);
-      
       if (status === 'granted') {
         setShowPermissionSheet(false);
-        navigation.navigate('SelfieCamera');
       } else if (status === 'denied') {
         Alert.alert(
           'Camera Permission Required',
-          'To verify your face, please enable camera access in Settings.',
+          'To verify with video, please enable camera access in Settings.',
           [
             { text: 'Cancel', style: 'cancel', onPress: () => setShowPermissionSheet(false) },
             {
@@ -57,13 +53,9 @@ export const FaceVerificationScreen: React.FC = () => {
           ]
         );
       } else if (status === 'notDetermined') {
-        // On iOS, notDetermined usually means permission wasn't requested yet
-        // But if we're here, it means the permission library isn't available
         Alert.alert(
           'Camera Permission Required',
-          Platform.OS === 'ios' 
-            ? 'Camera permission is required. Please enable it in Settings to continue with face verification.'
-            : 'Camera permission is required. Please enable it in Settings to continue with face verification.',
+          'Camera permission is required. Please enable it in Settings to continue with video verification.',
           [
             { text: 'Cancel', style: 'cancel', onPress: () => setShowPermissionSheet(false) },
             {
@@ -82,7 +74,7 @@ export const FaceVerificationScreen: React.FC = () => {
     } catch (error) {
       console.error('Error requesting camera permission:', error);
       Alert.alert(
-        'Error', 
+        'Error',
         'Failed to request camera permission. Please enable camera access in Settings.',
         [
           { text: 'Cancel', style: 'cancel' },
@@ -106,23 +98,15 @@ export const FaceVerificationScreen: React.FC = () => {
   const handleDontAllow = () => {
     Alert.alert(
       'Camera Permission Required',
-      'Face verification requires camera access. Please enable it to continue.',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Keep the sheet open - user must grant permission
-          },
-        },
-      ]
+      'Video verification requires camera access. Please enable it to continue.',
+      [{ text: 'OK' }]
     );
   };
 
   const handleCloseSheet = () => {
-    // Prevent closing without granting permission
     Alert.alert(
       'Permission Required',
-      'Camera permission is required for face verification. Please grant access to continue.',
+      'Camera permission is required for video verification. Please grant access to continue.',
       [{ text: 'OK' }]
     );
   };
@@ -145,8 +129,11 @@ export const FaceVerificationScreen: React.FC = () => {
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
-       
-
+        <View style={styles.headerContainer}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <BackArrowIcon size={48} backgroundColor="rgba(119, 66, 240, 0.2)" strokeColor="#7742F0" />
+          </TouchableOpacity>
+        </View>
         <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
@@ -159,29 +146,29 @@ export const FaceVerificationScreen: React.FC = () => {
 
           <View style={styles.textContainer}>
             <Text style={styles.title}>
-              {STRINGS.PROFILE_SETUP.FACE_VERIFICATION.TITLE}
+              {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.TITLE}
             </Text>
             <Text style={styles.description}>
-              {STRINGS.PROFILE_SETUP.FACE_VERIFICATION.DESCRIPTION}
+              {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.DESCRIPTION}
             </Text>
 
             <View style={styles.bulletPointsContainer}>
               <View style={styles.bulletPoint}>
                 <Text style={styles.bulletDot}>•</Text>
                 <Text style={styles.bulletText}>
-                  {STRINGS.PROFILE_SETUP.FACE_VERIFICATION.BULLET_1}
+                  {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.BULLET_1}
                 </Text>
               </View>
               <View style={styles.bulletPoint}>
                 <Text style={styles.bulletDot}>•</Text>
                 <Text style={styles.bulletText}>
-                  {STRINGS.PROFILE_SETUP.FACE_VERIFICATION.BULLET_2}
+                  {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.BULLET_2}
                 </Text>
               </View>
               <View style={styles.bulletPoint}>
                 <Text style={styles.bulletDot}>•</Text>
                 <Text style={styles.bulletText}>
-                  {STRINGS.PROFILE_SETUP.FACE_VERIFICATION.BULLET_3}
+                  {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.BULLET_3}
                 </Text>
               </View>
             </View>
@@ -190,7 +177,7 @@ export const FaceVerificationScreen: React.FC = () => {
 
         <View style={styles.buttonContainer}>
           <Button
-            title={STRINGS.PROFILE_SETUP.FACE_VERIFICATION.BUTTON}
+            title={STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.BUTTON}
             onPress={handleStartVerification}
             variant="primary"
             disabled={isRequesting}
@@ -212,11 +199,10 @@ export const FaceVerificationScreen: React.FC = () => {
       >
         <View style={styles.permissionSheetContent}>
           <Text style={styles.permissionTitle}>
-            {STRINGS.PROFILE_SETUP.FACE_VERIFICATION.PERMISSION_TITLE}
+            {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.PERMISSION_TITLE}
           </Text>
-          
           <Text style={styles.permissionDescription}>
-            {STRINGS.PROFILE_SETUP.FACE_VERIFICATION.PERMISSION_DESCRIPTION}
+            {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.PERMISSION_DESCRIPTION}
           </Text>
 
           <View style={styles.permissionButtons}>
@@ -253,4 +239,3 @@ export const FaceVerificationScreen: React.FC = () => {
     </View>
   );
 };
-

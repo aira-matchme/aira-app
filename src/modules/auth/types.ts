@@ -75,6 +75,47 @@ export interface UserProfileResponse {
     provider?: string;
     profilePicture?: string;
     phoneNumber?: string;
+    isProfileComplete?: boolean;
   };
 }
 
+export interface SelfieResponseProfilePhoto {
+  key: {
+    original: string;
+    medium: string;
+    thumb: string;
+  };
+  url: {
+    original: string;
+    medium: string;
+    thumb: string;
+  };
+}
+
+export interface SelfieResponseFaceAttributes {
+  success: boolean;
+  status_code: number;
+  skintone?: { value: string; confidence: number };
+  face_shape?: { value: string; confidence: number };
+  eyes_color?: { value: string; confidence: number };
+  eyes_shape?: { value: string; confidence: number };
+  eye_size?: { value: string; confidence: number };
+  eyebrow_shape?: { value: string; confidence: number };
+  eyebrow_thickness?: { value: string; confidence: number };
+  lip_shape?: { value: string; confidence: number };
+  nose_shape?: { value: string; confidence: number };
+  nose_size?: { value: string; confidence: number };
+  cheekbones?: { value: string; confidence: number };
+  hair_color?: { value: string; confidence: number };
+  hair_type?: { value: string; confidence: number };
+  face_bbox?: { x: number; y: number; width: number; height: number };
+}
+
+export interface SelfieResponse {
+  statusCode: number;
+  message: string;
+  data: {
+    profilePhoto: SelfieResponseProfilePhoto;
+    faceAttributes: SelfieResponseFaceAttributes;
+  };
+}

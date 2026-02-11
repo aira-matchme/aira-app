@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StatusBar, Image } from 'react-native';
+import { View, Text, StatusBar, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,6 +9,7 @@ import type { AuthStackParamList } from '../../../navigation/types';
 import {
   navigateToFirstQuestion,
   navigateToResumeQuestion,
+  useOnboardingQuestions,
 } from '../../../modules/onboarding/questionManager';
 import { LinearGradient } from 'react-native-linear-gradient';
 import { useOnboardingStore } from '../../../store/onboarding.store';
@@ -22,20 +23,25 @@ type OnboardingIntroNavigationProp = NativeStackNavigationProp<AuthStackParamLis
 export const OnboardingIntroScreen: React.FC = () => {
   const navigation = useNavigation<OnboardingIntroNavigationProp>();
   const { isOnboardingInProgress } = useOnboardingStore();
+  const { questions, isLoading, isError } = useOnboardingQuestions();
 
   const handleBegin = () => {
+    if (isLoading || isError) {
+      return;
+    }
+
     // Navigate to first question (or resume if in progress)
     if (isOnboardingInProgress) {
-      navigateToResumeQuestion(navigation);
+      navigateToResumeQuestion(navigation, questions);
     } else {
-      navigateToFirstQuestion(navigation);
+      navigateToFirstQuestion(navigation, questions);
     }
   };
 
   return (
     <View style={styles.wrapper}>
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-      <SafeAreaView style={styles.safeArea}>
+      {/* <SafeAreaView style={styles.safeArea}> */}
         <View style={styles.container}>
           {/* Image Section - 60% */}
           <View style={styles.imageSection}>
@@ -79,14 +85,22 @@ export const OnboardingIntroScreen: React.FC = () => {
               </View>
             </View>
 
-            {/* Button */}
+            {/* Loading / Error state */}
             <View style={styles.buttonContainer}>
-              <Button
-                title={STRINGS.ONBOARDING_INTRO.PRIMARY_CTA}
-                onPress={handleBegin}
-                variant="primary"
-                style={styles.button}
-              />
+              {isLoading ? (
+                <ActivityIndicator />
+              ) : isError ? (
+                <Text style={styles.description}>
+                  {STRINGS.GENERAL.ERROR_TRY_AGAIN ?? 'Something went wrong. Please try again.'}
+                </Text>
+              ) : (
+                <Button
+                  title={STRINGS.ONBOARDING_INTRO.PRIMARY_CTA}
+                  onPress={handleBegin}
+                  variant="primary"
+                  style={styles.button}
+                />
+              )}
             </View>
 
             {/* Privacy Note */}
@@ -95,7 +109,7 @@ export const OnboardingIntroScreen: React.FC = () => {
             </Text>
           </View>
         </View>
-      </SafeAreaView>
+      {/* </SafeAreaView> */}
     </View>
   );
 };

@@ -39,7 +39,7 @@ const EMPLOYMENT_OPTIONS = [
 ];
 
 const employmentSchema = z.object({
-  employment: z.string().min(1),
+  employment: z.string().min(1, 'Please select an option'),
 });
 
 type EmploymentFormData = z.infer<typeof employmentSchema>;
@@ -90,10 +90,7 @@ export const BasicDetailsEmploymentScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.title}>
               {STRINGS.PROFILE_SETUP.EMPLOYMENT.TITLE}
@@ -103,43 +100,49 @@ export const BasicDetailsEmploymentScreen: React.FC = () => {
             </Text>
           </View>
 
-          <Controller
-            control={control}
-            name="employment"
-            render={({ field: { value } }) => (
-              <View style={styles.optionsContainer}>
-                {EMPLOYMENT_OPTIONS.map(option => {
-                  const selected = value === option.key;
+          <ScrollView
+            contentContainerStyle={styles.optionsScrollContainer}
+            showsVerticalScrollIndicator={false}
+            style={styles.optionsScrollView}
+          >
+            <Controller
+              control={control}
+              name="employment"
+              render={({ field: { value } }) => (
+                <View style={styles.optionsContainer}>
+                  {EMPLOYMENT_OPTIONS.map(option => {
+                    const selected = value === option.key;
 
-                  return (
-                    <TouchableOpacity
-                      key={option.key}
-                      style={[
-                        styles.option,
-                        selected && styles.optionSelected,
-                      ]}
-                      activeOpacity={0.8}
-                      onPress={() =>
-                        setValue('employment', option.key, {
-                          shouldValidate: true,
-                        })
-                      }
-                    >
-                      <Text
+                    return (
+                      <TouchableOpacity
+                        key={option.key}
                         style={[
-                          styles.optionText,
-                          selected && styles.optionTextSelected,
+                          styles.option,
+                          selected && styles.optionSelected,
                         ]}
+                        activeOpacity={0.8}
+                        onPress={() =>
+                          setValue('employment', option.key, {
+                            shouldValidate: true,
+                          })
+                        }
                       >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-          />
-        </ScrollView>
+                        <Text
+                          style={[
+                            styles.optionText,
+                            selected && styles.optionTextSelected,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            />
+          </ScrollView>
+        </View>
 
         <View style={styles.buttonContainer}>
           <Button

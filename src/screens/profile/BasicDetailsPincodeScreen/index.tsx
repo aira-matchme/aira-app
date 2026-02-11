@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -50,10 +51,12 @@ type PincodeFormData = z.infer<typeof pincodeSchema>;
 
 export const BasicDetailsPincodeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const [isLoading, setIsLoading] = useState(false);
   const {
     setCurrentStep,
     name,
     dateOfBirth,
+    gender,
     height,
     education,
     employment,
@@ -71,18 +74,40 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
     defaultValues: { pincode: '' },
   });
 
+  // Prevent back navigation while loading
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (isLoading) {
+          return true; // Prevent back navigation
+        }
+        return false; // Allow back navigation
+      };
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [isLoading]),
+  );
+
   const onSubmit = async (data: PincodeFormData) => {
+    setIsLoading(true);
     try {
       // Normalize postcode: uppercase, remove extra spaces
       const rawPostcode = data.pincode.trim().toUpperCase();
       const normalizedPostcode = rawPostcode.replace(/\s+/g, '');
 
-      const response = await fetch(
+      const postcodeResponse = await fetch(
         `https://api.postcodes.io/postcodes/${encodeURIComponent(normalizedPostcode)}`,
       );
-      const json = await response.json();
+      const json = await postcodeResponse.json();
 
+      // Only proceed if postcode API is successful (status 200)
       if (json.status !== 200 || !json.result) {
+        setIsLoading(false);
         Alert.alert('Invalid postcode', 'Please enter a valid UK postcode.');
         return;
       }
@@ -104,7 +129,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
       const payload: Record<string, any> = {
         nickName: name ?? '',
         dob: formatDob(),
-        gender: '', // TODO: wire up when gender step is added
+        gender: gender ?? '',
         height: height?.value != null ? String(height.value) : undefined,
         heightUnit: height?.unit ?? undefined,
         education: education ?? '',
@@ -116,16 +141,36 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
       };
 
       console.log('📤 Submitting profile to /edit/profile with payload:', payload);
-      await apiClient.patch(endpoints.user.editProfile, payload);
+      const profileResponse = await apiClient.patch(endpoints.user.editProfile, payload);
 
-      setCurrentStep(CURRENT_STEP + 1);
-      navigation.navigate('FaceVerification');
-    } catch (error) {
-      console.error('❌ Error looking up postcode:', error);
-      Alert.alert(
-        'Network error',
-        'Unable to verify postcode right now. Please check your connection and try again.',
-      );
+      // Check if the API response is successful
+      if (profileResponse.data?.statusCode === 200) {
+        console.log('✅ Profile updated successfully:', profileResponse.data);
+        
+        // Check if profile is complete
+        const isProfileComplete = profileResponse.data?.data?.isProfileComplete;
+        console.log('📋 Profile completion status:', isProfileComplete);
+
+        setIsLoading(false);
+        setCurrentStep(CURRENT_STEP + 1);
+        navigation.navigate('FaceVerification');
+      } else {
+        // Handle API error response
+        setIsLoading(false);
+        const errorMessage = profileResponse.data?.message || 'Failed to update profile. Please try again.';
+        Alert.alert('Error', errorMessage);
+      }
+    } catch (error: any) {
+      console.error('❌ Error:', error);
+      setIsLoading(false);
+      
+      // Handle different error types
+      const errorMessage = 
+        error.response?.data?.message || 
+        error.message || 
+        'Unable to verify postcode right now. Please check your connection and try again.';
+      
+      Alert.alert('Network error', errorMessage);
     }
   };
 
@@ -151,7 +196,11 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
 
       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
         <View style={{ paddingTop: 16, paddingHorizontal: 20 }}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            disabled={isLoading}
+            style={{ opacity: isLoading ? 0.5 : 1 }}
+          >
             <BackArrowIcon size={48} />
           </TouchableOpacity>
         </View>
@@ -193,7 +242,8 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
             title={STRINGS.PROFILE_SETUP.COMMON.CONTINUE || "Next"}
             onPress={handleSubmit(onSubmit)}
             variant="primary"
-            disabled={!isValid}
+            disabled={!isValid || isLoading}
+            loading={isLoading}
             style={styles.button}
           />
         </View>

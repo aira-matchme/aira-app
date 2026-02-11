@@ -18,12 +18,18 @@ export const styles = StyleSheet.create({
     // borderRadius: 300,
   },
   content: {
+    flex: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm * 2,
-    paddingBottom: spacing.xl,
   },
   header: {
     marginBottom: spacing.sm * 2,
+  },
+  optionsScrollView: {
+    flex: 1,
+  },
+  optionsScrollContainer: {
+    paddingBottom: spacing.xl,
   },
   title: {
     fontSize: 36,
