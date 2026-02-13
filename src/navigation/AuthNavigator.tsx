@@ -45,12 +45,14 @@ const profileScreenOptions = {
 export const AuthNavigator = () => {
   const { isAuthenticated, user } = useAuthStore();
 
-  // Decide initial route based on auth state and profile completion
+  // When profile has profilePhoto, go to VideoVerification; else normal flow
   const initialRouteName: keyof AuthStackParamList = !isAuthenticated
     ? 'Welcome'
-    : user?.isProfileComplete
-    ? 'FaceVerification'
-    : 'ProfileIntro';
+    : !user?.isProfileComplete
+    ? 'ProfileIntro'
+    : user?.profilePhoto
+    ? 'VideoVerification'
+    : 'FaceVerification';
 
   // Set initial route based on auth state, but SplashScreen/AuthProvider will override with navigation
   return (

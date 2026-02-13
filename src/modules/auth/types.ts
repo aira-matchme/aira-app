@@ -76,6 +76,8 @@ export interface UserProfileResponse {
     profilePicture?: string;
     phoneNumber?: string;
     isProfileComplete?: boolean;
+    profilePhoto?: SelfieResponseProfilePhoto & { id?: string };
+    livenessCheck?: boolean;
   };
 }
 
@@ -118,4 +120,14 @@ export interface SelfieResponse {
     profilePhoto: SelfieResponseProfilePhoto;
     faceAttributes: SelfieResponseFaceAttributes;
   };
+}
+
+export interface LivenessRequest {
+  livenessCheck: boolean;
+}
+
+export interface LivenessResponse {
+  statusCode: number;
+  message: string;
+  data?: Record<string, unknown>;
 }

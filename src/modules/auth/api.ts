@@ -9,6 +9,8 @@ import {
   SocialLoginRequest,
   UserProfileResponse,
   SelfieResponse,
+  LivenessRequest,
+  LivenessResponse,
 } from './types';
 
 export const loginApi = async (
@@ -101,4 +103,14 @@ export const uploadSelfieApi = async (
     console.error('uploadSelfieApi error:', error);
     throw error;
   }
+};
+
+export const submitLivenessApi = async (
+  payload: LivenessRequest
+): Promise<LivenessResponse> => {
+  const { data } = await apiClient.post<LivenessResponse>(
+    endpoints.auth.liveness,
+    payload
+  );
+  return data;
 };

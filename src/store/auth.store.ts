@@ -10,6 +10,8 @@ export interface User {
   profilePicture?: string;
   phoneNumber?: string;
   isProfileComplete?: boolean;
+  profilePhoto?: { key?: unknown; url?: unknown; id?: string };
+  livenessCheck?: boolean;
 }
 
 interface AuthState {

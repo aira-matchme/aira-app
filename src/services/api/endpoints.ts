@@ -8,6 +8,7 @@ export const endpoints = {
     verifyOtp: '/auth/verify-otp',
     resendOtp: '/auth/resend-otp',
     socialLogin: '/auth/social-login',
+    liveness: '/auth/liveness-check',
   },
   user: {
     profile: '/auth/profile',
