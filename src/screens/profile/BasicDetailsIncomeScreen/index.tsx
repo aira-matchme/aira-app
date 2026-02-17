@@ -17,6 +17,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { Button } from '../../../components/Button';
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { STRINGS } from '../../../constants/strings';
+import { INCOME_OPTIONS } from '../../../constants/profile';
 import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './styles';
@@ -28,15 +29,6 @@ type NavigationProp = NativeStackNavigationProp<
 
 const TOTAL_STEPS = 9;
 const CURRENT_STEP = 7;
-
-// Keys are backend values
-const INCOME_OPTIONS = [
-  { key: 'eur_20k_30k', label: STRINGS.PROFILE_SETUP.FINAL.OPTIONS.BETWEEN_20000_AND_30000 },
-  { key: 'eur_30k_40k', label: STRINGS.PROFILE_SETUP.FINAL.OPTIONS.BETWEEN_30000_AND_40000 },
-  { key: 'eur_40k_50k', label: STRINGS.PROFILE_SETUP.FINAL.OPTIONS.BETWEEN_40000_AND_50000 },
-  { key: 'eur_50k_plus', label: STRINGS.PROFILE_SETUP.FINAL.OPTIONS.OVER_50000 },
-  { key: 'prefer_not_to_say', label: STRINGS.PROFILE_SETUP.EMPLOYMENT.OPTIONS.PREFER_NOT_TO_SAY },
-];
 
 const incomeSchema = z.object({
   income: z.string().min(1, 'Please select an option'),

@@ -15,6 +15,8 @@ import type { RootStackParamList, AuthStackParamList } from '../../../navigation
 import { useVerifyOtp, useSendOtp, useResendOtp } from '../../../modules/auth/hooks';
 import { getProfileApi } from '../../../modules/auth/api';
 import { useAuthStore } from '../../../store/auth.store';
+import { checkNotificationPermission } from '../../../config/permissions';
+import { getPostAuthScreen, type PostAuthUser } from '../../../navigation/getPostAuthScreen';
 import Toast from 'react-native-toast-message';
 import { styles } from './styles';
 
@@ -52,7 +54,7 @@ export const OTPVerificationScreen: React.FC = () => {
   const verifyOtpMutation = useVerifyOtp();
   const sendOtpMutation = useSendOtp();
   const resendOtpMutation = useResendOtp();
-  const { setTokens, setUser } = useAuthStore();
+  const { setTokens, setUser, setShouldShowEnableNotifications } = useAuthStore();
 
   const {
     control,
@@ -139,45 +141,49 @@ export const OTPVerificationScreen: React.FC = () => {
         otp: data.otp,
       });
 
-      let screenToOpen: 'FaceVerification' | 'ProfileIntro' = 'ProfileIntro';
-
       if (response.data?.accessToken && response.data?.refreshToken) {
         await setTokens(response.data.accessToken, response.data.refreshToken);
-        // Fetch profile to get isProfileComplete for correct redirection
+        let userData = response.data?.user;
         try {
           const profileResponse = await getProfileApi();
           if (profileResponse?.data) {
-            setUser(profileResponse.data);
-            screenToOpen = profileResponse.data.isProfileComplete
-              ? 'FaceVerification'
-              : 'ProfileIntro';
+            userData = profileResponse.data;
+            setUser(userData);
           } else if (response.data?.user) {
-            setUser(response.data.user);
+            userData = response.data.user;
+            setUser(userData);
           }
         } catch (profileError) {
           console.warn('Profile fetch after verify failed, using verify response user', profileError);
           if (response.data?.user) {
-            setUser(response.data.user);
+            userData = response.data.user;
+            setUser(userData);
           }
         }
-      }
 
-      setIsVerified(true);
+        let shouldShowNotifications = false;
+        try {
+          const notificationStatus = await checkNotificationPermission();
+          shouldShowNotifications = notificationStatus !== 'granted';
+          if (shouldShowNotifications) setShouldShowEnableNotifications(true);
+        } catch {
+          shouldShowNotifications = true;
+          setShouldShowEnableNotifications(true);
+        }
+        const screen = getPostAuthScreen((userData ?? null) as PostAuthUser | null, shouldShowNotifications);
 
-      setTimeout(() => {
-        setIsBottomSheetOpen(false);
+        setIsVerified(true);
+
         setTimeout(() => {
-          navigation.reset({
-            index: 0,
-            routes: [
-              {
-                name: 'AuthStack',
-                params: { screen: screenToOpen },
-              },
-            ],
-          });
-        }, 350);
-      }, 1000);
+          setIsBottomSheetOpen(false);
+          setTimeout(() => {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'AuthStack', params: { screen } }],
+            });
+          }, 350);
+        }, 1000);
+      }
     } catch (error: any) {
       console.error('Error verifying OTP:', error);
       const errorMessage =

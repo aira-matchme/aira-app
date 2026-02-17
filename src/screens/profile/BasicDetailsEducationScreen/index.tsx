@@ -17,6 +17,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { Button } from '../../../components/Button';
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { STRINGS } from '../../../constants/strings';
+import { EDUCATION_OPTIONS } from '../../../constants/profile';
 import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './styles';
@@ -28,15 +29,6 @@ type NavigationProp = NativeStackNavigationProp<
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 5;
-
-// Keys are backend values
-const EDUCATION_OPTIONS = [
-  { key: 'phd_dr', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.PHD },
-  { key: 'masters_or_equivalent', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.MASTER },
-  { key: 'degree_or_equivalent', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.A_LEVEL },
-  { key: 'gcse_or_equivalent', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.GCSE },
-  { key: 'other', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.OTHER },
-];
 
 const educationSchema = z.object({
   education: z.string().min(1, 'Please select an option'),

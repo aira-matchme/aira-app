@@ -114,3 +114,35 @@ export const submitLivenessApi = async (
   );
   return data;
 };
+
+export interface UploadProfilePhotoResponse {
+  statusCode: number;
+  message: string;
+  data?: { imageUrl?: string; order?: number };
+}
+
+/** Upload a profile/reference image with order (1-based: 1st slot = 1, 6th slot = 6) */
+export const uploadProfilePhotoApi = async (
+  photoUri: string,
+  order: number
+): Promise<UploadProfilePhotoResponse> => {
+  const formData = new FormData();
+  formData.append('file', {
+    uri: photoUri.startsWith('file://') ? photoUri : `file://${photoUri}`,
+    type: 'image/jpeg',
+    name: `profile_photo_${order}_${Date.now()}.jpg`,
+  } as any);
+  formData.append('order', String(order));
+
+  const { data } = await apiClient.post<UploadProfilePhotoResponse>(
+    endpoints.user.uploadPhotos,
+    formData,
+    {
+      timeout: 60000,
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
+  return data;
+};

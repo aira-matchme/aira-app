@@ -9,6 +9,7 @@ import { ReusableBottomSheet } from '../../../components/BottomSheet';
 import { Button } from '../../../components/Button';
 import { STRINGS } from '../../../constants/strings';
 import { requestNotificationPermission } from '../../../config/permissions';
+import { useAuthStore } from '../../../store/auth.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import Mockup from '../../../assets/icons/common/Mockup';
 import { styles } from './styles';
@@ -17,6 +18,7 @@ type EnableNotificationsNavigationProp = NativeStackNavigationProp<AuthStackPara
 
 export const EnableNotificationsScreen = () => {
   const navigation = useNavigation<EnableNotificationsNavigationProp>();
+  const setShouldShowEnableNotifications = useAuthStore((s) => s.setShouldShowEnableNotifications);
   const [isRequesting, setIsRequesting] = useState(false);
   const [showPermissionSheet, setShowPermissionSheet] = useState(false);
 
@@ -33,8 +35,9 @@ export const EnableNotificationsScreen = () => {
       console.log('Notification permission status:', status);
       
       if (status === 'granted') {
-        console.log('Navigating to EnableLocation');
-        navigation.navigate('EnableLocation');
+        console.log('Navigating to ProfileIntro');
+        setShouldShowEnableNotifications(false);
+        navigation.navigate('ProfileIntro');
       } else if (status === 'denied') {
         Alert.alert(
           'Permission Denied',
@@ -65,12 +68,14 @@ export const EnableNotificationsScreen = () => {
   const handleDontAllow = () => {
     console.log('Don\'t Allow button pressed');
     setShowPermissionSheet(false);
-    navigation.navigate('EnableLocation');
+    setShouldShowEnableNotifications(false);
+    navigation.navigate('ProfileIntro');
   };
 
   const handleMayBeLater = () => {
     console.log('Maybe Later button pressed');
-    navigation.navigate('EnableLocation');
+    setShouldShowEnableNotifications(false);
+    navigation.navigate('ProfileIntro');
   };
 
   const handleCloseSheet = () => {

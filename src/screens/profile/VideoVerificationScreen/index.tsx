@@ -12,24 +12,27 @@ import {
   NativeModules,
   DeviceEventEmitter,
   requireNativeComponent,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import LinearGradient from 'react-native-linear-gradient';
 
 import { Button } from '../../../components/Button';
-import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import FrameIcon from '../../../assets/icons/common/FrameIcon';
 import { ReusableBottomSheet } from '../../../components/BottomSheet';
 import { STRINGS } from '../../../constants/strings';
 import { requestCameraPermission } from '../../../config/permissions';
 import { submitLivenessApi } from '../../../modules/auth/api';
 import type { AuthStackParamList } from '../../../navigation/types';
+import { colors } from '../../../theme';
 import { styles } from './styles';
+import { useAuthStore } from '../../../store/auth.store';
 
 const { FaceDetection } = NativeModules;
 
-const cameraStyles = StyleSheet.create({ root: { flex: 1, backgroundColor: '#000' }, backButton: { position: 'absolute', top: 50, left: 16, zIndex: 10, }, header: { position: 'absolute', top: 120, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14, }, title: { color: '#fff', fontSize: 16, fontWeight: '600', }, progressContainer: { position: 'absolute', bottom: 110, flexDirection: 'row', alignSelf: 'center', }, progressDot: { width: 18, height: 6, borderRadius: 4, backgroundColor: '#555', marginHorizontal: 6, }, progressDone: { backgroundColor: '#34C759' }, successOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', }, successText: { color: '#34C759', fontSize: 22, fontWeight: '700', }, errorText: { color: '#E50000', fontSize: 16, }, });
+const cameraStyles = StyleSheet.create({ root: { flex: 1, backgroundColor: '#000' }, header: { position: 'absolute', top: 120, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14, }, title: { color: '#fff', fontSize: 16, fontWeight: '600', }, progressContainer: { position: 'absolute', bottom: 110, flexDirection: 'row', alignSelf: 'center', }, progressDot: { width: 18, height: 6, borderRadius: 4, backgroundColor: '#555', marginHorizontal: 6, }, progressDone: { backgroundColor: '#34C759' }, successOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', }, successText: { color: '#34C759', fontSize: 22, fontWeight: '700', }, errorText: { color: '#E50000', fontSize: 16, }, });
 
 let FaceDetectionView: any = null;
 
@@ -87,7 +90,10 @@ export const VideoVerificationScreen: React.FC = () => {
 
     const sub = DeviceEventEmitter.addListener(
       'LIVENESS_STEP',
-      (e) => setLivenessStep(e.step),
+      (e: { step?: string }) => {
+        const step = (e?.step ?? '').toUpperCase();
+        if (step) setLivenessStep(step as LivenessStep);
+      },
     );
 
     FaceDetection?.startCamera();
@@ -99,12 +105,12 @@ export const VideoVerificationScreen: React.FC = () => {
   }, [showCamera]);
 
   /* ------------------------------------------------------------------ */
-  /* ---------------- API SUBMIT AFTER VERIFIED ----------------------- */
+  /* ---------------- LIVENESS API (iOS + Android) --------------------- */
+  /* Both platforms: when native emits VERIFIED, we call liveness-check API */
   /* ------------------------------------------------------------------ */
 
   useEffect(() => {
-    if (livenessStep !== 'VERIFIED' || livenessSubmittedRef.current)
-      return;
+    if (livenessStep !== 'VERIFIED' || livenessSubmittedRef.current) return;
 
     livenessSubmittedRef.current = true;
     setLivenessSubmitting(true);
@@ -114,6 +120,7 @@ export const VideoVerificationScreen: React.FC = () => {
       .then(() => {
         setLivenessSubmitting(false);
         setShowCamera(false);
+        navigation.navigate('ProfilePhotos');
       })
       .catch((err) => {
         setLivenessSubmitting(false);
@@ -134,15 +141,79 @@ export const VideoVerificationScreen: React.FC = () => {
         setShowPermissionSheet(false);
         setShowCamera(true);
         StatusBar.setHidden(true);
-      } else {
+      } else if (status === 'denied') {
         Alert.alert(
           'Camera Permission Required',
-          'Please enable camera access in Settings.',
+          'To verify your identity, please enable camera access in Settings.',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: () => setShowPermissionSheet(false),
+            },
+            {
+              text: 'Open Settings',
+              onPress: () => {
+                if (Platform.OS === 'ios') Linking.openURL('app-settings:');
+                else Linking.openSettings();
+              },
+            },
+          ],
+        );
+      } else if (status === 'notDetermined') {
+        Alert.alert(
+          'Camera Permission Required',
+          'Camera permission is required. Please enable it in Settings to continue with video verification.',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: () => setShowPermissionSheet(false),
+            },
+            {
+              text: 'Open Settings',
+              onPress: () => {
+                if (Platform.OS === 'ios') Linking.openURL('app-settings:');
+                else Linking.openSettings();
+              },
+            },
+          ],
         );
       }
+    } catch {
+      Alert.alert(
+        'Error',
+        'Failed to request camera permission. Please enable camera access in Settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Open Settings',
+            onPress: () => {
+              if (Platform.OS === 'ios') Linking.openURL('app-settings:');
+              else Linking.openSettings();
+            },
+          },
+        ],
+      );
     } finally {
       setIsRequesting(false);
     }
+  };
+
+  const handleDontAllow = () => {
+    Alert.alert(
+      'Camera Permission Required',
+      'Video verification requires camera access. Please enable it to continue.',
+      [{ text: 'OK' }],
+    );
+  };
+
+  const handleCloseSheet = () => {
+    Alert.alert(
+      'Permission Required',
+      'Camera permission is required for video verification. Please grant access to continue.',
+      [{ text: 'OK' }],
+    );
   };
 
   /* ------------------------------------------------------------------ */
@@ -158,9 +229,10 @@ export const VideoVerificationScreen: React.FC = () => {
         {Platform.OS === 'ios' && (
           <FaceDetectionView
             style={StyleSheet.absoluteFill}
-            onLivenessStep={(event: any) =>
-              setLivenessStep(event.nativeEvent.step)
-            }
+            onLivenessStep={(event: { nativeEvent: { step?: string } }) => {
+              const step = (event?.nativeEvent?.step ?? '').toUpperCase();
+              if (step) setLivenessStep(step as LivenessStep);
+            }}
           />
         )}
 
@@ -202,20 +274,6 @@ export const VideoVerificationScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Back */}
-        <TouchableOpacity
-          onPress={() => {
-            setShowCamera(false);
-            StatusBar.setHidden(false);
-          }}
-          style={cameraStyles.backButton}
-        >
-          <BackArrowIcon
-            size={48}
-            backgroundColor="rgba(0,0,0,0.4)"
-            strokeColor="#fff"
-          />
-        </TouchableOpacity>
       </View>
     );
   }
@@ -226,41 +284,124 @@ export const VideoVerificationScreen: React.FC = () => {
 
   return (
     <View style={styles.wrapper}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.content}>
-          <FrameIcon size={72} color="#7742F0" />
-          <Text style={styles.title}>
-            {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.TITLE}
-          </Text>
+      <LinearGradient
+        colors={[
+          'rgba(221, 170, 249, 0)',
+          'rgba(221, 170, 249, 0.18)',
+          'rgba(221, 170, 249, 0.18)',
+          'rgba(221, 170, 249, 0)',
+        ]}
+        locations={[0, 0.38, 0.62, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.backgroundGlow}
+      />
+
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.iconContainer}>
+            <View style={styles.iconWrapper}>
+              <FrameIcon size={72} color="#7742F0" />
+            </View>
+          </View>
+
+          <View style={styles.textContainer}>
+            <Text style={styles.title}>
+              {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.TITLE}
+            </Text>
+            <Text style={styles.description}>
+              {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.DESCRIPTION}
+            </Text>
+
+            <View style={styles.bulletPointsContainer}>
+              <View style={styles.bulletPoint}>
+                <Text style={styles.bulletDot}>•</Text>
+                <Text style={styles.bulletText}>
+                  {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.BULLET_1}
+                </Text>
+              </View>
+              <View style={styles.bulletPoint}>
+                <Text style={styles.bulletDot}>•</Text>
+                <Text style={styles.bulletText}>
+                  {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.BULLET_2}
+                </Text>
+              </View>
+              <View style={styles.bulletPoint}>
+                <Text style={styles.bulletDot}>•</Text>
+                <Text style={styles.bulletText}>
+                  {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.BULLET_3}
+                </Text>
+              </View>
+            </View>
+          </View>
         </ScrollView>
 
         <View style={styles.buttonContainer}>
           <Button
             title={STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.BUTTON}
             onPress={() => setShowPermissionSheet(true)}
+            variant="primary"
+            disabled={isRequesting}
             loading={isRequesting}
+            style={styles.button}
           />
         </View>
       </SafeAreaView>
 
       <ReusableBottomSheet
         isOpen={showPermissionSheet}
-        onClose={() => {}}
+        onClose={handleCloseSheet}
         snapPoints={['55%']}
+        showDragHandle={true}
+        showCloseButton={false}
+        enablePanDownToClose={false}
+        backgroundStyle={styles.bottomSheetBackground}
+        scrollEnabled={false}
       >
-        <View style={{ padding: 24 }}>
-          <TouchableOpacity
-            onPress={handleAllow}
-            style={{
-              backgroundColor: '#7742F0',
-              padding: 14,
-              borderRadius: 10,
-            }}
-          >
-            <Text style={{ color: '#fff', textAlign: 'center' }}>
-              Allow
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.permissionSheetContent}>
+          <Text style={styles.permissionTitle}>
+            {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.PERMISSION_TITLE}
+          </Text>
+
+          <Text style={styles.permissionDescription}>
+            {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.PERMISSION_DESCRIPTION}
+          </Text>
+
+          <View style={styles.permissionButtons}>
+            <TouchableOpacity
+              onPress={handleAllow}
+              activeOpacity={0.8}
+              style={styles.allowButtonWrapper}
+              disabled={isRequesting}
+            >
+              <LinearGradient
+                colors={['#C671F4', '#7640F0']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.allowButton}
+              >
+                <View style={styles.allowButtonInner}>
+                  <Text style={styles.allowButtonText}>
+                    {isRequesting ? 'Requesting...' : 'Allow'}
+                  </Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleDontAllow}
+              activeOpacity={0.7}
+              style={styles.dontAllowButton}
+            >
+              <Text style={styles.dontAllowButtonText}>Don't Allow</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ReusableBottomSheet>
     </View>

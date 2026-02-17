@@ -18,6 +18,7 @@ import { Button } from '../../../components/Button';
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
+import { RELIGION_OPTIONS } from '../../../constants/profile';
 import { styles } from './styles';
 
 type NavigationProp = NativeStackNavigationProp<
@@ -27,18 +28,6 @@ type NavigationProp = NativeStackNavigationProp<
 
 const TOTAL_STEPS = 9;
 const CURRENT_STEP = 8;
-
-const RELIGION_OPTIONS = [
-  { key: 'christian', label: 'Christian' },
-  { key: 'judaism', label: 'Judaism' },
-  { key: 'islam', label: 'Islam' },
-  { key: 'hinduism', label: 'Hinduism' },
-  { key: 'buddhism', label: 'Buddhism' },
-  { key: 'sikhism', label: 'Sikhism' },
-  { key: 'agnostic', label: 'Agnostic' },
-  { key: 'other', label: 'Other' },
-  { key: 'none', label: 'No Religion' },
-];
 
 const religionSchema = z.object({
   religion: z.string().min(1),

@@ -111,8 +111,7 @@ export const STRINGS = {
       OPTIONS: {
         MAN: 'Man',
         WOMAN: 'Woman',
-        NON_BINARY: 'Non-binary',
-        PREFER_NOT_TO_SAY: 'Prefer not to say',
+        PREFER_NOT_TO_SAY: 'Other',
       },
     },
     HEIGHT: {
@@ -194,6 +193,24 @@ export const STRINGS = {
       VERIFIED_SUBTITLE: 'Your identity has been successfully verified.',
       CONTINUE: 'Continue',
     },
+    PROFILE_PHOTOS: {
+      TITLE: 'Show different sides of you',
+      BULLET_1: 'First photo will be your profile picture',
+      BULLET_2: 'Min. 2 Required',
+      BULLET_3: 'Tap to edit, drag to reorder',
+      CONTINUE: 'Continue',
+      MATCHES_TIP: 'Profiles with more photos get 5x more matches.',
+      CHOOSE_ACTION_TITLE: 'Choose An Action',
+      CAMERA: 'Camera',
+      GALLERY: 'Gallery',
+      CAMERA_PERMISSION_TITLE: 'AIRA Would Like To Access The Camera',
+      CAMERA_PERMISSION_DESCRIPTION:
+        'AIRA uses the camera to take photos and videos for profile verification. These can be managed in Settings.',
+      PHOTOS_PERMISSION_TITLE: 'AIRA Would Like To Access Your Photos',
+      PHOTOS_PERMISSION_DESCRIPTION:
+        'AIRA uses your photos to let you upload images to your profile. These can be managed in Settings.',
+      ALLOW: 'Allow',
+    },
   },
   ONBOARDING_QUESTIONS: {
     PRIMARY_INTENT: {
@@ -267,6 +284,15 @@ export const STRINGS = {
     TIME_ESTIMATE: 'Time estimate (2–3 minutes)',
     PRIMARY_CTA: "Let's begin",
     PRIVACY_NOTE: 'Your answers stay private and only improve your matches.',
+  },
+  PREFERENCES: {
+    FINE_TUNE_TITLE: 'Fine-tune your matches.',
+    FINE_TUNE_SUBTITLE: 'Make quick changes - you can always adjust more later.',
+    CANCEL: 'Cancel',
+    SAVE: 'Save',
+    AGE_YEARS: (val: number) => `${val} yrs`,
+    HEIGHT_CM: (val: number) => `${val} cm`,
+    DISTANCE_MILES: (val: number) => `${val} miles`,
   },
 } as const;
 

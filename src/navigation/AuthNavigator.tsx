@@ -18,14 +18,17 @@ import { BasicDetailsPincodeScreen } from '../screens/profile/BasicDetailsPincod
 import { FaceVerificationScreen } from '../screens/profile/FaceVerificationScreen';
 import { SelfieCameraScreen } from '../screens/profile/SelfieCameraScreen';
 import { VideoVerificationScreen } from '../screens/profile/VideoVerificationScreen';
+import { ProfilePhotosScreen } from '../screens/profile/ProfilePhotosScreen';
 import { OnboardingIntroScreen } from '../screens/onboarding/OnboardingIntroScreen';
 import { OnboardingRadioQuestionScreen } from '../screens/onboarding/OnboardingRadioQuestionScreen';
 import { OnboardingMultiSelectQuestionScreen } from '../screens/onboarding/OnboardingMultiSelectQuestionScreen';
 import { OnboardingCardQuestionScreen } from '../screens/onboarding/OnboardingCardQuestionScreen';
 import { OnboardingBooleanQuestionScreen } from '../screens/onboarding/OnboardingBooleanQuestionScreen';
 import { OnboardingPhotoQuestionScreen } from '../screens/onboarding/OnboardingPhotoQuestionScreen';
+import { PreferencesMatchScreen } from '../screens/preferences/PreferencesMatchScreen';
 import { AuthStackParamList } from './types';
 import { useAuthStore } from '../store/auth.store';
+import { getPostAuthScreen } from './getPostAuthScreen';
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
@@ -43,16 +46,11 @@ const profileScreenOptions = {
 };
 
 export const AuthNavigator = () => {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, shouldShowEnableNotifications } = useAuthStore();
 
-  // When profile has profilePhoto, go to VideoVerification; else normal flow
   const initialRouteName: keyof AuthStackParamList = !isAuthenticated
     ? 'Welcome'
-    : !user?.isProfileComplete
-    ? 'ProfileIntro'
-    : user?.profilePhoto
-    ? 'VideoVerification'
-    : 'FaceVerification';
+    : getPostAuthScreen(user ?? null, shouldShowEnableNotifications);
 
   // Set initial route based on auth state, but SplashScreen/AuthProvider will override with navigation
   return (
@@ -132,6 +130,11 @@ export const AuthNavigator = () => {
         options={profileScreenOptions}
       />
       <Stack.Screen
+        name="ProfilePhotos"
+        component={ProfilePhotosScreen}
+        options={profileScreenOptions}
+      />
+      <Stack.Screen
         name="OnboardingIntro"
         component={OnboardingIntroScreen}
         options={profileScreenOptions}
@@ -159,6 +162,11 @@ export const AuthNavigator = () => {
       <Stack.Screen
         name="OnboardingPhotoQuestion"
         component={OnboardingPhotoQuestionScreen}
+        options={profileScreenOptions}
+      />
+      <Stack.Screen
+        name="PreferencesMatch"
+        component={PreferencesMatchScreen}
         options={profileScreenOptions}
       />
     </Stack.Navigator>

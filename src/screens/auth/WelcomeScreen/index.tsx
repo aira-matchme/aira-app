@@ -82,11 +82,12 @@ export const WelcomeScreen: React.FC = () => {
           </View>
         </LinearGradient>
       </ImageBackground>
-
-      <LoginOptionsBottomSheet
-        isOpen={showLoginOptions}
-        onClose={handleCloseLoginOptions}
-      />
+{showLoginOptions && (
+  <LoginOptionsBottomSheet
+    isOpen={showLoginOptions}
+    onClose={handleCloseLoginOptions}
+  />
+)}
     </SafeAreaView>
   );
 };

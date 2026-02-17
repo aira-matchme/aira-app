@@ -18,6 +18,7 @@ import { Button } from '../../../components/Button';
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { getDobForMinimumAge } from '../../../utils/date';
 import { STRINGS } from '../../../constants/strings';
+import { DOB_DAYS, DOB_MONTHS, DOB_YEARS } from '../../../constants/profile';
 import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './styles';
@@ -30,17 +31,6 @@ type BasicDetailsDobNavigationProp = NativeStackNavigationProp<
 const CURRENT_STEP = 2;
 
 const ITEM_HEIGHT = 52;
-
-const MONTHS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
-const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
-const YEARS = Array.from(
-  { length: 100 },
-  (_, i) => new Date().getFullYear() - 18 - i
-);
 
 // Validation
 const dobSchema = z
@@ -141,8 +131,8 @@ export const BasicDetailsDobScreen: React.FC = () => {
                       const offsetY = e.nativeEvent.contentOffset.y;
                       let index = Math.round(offsetY / ITEM_HEIGHT);
                       if (index < 0) index = 0;
-                      if (index >= DAYS.length) index = DAYS.length - 1;
-                      const snappedDay = DAYS[index]!;
+                      if (index >= DOB_DAYS.length) index = DOB_DAYS.length - 1;
+                      const snappedDay = DOB_DAYS[index]!;
                       setValue('day', snappedDay, { shouldValidate: true });
                       dayScrollRef.current?.scrollTo({
                         y: index * ITEM_HEIGHT,
@@ -150,7 +140,7 @@ export const BasicDetailsDobScreen: React.FC = () => {
                       });
                     }}
                   >
-                    {DAYS.map((day, index) => {
+                    {DOB_DAYS.map((day, index) => {
                       const selected = day === value;
                       return (
                         <TouchableOpacity
@@ -198,7 +188,7 @@ export const BasicDetailsDobScreen: React.FC = () => {
                       const offsetY = e.nativeEvent.contentOffset.y;
                       let index = Math.round(offsetY / ITEM_HEIGHT);
                       if (index < 0) index = 0;
-                      if (index >= MONTHS.length) index = MONTHS.length - 1;
+                      if (index >= DOB_MONTHS.length) index = DOB_MONTHS.length - 1;
                       const snappedMonthValue = index + 1;
                       setValue('month', snappedMonthValue, {
                         shouldValidate: true,
@@ -209,7 +199,7 @@ export const BasicDetailsDobScreen: React.FC = () => {
                       });
                     }}
                   >
-                    {MONTHS.map((month, index) => {
+                    {DOB_MONTHS.map((month, index) => {
                       const monthValue = index + 1;
                       const selected = monthValue === value;
                       return (
@@ -260,8 +250,8 @@ export const BasicDetailsDobScreen: React.FC = () => {
                       const offsetY = e.nativeEvent.contentOffset.y;
                       let index = Math.round(offsetY / ITEM_HEIGHT);
                       if (index < 0) index = 0;
-                      if (index >= YEARS.length) index = YEARS.length - 1;
-                      const snappedYear = YEARS[index]!;
+                      if (index >= DOB_YEARS.length) index = DOB_YEARS.length - 1;
+                      const snappedYear = DOB_YEARS[index]!;
                       setValue('year', snappedYear, { shouldValidate: true });
                       yearScrollRef.current?.scrollTo({
                         y: index * ITEM_HEIGHT,
@@ -269,7 +259,7 @@ export const BasicDetailsDobScreen: React.FC = () => {
                       });
                     }}
                   >
-                    {YEARS.map((year, index) => {
+                    {DOB_YEARS.map((year, index) => {
                       const selected = year === value;
                       return (
                         <TouchableOpacity

@@ -21,6 +21,7 @@ import { TextInput } from '../../../components/TextInput';
 import { Button } from '../../../components/Button';
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { STRINGS } from '../../../constants/strings';
+import { UK_POSTCODE_REGEX } from '../../../constants/profile';
 import { apiClient } from '../../../services/api/client';
 import { endpoints } from '../../../services/api/endpoints';
 import { useProfileStore } from '../../../store/profile.store';
@@ -34,10 +35,6 @@ type NavigationProp = NativeStackNavigationProp<
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 8;
-
-// Basic UK postcode validation (e.g. SW1A 1AA, M1 1AE, EH1 1BB)
-// Accepts common UK formats, case-insensitive, with optional space
-const UK_POSTCODE_REGEX = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
 
 const pincodeSchema = z.object({
   pincode: z
@@ -228,6 +225,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
                   keyboardType="default"
                   autoCapitalize="characters"
                   autoCorrect={false}
+                  autoFocus
                   maxLength={8}
                   error={errors.pincode?.message || ''}
                   style={styles.input}

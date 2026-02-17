@@ -36,6 +36,7 @@ export type AuthStackParamList = {
   FaceVerification: undefined;
   SelfieCamera: undefined;
   VideoVerification: undefined;
+  ProfilePhotos: undefined;
   OnboardingIntro: undefined;
   OnboardingRadioQuestion: {
     question: OnboardingQuestion;
@@ -69,6 +70,7 @@ export type AuthStackParamList = {
     totalSteps: number;
     questionOrder: number;
   };
+  PreferencesMatch: undefined;
 };
 
 export type TabStackParamList = {

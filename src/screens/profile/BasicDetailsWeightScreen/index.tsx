@@ -14,6 +14,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { Button } from '../../../components/Button';
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { STRINGS } from '../../../constants/strings';
+import { GENDER_OPTIONS } from '../../../constants/profile';
 import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './styles';
@@ -26,17 +27,18 @@ type NavigationProp = NativeStackNavigationProp<
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 3;
 
-const GENDER_OPTIONS = [
-  STRINGS.PROFILE_SETUP.GENDER.OPTIONS.MAN,
-  STRINGS.PROFILE_SETUP.GENDER.OPTIONS.WOMAN,
-  STRINGS.PROFILE_SETUP.GENDER.OPTIONS.NON_BINARY,
-  STRINGS.PROFILE_SETUP.GENDER.OPTIONS.PREFER_NOT_TO_SAY,
-];
-
 export const BasicDetailsWeightScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { gender, setGender, setCurrentStep } = useProfileStore();
-  const [selectedGender, setSelectedGender] = useState<string | null>(gender);
+  // Map legacy values to API keys (male, female, other)
+  const legacyMap: Record<string, string> = {
+    man: 'male', woman: 'female', non_binary: 'other', prefer_not_to_say: 'other',
+    Man: 'male', Woman: 'female', 'Non-binary': 'other', 'Prefer not to say': 'other',
+  };
+  const resolvedGender = gender
+    ? (legacyMap[gender] ?? GENDER_OPTIONS.find(o => o.key === gender || o.label === gender)?.key ?? null)
+    : null;
+  const [selectedGender, setSelectedGender] = useState<string | null>(resolvedGender);
 
   const onSubmit = () => {
     if (selectedGender) {
@@ -85,17 +87,17 @@ export const BasicDetailsWeightScreen: React.FC = () => {
             style={styles.optionsScrollView}
           >
             <View style={styles.optionsContainer}>
-              {GENDER_OPTIONS.map((option, index) => {
-                const isSelected = selectedGender === option;
+              {GENDER_OPTIONS.map((option) => {
+                const isSelected = selectedGender === option.key;
                 return (
                   <TouchableOpacity
-                    key={index}
+                    key={option.key}
                     style={[
                       styles.option,
                       isSelected && styles.optionSelected,
                     ]}
                     activeOpacity={0.8}
-                    onPress={() => setSelectedGender(option)}
+                    onPress={() => setSelectedGender(option.key)}
                   >
                     <Text
                       style={[
@@ -103,7 +105,7 @@ export const BasicDetailsWeightScreen: React.FC = () => {
                         isSelected && styles.optionTextSelected,
                       ]}
                     >
-                      {option}
+                      {option.label}
                     </Text>
                   </TouchableOpacity>
                 );

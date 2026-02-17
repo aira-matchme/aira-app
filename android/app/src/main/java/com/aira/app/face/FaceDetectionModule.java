@@ -111,12 +111,12 @@ public class FaceDetectionModule extends ReactContextBaseJavaModule {
                 previewView = null;
                 currentStep = Step.ALIGN_FACE;
                 stableFrames = 0;
-                ViewGroup content = (ViewGroup) activity.findViewById(android.R.id.content);
-                if (content != null) setViewTreeTransparent(content, false);
                 if (activity.getWindow() != null) {
                     activity.getWindow().setBackgroundDrawableResource(android.R.color.white);
                 }
                 rootView = null;
+                // Do NOT call setViewTreeTransparent(content, false) - it overwrites every RN view
+                // background with white and causes a blank white screen after liveness success.
             } catch (Exception e) {
                 Log.e("LIVENESS", "stopCamera failed", e);
             }

@@ -20,7 +20,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.lg,
     // Align title vertically with other profile screens
-    paddingTop: spacing.sm * 2,
+    // paddingTop: spacing.sm 
   },
   title: {
     fontSize: 34,
@@ -28,7 +28,7 @@ export const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.regular,
     lineHeight: 42,
     color: colors.black,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   subtitle: {
     fontSize: 15,
@@ -39,7 +39,7 @@ export const styles = StyleSheet.create({
   },
   inputWrapper: {
     marginTop: spacing.xl * 2,
-    // marginBottom: spacing.lg, // add space below input + error to avoid overlap with button
+    marginBottom: spacing.lg, // add space below input + error to avoid overlap with button
     alignSelf: 'center',
     width: '100%',
     maxWidth: 343,
@@ -62,8 +62,8 @@ export const styles = StyleSheet.create({
   },
   buttonContainer: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl * 1.5,
+    paddingVertical: spacing.md,
+    // paddingBottom: spacing.sm * 1.5,
   },
   button: {
     height: 56,

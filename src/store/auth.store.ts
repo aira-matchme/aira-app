@@ -12,7 +12,11 @@ export interface User {
   isProfileComplete?: boolean;
   profilePhoto?: { key?: unknown; url?: unknown; id?: string };
   livenessCheck?: boolean;
+  galleryPhotosUploaded?: boolean;
+  questionnaireCompleted?: boolean;
 }
+
+const TOKEN_STORAGE_KEY = '@auth_tokens';
 
 interface AuthState {
   accessToken: string | null;
@@ -20,76 +24,76 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  shouldShowEnableNotifications: boolean;
+  initialize: () => Promise<void>;
   setTokens: (access: string, refresh: string) => Promise<void>;
   setUser: (user: User) => void;
   setLoading: (loading: boolean) => void;
-  initialize: () => Promise<void>;
+  setShouldShowEnableNotifications: (show: boolean) => void;
   logout: () => Promise<void>;
 }
 
-const TOKEN_STORAGE_KEY = '@auth_tokens';
-
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   accessToken: null,
   refreshToken: null,
   user: null,
   isAuthenticated: false,
   isLoading: true,
+  shouldShowEnableNotifications: false,
 
   initialize: async () => {
     try {
-      console.log('🔄 AuthStore: Loading tokens from storage...');
-      // Load tokens from storage
-      const storedTokens = await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
-      console.log('🔄 AuthStore: Tokens loaded from storage:', !!storedTokens);
-      if (storedTokens) {
-        const { accessToken, refreshToken } = JSON.parse(storedTokens);
-        console.log('✅ AuthStore: Tokens found in storage');
+      const stored = await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
+      if (stored) {
+        const { accessToken, refreshToken } = JSON.parse(stored);
         set({ accessToken, refreshToken, isAuthenticated: !!accessToken, isLoading: true });
-        // Keep loading true if we have tokens - AuthProvider will fetch profile and set it to false
       } else {
-        console.log('ℹ️ AuthStore: No tokens in storage');
         set({ isLoading: false });
       }
-    } catch (error) {
-      console.error('❌ AuthStore: Error loading tokens from storage:', error);
+    } catch (e) {
+      console.error('AuthStore: Error loading tokens:', e);
       set({ isLoading: false });
     }
   },
 
   setTokens: async (access, refresh) => {
     try {
-      // Save tokens to storage
       await AsyncStorage.setItem(
         TOKEN_STORAGE_KEY,
-        JSON.stringify({ accessToken: access, refreshToken: refresh })
+        JSON.stringify({ accessToken: access, refreshToken: refresh }),
       );
-      set({ accessToken: access, refreshToken: refresh, isAuthenticated: true });
-    } catch (error) {
-      console.error('Error saving tokens to storage:', error);
-      // Still set tokens in memory even if storage fails
-      set({ accessToken: access, refreshToken: refresh, isAuthenticated: true });
+    } catch (e) {
+      console.error('AuthStore: Error saving tokens:', e);
     }
+    set({ accessToken: access, refreshToken: refresh, isAuthenticated: true });
   },
 
-  setUser: (user) =>
-    set({ user, isAuthenticated: true }),
+  setUser: (user) => {
+    const normalized = { ...user };
+    if (typeof (user as any)?.profileCompleted === 'boolean') {
+      normalized.isProfileComplete = (user as any).profileCompleted;
+    }
+    set({ user: normalized, isAuthenticated: true });
+  },
 
-  setLoading: (loading) =>
-    set({ isLoading: loading }),
+  setLoading: (loading) => set({ isLoading: loading }),
+
+  setShouldShowEnableNotifications: (show) =>
+    set({ shouldShowEnableNotifications: show }),
 
   logout: async () => {
     try {
-      // Remove tokens from storage
-      await AsyncStorage.removeItem(TOKEN_STORAGE_KEY);
-    } catch (error) {
-      console.error('Error removing tokens from storage:', error);
+      await AsyncStorage.clear();
+    } catch (e) {
+      console.error('Error clearing AsyncStorage on logout:', e);
     }
-    set({ 
-      accessToken: null, 
-      refreshToken: null, 
-      user: null, 
-      isAuthenticated: false 
+    set({
+      accessToken: null,
+      refreshToken: null,
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      shouldShowEnableNotifications: false,
     });
   },
 }));

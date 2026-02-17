@@ -8,7 +8,6 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { ReusableBottomSheet } from './BottomSheet';
 import { GoogleIcon, AppleIcon, EmailIcon } from '../assets/icons/social';
 import { colors, typography, spacing } from '../theme';
@@ -16,8 +15,43 @@ import type { RootStackParamList } from '../navigation/types';
 import { env } from '../config/env';
 import { useSocialLogin } from '../modules/auth/hooks';
 import { useAuthStore } from '../store/auth.store';
+import { checkNotificationPermission } from '../config/permissions';
+import { getPostAuthScreen } from '../navigation/getPostAuthScreen';
 import type { SocialLoginRequest } from '../modules/auth/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
+import appleAuth from '@invertase/react-native-apple-authentication';
+import { apiClient } from '../services/api/client';
+import { endpoints } from '../services/api/endpoints';
+
+const DEVICE_ID_KEY = '@device_id';
+
+const generateInstallId = () =>
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+
+const getDeviceId = async (): Promise<string> => {
+  try {
+    const { getUniqueId } = require('react-native-device-info');
+    const deviceId = await getUniqueId();
+    if (deviceId) return deviceId;
+  } catch {
+    // DeviceInfo not available or failed
+  }
+  try {
+    let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
+    if (!id) {
+      id = generateInstallId();
+      await AsyncStorage.setItem(DEVICE_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    return generateInstallId();
+  }
+};
 
 type LoginOptionsNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -26,94 +60,142 @@ interface LoginOptionsBottomSheetProps {
   onClose: () => void;
 }
 
+
+
 export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = ({
   isOpen,
   onClose,
 }) => {
   const navigation = useNavigation<LoginOptionsNavigationProp>();
   const socialLoginMutation = useSocialLogin();
-  const { setTokens, setUser } = useAuthStore();
+  const { setTokens, setUser, setShouldShowEnableNotifications } = useAuthStore();
 
-  // Configure Google Sign-In once when this module is loaded
-  // GoogleSignin.configure({
-  //   webClientId: env.GOOGLE_CLIENT_ID,
-  // });
-  // console.log('🔑 Google Client ID:', env.GOOGLE_CLIENT_ID);
+  const resolvePostLoginScreen = async (
+    user: { isProfileComplete?: boolean; profilePhoto?: unknown; livenessCheck?: boolean; galleryPhotosUploaded?: boolean; questionnaireCompleted?: boolean } | null
+  ) => {
+    let shouldShowNotifications = false;
+    try {
+      const notificationStatus = await checkNotificationPermission();
+      shouldShowNotifications = notificationStatus !== 'granted';
+      if (shouldShowNotifications) setShouldShowEnableNotifications(true);
+    } catch {
+      shouldShowNotifications = true;
+      setShouldShowEnableNotifications(true);
+    }
+    return getPostAuthScreen(user, shouldShowNotifications);
+  };
 
   const handleGoogleLogin = async () => {
+  try {
+    const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+    GoogleSignin.configure({
+      webClientId: env.GOOGLE_CLIENT_ID || '',
+      iosClientId: env.IOS_CLIENT_ID || undefined,
+      offlineAccess: true,
+    });
+    await GoogleSignin.hasPlayServices({
+      showPlayServicesUpdateDialog: true,
+    });
+    await GoogleSignin.signOut().catch(() => {});
+    await GoogleSignin.revokeAccess().catch(() => {});
+    const userInfo = await GoogleSignin.signIn();
+    console.log('📱 Google Sign-In User Info:', userInfo);
+
+    const { idToken } = userInfo;
+    console.log(idToken)
+
+    if (!idToken) {
+      Alert.alert('Google Login Error', 'No ID token received.');
+      return;
+    }
+
+    const payload = {
+      idToken: idToken,
+      deviceType: Platform.OS === 'android' ? 'android' : 'ios',
+      deviceId: await getDeviceId(),
+    };
+console.log('🔑 Google Login Payload:', payload);
+    const response = await apiClient.post(endpoints.auth.googleLogin, payload);
+    console.log('🔑 Google Login Response:', response);
+    const authData = response.data?.data ?? response.data;
+    if (authData?.accessToken && authData?.refreshToken) {
+      await setTokens(authData.accessToken, authData.refreshToken);
+      if (authData?.user) {
+        setUser(authData.user);
+        const screen = await resolvePostLoginScreen(authData.user);
+        onClose();
+        navigation.navigate('AuthStack', { screen });
+        return;
+      }
+    }
+
+    onClose();
+    navigation.navigate('AuthStack', { screen: 'EnableNotifications' });
+  } catch (error: any) {
+    console.error('Google login error:', error);
+    if (error?.message?.includes('RNGoogleSignin') || error?.message?.includes('TurboModuleRegistry')) {
+      Alert.alert(
+        'Google Sign-In Not Available',
+        'Please rebuild the app: run "cd android && ./gradlew clean" then "npx react-native run-android"',
+      );
+    }
+  }
+};
+
+
+  async function handleAppleLogin() {
     try {
-      // Ensure Google Play Services are available (Android)
-      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-
-      // Trigger Google Sign-In
-      const userInfo = await GoogleSignin.signIn();
-      console.log('📱 Google Sign-In User Info:', userInfo);
-
-      const { user } = userInfo;
-
-      const providerId = user.id ?? '';
-      const email = user.email ?? '';
-      const name =
-        user.name ??
-        [user.givenName, user.familyName].filter(Boolean).join(' ') ??
-        '';
-      const profilePicture = user.photo ?? '';
-
-      if (!providerId || !email) {
-        // Alert.alert('Google Login Error', 'Could not retrieve Google account information.');
+      const isSupported = appleAuth.isSupported;
+      if (!isSupported) {
+        Alert.alert('Apple login not supported on this device');
         return;
       }
 
-      const payload: SocialLoginRequest = {
-        provider: 'google',
-        providerId,
-        email,
-        name,
-        profilePicture,
-        // If the user can log in with Google, the email is considered verified by Google
-        emailVerified: true,
-        googleId: providerId,
-        // device info can be added later when FCM is integrated
+      const appleAuthRequestResponse = await appleAuth.performRequest({
+        requestedOperation: appleAuth.Operation.LOGIN,
+        requestedScopes: [
+          appleAuth.Scope.EMAIL,
+          appleAuth.Scope.FULL_NAME,
+        ],
+      });
+
+      const { identityToken } = appleAuthRequestResponse;
+
+      if (!identityToken) {
+        Alert.alert('Apple Login failed - No identity token');
+        return;
+      }
+
+      const payload = {
+        idToken:identityToken,
         deviceType: Platform.OS === 'android' ? 'android' : 'ios',
+        deviceId: await getDeviceId(),
       };
 
-      const response = await socialLoginMutation.mutateAsync(payload);
-
-      // Store tokens and user data in auth store
-      if (response.data?.accessToken && response.data?.refreshToken) {
-        await setTokens(response.data.accessToken, response.data.refreshToken);
-        // Also set user data from response
-        if (response.data?.user) {
-          setUser(response.data.user);
+      const response = await apiClient.post(endpoints.auth.appleLogin, payload);
+      const authData = response.data?.data ?? response.data;
+      if (authData?.accessToken && authData?.refreshToken) {
+        await setTokens(authData.accessToken, authData.refreshToken);
+        if (authData?.user) {
+          setUser(authData.user);
+          const screen = await resolvePostLoginScreen(authData.user);
+          onClose();
+          navigation.navigate('AuthStack', { screen });
+          return;
         }
       }
 
       onClose();
-      // Navigate to ProfileIntro after successful login
-      navigation.navigate('AuthStack', { screen: 'ProfileIntro' });
+      navigation.navigate('AuthStack', { screen: 'EnableNotifications' });
     } catch (error: any) {
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        // User cancelled the sign-in; no need to show an error
-        return;
+      if (error.code === appleAuth.Error.CANCELED) {
+        // User canceled - no need to alert
+      } else {
+        console.error('Apple login error:', error);
+        Alert.alert('Apple login failed');
       }
-      if (error.code === statusCodes.IN_PROGRESS) {
-        Alert.alert('Google Login', 'Sign-in already in progress.');
-        return;
-      }
-      if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        Alert.alert('Google Login Error', 'Google Play Services not available or outdated.');
-        return;
-      }
-
-      console.error('Google login error:', error);
     }
-  };
-
-  const handleAppleLogin = () => {
-    // TODO: Implement Apple OAuth
-    console.log('Apple login');
-    onClose();
-  };
+  }
 
   const handleEmailLogin = () => {
     onClose();

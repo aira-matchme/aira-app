@@ -1,17 +1,16 @@
 import React from 'react';
-import { View, Text, StatusBar, StyleSheet, Platform } from 'react-native';
+import { View, Text, Image, StatusBar, StyleSheet, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LinearGradient from 'react-native-linear-gradient';
-import Video from 'react-native-video';
 import { Button } from '../../../components/Button';
 import { colors } from '../../../theme';
 import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './styles';
 
-const PROFILE_VIDEO = require('../../../assets/images/profilevideo.mp4');
+const PROFILE_IMAGE = require('../../../assets/images/ProfileImage.png');
 
 type ProfileIntroNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'ProfileIntro'>;
 
@@ -29,20 +28,11 @@ export const ProfileIntroScreen: React.FC = () => {
         <View style={styles.container}>
           {/* Header Video Section */}
           <View style={styles.headerCard}>
-            {Platform.OS === 'ios' ? (
-              <Video
-                source={PROFILE_VIDEO}
-                style={styles.headerImage}
-                resizeMode="cover"
-                repeat
-                muted
-                paused={false}
-                controls={false}
-              />
-            ) : (
-              // Fallback on Android (avoids RCTVideo native dependency issues)
-              <View style={styles.headerImage} />
-            )}
+            <Image
+              source={PROFILE_IMAGE}
+              style={styles.headerImage}
+              resizeMode="cover"
+            />
           </View>
 
           {/* Bottom Gradient Card Section */}

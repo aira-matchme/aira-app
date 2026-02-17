@@ -22,7 +22,7 @@ export const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: spacing.lg,
-    paddingTop: 68,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
   iconContainer: {

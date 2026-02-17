@@ -6,8 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthNavigator } from './AuthNavigator';
 import { TabNavigator } from './TabNavigator';
 import { SplashScreen } from '../screens/SplashScreen';
-import { LoginOptionsScreen } from '../screens/auth/LoginOptionsScreen';
-import { EmailLoginScreen } from '../screens/auth/EmailLoginScreen';
+import { EmailLoginScreen } from '../screens/auth/EmailLoginScreen';            
 import { LostAccessEmailScreen } from '../screens/auth/LostAccessEmailScreen';
 import { OTPVerificationScreen } from '../screens/auth/OTPVerificationScreen';
 import { useAuthStore } from '../store/auth.store';
@@ -45,12 +44,6 @@ export const RootNavigator = () => {
             <RootStack.Screen 
               name="AuthStack" 
               component={AuthNavigator}
-            />
-            {/* Transparent modals ONLY */}
-            <RootStack.Screen
-              name="LoginOptionsModal"
-              component={LoginOptionsScreen}
-              options={{ presentation: 'transparentModal' }}
             />
             <RootStack.Screen
               name="EmailLogin"

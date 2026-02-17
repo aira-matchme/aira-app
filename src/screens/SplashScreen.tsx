@@ -8,6 +8,7 @@ import { colors } from '../theme';
 import { LogoIcon } from '../assets/icons/branding/LogoIcon';
 import { useAuthStore } from '../store/auth.store';
 import { useMe } from '../modules/auth/hooks';
+import { checkNotificationPermission } from '../config/permissions';
 import type { RootStackParamList } from '../navigation/types';
 
 const ELLIPSE_BACKGROUND = 'https://www.figma.com/api/mcp/asset/01e902af-440b-49ff-a38a-dbc06cb487ea';
@@ -16,7 +17,7 @@ type SplashScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export const SplashScreen: React.FC = () => {
   const navigation = useNavigation<SplashScreenNavigationProp>();
-  const { accessToken, setUser, setLoading, logout, initialize } = useAuthStore();
+  const { accessToken, setUser, setLoading, logout, initialize, setShouldShowEnableNotifications } = useAuthStore();
   const [isInitialized, setIsInitialized] = useState(false);
   const hasNavigatedRef = useRef(false); // Prevent multiple navigations using ref
   const hasToken = !!accessToken;
@@ -75,12 +76,26 @@ export const SplashScreen: React.FC = () => {
     // Profile fetch completed
     if (data?.data) {
       // Successfully fetched profile, set user data
-      // RootNavigator will show AuthStack, and AuthNavigator will use initialRouteName
       if (hasNavigatedRef.current) return;
       console.log('✅ SplashScreen: Profile fetched successfully');
       hasNavigatedRef.current = true;
       setUser(data.data);
-      setLoading(false);
+
+      // Check notification permission - redirect to EnableNotifications if not granted
+      (async () => {
+        try {
+          const notificationStatus = await checkNotificationPermission();
+          if (notificationStatus !== 'granted') {
+            console.log('🔔 SplashScreen: Notification permission not granted, redirecting to EnableNotifications');
+            setShouldShowEnableNotifications(true);
+          }
+        } catch (e) {
+          console.warn('SplashScreen: Error checking notification permission', e);
+          setShouldShowEnableNotifications(true);
+        }
+        setLoading(false);
+      })();
+      return;
     } else if (error) {
       // Profile fetch failed (e.g., token expired), logout
       if (hasNavigatedRef.current) return;
@@ -89,7 +104,7 @@ export const SplashScreen: React.FC = () => {
       logout();
       setLoading(false);
     }
-  }, [isInitialized, hasToken, data, error, isFetchingProfile, setUser, setLoading, logout, navigation]);
+  }, [isInitialized, hasToken, data, error, isFetchingProfile, setUser, setLoading, logout, setShouldShowEnableNotifications, navigation]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>

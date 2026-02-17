@@ -19,7 +19,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.lg,
     // Align title vertically with other profile screens
-    paddingTop: spacing.sm * 2,
+    // paddingTop: spacing.sm * 2,
   },
   header: {
     marginBottom: spacing.xl * 2,
@@ -54,8 +54,9 @@ export const styles = StyleSheet.create({
   },
   buttonContainer: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl * 1.5,
+    paddingVertical:spacing.md,
+    // paddingTop: spacing.md,
+    // paddingBottom: spacing.sm * 1.5,
   },
   button: {
     width: '100%',

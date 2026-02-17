@@ -9,6 +9,8 @@ export const endpoints = {
     resendOtp: '/auth/resend-otp',
     socialLogin: '/auth/social-login',
     liveness: '/auth/liveness-check',
+    googleLogin: '/auth/google',
+    appleLogin: '/auth/apple',
   },
   user: {
     profile: '/auth/profile',
@@ -16,6 +18,7 @@ export const endpoints = {
     editProfile: '/auth/profile',
     self: '/auth/self',
     selfie: '/auth/selfie',
+    uploadPhotos: '/auth/gallery',
   },
   question: {
     getQuestions: '/questions',

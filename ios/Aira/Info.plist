@@ -2,6 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleURLSchemes</key>
+    <array>
+      <string>com.googleusercontent.apps.948934490836-3k7rs2p8hp5r6ub41e8e5hbt2stciv1q</string>
+    </array>
+  </dict>
+</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -35,6 +44,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Aira needs access to your camera to verify your identity for face verification.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>AIRA uses your photos to let you upload images to your profile. These can be managed in Settings.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>RCTNewArchEnabled</key>

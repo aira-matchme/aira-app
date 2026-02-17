@@ -109,10 +109,8 @@ export const navigateToNextQuestion = (
       } catch (error) {
         console.error('Failed to submit onboarding answers', error);
       } finally {
-        // Clear onboarding state when completed
         clearOnboarding();
-        // TODO: Navigate to completion screen or dashboard
-        // navigation.navigate('Dashboard');
+        navigation.navigate('PreferencesMatch');
       }
     })();
   }

@@ -78,6 +78,8 @@ export interface UserProfileResponse {
     isProfileComplete?: boolean;
     profilePhoto?: SelfieResponseProfilePhoto & { id?: string };
     livenessCheck?: boolean;
+    galleryPhotosUploaded?: boolean;
+    questionnaireCompleted?: boolean;
   };
 }
 

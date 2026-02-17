@@ -17,6 +17,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { Button } from '../../../components/Button';
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { STRINGS } from '../../../constants/strings';
+import { EMPLOYMENT_OPTIONS } from '../../../constants/profile';
 import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './styles';
@@ -28,15 +29,6 @@ type NavigationProp = NativeStackNavigationProp<
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 6;
-
-// Keys are backend values
-const EMPLOYMENT_OPTIONS = [
-  { key: 'employed', label: STRINGS.PROFILE_SETUP.EMPLOYMENT.OPTIONS.EMPLOYED },
-  { key: 'self_employed', label: STRINGS.PROFILE_SETUP.EMPLOYMENT.OPTIONS.SELF_EMPLOYED },
-  { key: 'student', label: STRINGS.PROFILE_SETUP.EMPLOYMENT.OPTIONS.STUDENT },
-  { key: 'unemployed', label: STRINGS.PROFILE_SETUP.EMPLOYMENT.OPTIONS.NOT_WORKING },
-  { key: 'prefer_not_to_say', label: STRINGS.PROFILE_SETUP.EMPLOYMENT.OPTIONS.PREFER_NOT_TO_SAY },
-];
 
 const employmentSchema = z.object({
   employment: z.string().min(1, 'Please select an option'),
