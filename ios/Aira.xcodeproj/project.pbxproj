@@ -125,6 +125,7 @@
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				5F6A543808F565AE5FDBF80F /* [CP] Embed Pods Frameworks */,
 				ABB9BB7FA051A2397049825B /* [CP] Copy Pods Resources */,
+				FCDA6532172946F4A913C95D /* Upload Debug Symbols to Sentry */,
 			);
 			buildRules = (
 			);
@@ -194,7 +195,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"\\\"$WITH_ENVIRONMENT\\\" \\\"$REACT_NATIVE_XCODE\\\"\"\n";
+			shellScript = "set -e\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\nSENTRY_RN_XCODE=\"$SRCROOT/../node_modules/@sentry/react-native/scripts/sentry-xcode.sh\"\n\n# Avoid failing local Release builds if sourcemap upload isn't configured.\n# In CI, provide SENTRY_AUTH_TOKEN (and optionally SENTRY_ORG / SENTRY_PROJECT) to enable uploads.\nif [ -z \"$SENTRY_AUTH_TOKEN\" ]; then\n  export SENTRY_DISABLE_AUTO_UPLOAD=true\nfi\n\n/bin/sh -c \"\\\"$WITH_ENVIRONMENT\\\" \\\"$SENTRY_RN_XCODE\\\" \\\"$REACT_NATIVE_XCODE\\\"\"\n";
 		};
 		5F6A543808F565AE5FDBF80F /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -251,6 +252,20 @@
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
+		};
+		FCDA6532172946F4A913C95D /* Upload Debug Symbols to Sentry */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			name = "Upload Debug Symbols to Sentry";
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh ../node_modules/@sentry/react-native/scripts/sentry-xcode-debug-files.sh";
 		};
 /* End PBXShellScriptBuildPhase section */
 

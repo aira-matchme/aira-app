@@ -1,6 +1,7 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+apply from: "../../node_modules/@sentry/react-native/sentry.gradle"
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -124,5 +125,18 @@ dependencies {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
+    }
+}
+
+// Only attempt Sentry uploads when auth token is present.
+// This prevents local release builds from failing if SENTRY_AUTH_TOKEN isn't set.
+afterEvaluate {
+    tasks.matching { t ->
+        t.name.contains("SentryUpload")
+    }.configureEach { t ->
+        t.onlyIf {
+            def token = System.getenv("SENTRY_AUTH_TOKEN")
+            return token != null && !token.trim().isEmpty()
+        }
     }
 }

@@ -17,7 +17,6 @@ import { useSocialLogin } from '../modules/auth/hooks';
 import { useAuthStore } from '../store/auth.store';
 import { checkNotificationPermission } from '../config/permissions';
 import { getPostAuthScreen } from '../navigation/getPostAuthScreen';
-import type { SocialLoginRequest } from '../modules/auth/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import appleAuth from '@invertase/react-native-apple-authentication';
