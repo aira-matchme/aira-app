@@ -70,10 +70,16 @@ export const PreferencesMatchScreen: React.FC = () => {
 
   return (
     <View style={styles.wrapper}>
-      <LinearGradient
-        colors={['#F3E8FF', '#F5E7FF', '#F3E8FF']}
+       <LinearGradient
+        colors={[
+          'rgba(221, 170, 249, 0)',
+          'rgba(221, 170, 249, 0.18)',
+          'rgba(221, 170, 249, 0.18)',
+          'rgba(221, 170, 249, 0)',
+        ]}
+        locations={[0, 0.38, 0.62, 1]}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0.4 }}
+        end={{ x: 0, y: 1 }}
         style={styles.backgroundGradient}
       />
 

@@ -4,14 +4,10 @@ import { colors, spacing, typography } from '../../../theme';
 export const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: colors.primary.purple,
+    backgroundColor: colors.white,
   },
   backgroundGlow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
   },
   safeArea: {
     flex: 1,
@@ -22,9 +18,9 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
   },
   card: {
     flex: 1,

@@ -11,9 +11,17 @@ export const styles = StyleSheet.create({
   },
   backgroundGlow: {
     position: 'absolute',
-    top: '32%',
-    width: '100%',
-    height: 220,
+    top: 0,
+    left: 0,
+    width: '50%',
+    height: 280,
+  },
+  middleGradient: {
+    position: 'absolute',
+    top: '30%',
+    left: 0,
+    right: 0,
+    height:480,
   },
   content: {
     flex: 1,

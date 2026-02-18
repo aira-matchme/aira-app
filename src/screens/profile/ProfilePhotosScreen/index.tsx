@@ -17,7 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
-
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { AddPhotoIcon } from '../../../assets/icons/common/AddPhotoIcon';
 import { ActionSheetCameraIcon } from '../../../assets/icons/common/ActionSheetCameraIcon';
@@ -257,18 +257,26 @@ export const ProfilePhotosScreen: React.FC = () => {
 
   return (
     <View style={styles.wrapper}>
-      <LinearGradient
-        colors={[
-          'rgba(221, 170, 249, 0)',
-          'rgba(221, 170, 249, 0.18)',
-          'rgba(221, 170, 249, 0.18)',
-          'rgba(221, 170, 249, 0)',
-        ]}
-        locations={[0, 0.35, 0.65, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.backgroundGlow}
-      />
+      <View style={styles.backgroundGlow}>
+        <Svg height="100%" width="100%" style={{ position: 'absolute' }}>
+          <Defs>
+            <RadialGradient
+              id="nameScreenGrad"
+              cx="0%"
+              cy="0%"
+              rx="120%"
+              ry="120%"
+              fx="0%"
+              fy="0%"
+            >
+              <Stop offset="0%" stopColor="#C87BF5" stopOpacity="0.2" />
+              <Stop offset="70%" stopColor="#C87BF5" stopOpacity="0.06" />
+              <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#nameScreenGrad)" />
+        </Svg>
+      </View>
 
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
@@ -304,7 +312,7 @@ export const ProfilePhotosScreen: React.FC = () => {
                   />
                 ) : (
                   <View style={styles.placeholder}>
-                    <AddPhotoIcon  />
+                    <AddPhotoIcon stroke={colors.neutral[300]} />
                   </View>
                 )}
                 {uploadingSlot === index && (

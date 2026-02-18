@@ -5,13 +5,21 @@ export const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
     backgroundColor: colors.white,
-    overflow: 'hidden',
+    // overflow: 'hidden',
   },
   backgroundGlow: {
     position: 'absolute',
-    top: '32%',
-    width: '100%',
-    height: 320,
+    top: 0,
+    left: 0,
+    width: '50%',
+    height: 280,
+  },
+  middleGradient: {
+    position: 'absolute',
+    top: '30%',
+    left: 0,
+    right: 0,
+    height:480,
   },
   safeArea: {
     flex: 1,

@@ -12,7 +12,11 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   backgroundGradient: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    width: '100%',
+    height: 600,
+    alignSelf: 'center',
+    top: '15%',
   },
   headerContainer: {
     paddingTop: 16,

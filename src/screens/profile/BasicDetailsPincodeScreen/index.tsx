@@ -27,6 +27,7 @@ import { endpoints } from '../../../services/api/endpoints';
 import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './styles';
+import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 
 type NavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -101,6 +102,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
         `https://api.postcodes.io/postcodes/${encodeURIComponent(normalizedPostcode)}`,
       );
       const json = await postcodeResponse.json();
+      console.log('📍 Postcode lookup result:', json.result);
 
       // Only proceed if postcode API is successful (status 200)
       if (json.status !== 200 || !json.result) {
@@ -109,11 +111,12 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
         return;
       }
 
-      const { latitude, longitude } = json.result;
+      const { latitude, longitude, admin_district      } = json.result;
       console.log('📍 Postcode lookup result:', {
         postcode: rawPostcode,
         latitude,
         longitude,
+        admin_district
       });
 
       // Build payload for /edit/profile
@@ -134,6 +137,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
         income: finalChoice ?? '',
         latitude: latitude != null ? String(latitude) : undefined,
         longitude: longitude != null ? String(longitude) : undefined,
+        city: admin_district ?? '',
         religion: religion ?? '',
       };
 
@@ -177,17 +181,38 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
     >
-        <LinearGradient
+         <View style={styles.backgroundGlow}>
+        <Svg height="100%" width="100%" style={{ position: 'absolute' }}>
+          <Defs>
+            <RadialGradient
+              id="nameScreenGrad"
+              cx="0%"
+              cy="0%"
+              rx="120%"
+              ry="120%"
+              fx="0%"
+              fy="0%"
+            >
+              <Stop offset="0%" stopColor="#C87BF5" stopOpacity="0.2" />
+              <Stop offset="70%" stopColor="#C87BF5" stopOpacity="0.06" />
+              <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#nameScreenGrad)" />
+        </Svg>
+      </View>
+      <LinearGradient
         colors={[
-          'rgba(221,170,249,0)',
-          'rgba(221,170,249,0.18)',
-          'rgba(221,170,249,0.18)',
-          'rgba(221,170,249,0)',
+          'rgba(203, 123, 245, 0)',
+          'rgba(203, 123, 245, 0.08)',
+          'rgba(203, 123, 245, 0.14)',
+          'rgba(203, 123, 245, 0.08)',
+          'rgba(203, 123, 245, 0)',
         ]}
-        locations={[0, 0.38, 0.62, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.backgroundGlow}
+        locations={[0, 0.15, 0.3, 0.5, 1]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={styles.middleGradient}
       />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 

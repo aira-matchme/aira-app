@@ -110,9 +110,11 @@ export const SplashScreen: React.FC = () => {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" />
       
-      {/* Purple gradient background */}
+      {/* Figma Primary Gradient */}
       <LinearGradient
-        colors={[colors.primary.purpleLight, colors.primary.purpleDark]}
+        colors={[...colors.gradients.primary.colors]}
+        start={colors.gradients.primary.start}
+        end={colors.gradients.primary.end}
         style={styles.gradient}
       >
         {/* Background ellipse/circle */}

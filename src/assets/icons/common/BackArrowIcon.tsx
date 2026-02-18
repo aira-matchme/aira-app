@@ -9,8 +9,8 @@ interface BackArrowIconProps {
 
 export const BackArrowIcon: React.FC<BackArrowIconProps> = ({
   size = 48,
-  backgroundColor = '#F2F2F2',
-  strokeColor = 'black',
+  backgroundColor = '#FFFFFF',
+  strokeColor = '#000000',
 }) => {
   return (
     <Svg width={size} height={size} viewBox="0 0 48 48" fill="none">

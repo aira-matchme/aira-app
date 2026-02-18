@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -13,8 +14,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import LinearGradient from 'react-native-linear-gradient';
-
 import { TextInput } from '../../../components/TextInput';
 import { Button } from '../../../components/Button';
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
@@ -67,19 +68,40 @@ export const BasicDetailsNameScreen: React.FC = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
     >
-     <LinearGradient
-  colors={[
-    'rgba(221, 170, 249, 0)',     // top fade
-    'rgba(221, 170, 249, 0.12)',  // start glow
-    'rgba(221, 170, 249, 0.22)',  // strongest center
-    'rgba(221, 170, 249, 0.12)',  // end glow
-    'rgba(221, 170, 249, 0)',     // bottom fade
-  ]}
-  locations={[0, 0.25, 0.5, 0.75, 1]}
-  start={{ x: 0.5, y: 0 }}
-  end={{ x: 0.5, y: 1 }}
-  style={styles.backgroundGlow}
-/>
+      <View style={styles.backgroundGlow}>
+        <Svg height="100%" width="100%" style={{ position: 'absolute' }}>
+          <Defs>
+            <RadialGradient
+              id="nameScreenGrad"
+              cx="0%"
+              cy="0%"
+              rx="120%"
+              ry="120%"
+              fx="0%"
+              fy="0%"
+            >
+              <Stop offset="0%" stopColor="#C87BF5" stopOpacity="0.2" />
+              <Stop offset="70%" stopColor="#C87BF5" stopOpacity="0.06" />
+              <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#nameScreenGrad)" />
+        </Svg>
+      </View>
+      <LinearGradient
+        colors={[
+          'rgba(203, 123, 245, 0)',
+          'rgba(203, 123, 245, 0.08)',
+          'rgba(203, 123, 245, 0.14)',
+          'rgba(203, 123, 245, 0.08)',
+          'rgba(203, 123, 245, 0)',
+        ]}
+        locations={[0, 0.15, 0.3, 0.5, 1]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={styles.middleGradient}
+      />
+
 
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 

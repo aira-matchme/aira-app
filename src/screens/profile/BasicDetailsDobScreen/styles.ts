@@ -11,9 +11,17 @@ export const styles = StyleSheet.create({
   },
   backgroundGlow: {
     position: 'absolute',
-    top: '38%',
-    width: '100%',
-    height: 300,
+    top: 0,
+    left: 0,
+    width: '50%',
+    height: 280,
+  },
+  middleGradient: {
+    position: 'absolute',
+    top: '30%',
+    left: 0,
+    right: 0,
+    height: 480,
   },
   content: {
     flex: 1,
@@ -40,16 +48,17 @@ export const styles = StyleSheet.create({
   },
   datePickerContainer: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.md,
     justifyContent: 'center',
-    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
   },
   dateColumn: {
     flex: 1,
-    maxHeight: 150,
+    height: 180, // 3 rows (52 + 8) so selected row is centered like Figma
   },
   scrollContent: {
-    paddingVertical: 30,
+    paddingVertical: 60, // centers the selected row in the 180px visible area
   },
   dateOption: {
     height: 52,

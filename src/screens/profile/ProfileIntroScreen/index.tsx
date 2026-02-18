@@ -38,8 +38,8 @@ export const ProfileIntroScreen: React.FC = () => {
           {/* Bottom Gradient Card Section */}
           <View style={styles.bottomGradient}>
             <LinearGradient
-              colors={[colors.white, colors.secondary.lavenderLight, colors.secondary.lavender]}
-              locations={[0, 0.5, 0.9]}
+              colors={[colors.white, colors.secondary.lavenderLight, colors.secondary[200]]}
+              locations={[0, 0.5, 1]}
               start={{ x: 0.5, y: 0 }}
               end={{ x: 0.5, y: 1 }}
               style={StyleSheet.absoluteFill}

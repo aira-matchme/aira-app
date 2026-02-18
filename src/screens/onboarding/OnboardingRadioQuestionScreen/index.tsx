@@ -15,6 +15,7 @@ import {
 } from '../../../modules/onboarding/questionManager';
 import { useOnboardingStore } from '../../../store/onboarding.store';
 import { styles } from './styles';
+import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 
 type NavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -63,13 +64,39 @@ export const OnboardingRadioQuestionScreen: React.FC = () => {
 
   return (
     <View style={styles.wrapper}>
-      <LinearGradient
-        colors={['#F3E8FF', '#F5E7FF', '#F3E8FF']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.backgroundGlow}
-      />
-
+     <View style={styles.backgroundGlow}>
+  <Svg height="100%" width="100%" style={{ position: 'absolute' }}>
+    <Defs>
+      {/*
+        RadialGradient usage:
+        - id="grad"       : Unique ID for referencing (used in fill="url(#grad)")
+        - cx="50%"        : Center X of ellipse (horizontally centered)
+        - cy="30%"        : Center Y of ellipse (30% from top)
+        - rx="60%"        : Radius X of ellipse (horizontal spread)
+        - ry="60%"        : Radius Y of ellipse (vertical spread)
+        - fx="50%"        : Focus X (gradient radiates from this point)
+        - fy="40%"        : Focus Y (slightly below center for top-down glow)
+        - Stop offset="0%": Inner color #C87BF5 at 80% opacity
+        - Stop offset="100%": Outer color #FFFFFF at full opacity
+      */}
+     <RadialGradient
+      id="grad"
+      cx="50%"
+      cy="40%"      // move slightly lower
+      rx="65%"      // wider horizontal spread
+      ry="85%"      // full vertical spread
+      fx="40%"
+      fy="35%"
+    >
+        <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="1" />
+        <Stop offset="0%" stopColor="#C87BF5" stopOpacity="0.7" />
+        <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="1" />
+      </RadialGradient>
+    </Defs>
+    {/* Full-size rect filled with the radial gradient */}
+    <Rect width="100%" height="100%" fill="url(#grad)" />
+  </Svg>
+</View>
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>

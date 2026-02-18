@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -16,8 +17,6 @@ import { Camera, useCameraDevice, useCameraPermission } from 'react-native-visio
 import LinearGradient from 'react-native-linear-gradient';
 
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
-import { Button } from '../../../components/Button';
-import { CameraIcon } from '../../../assets/icons/common/CameraIcon';
 import { VerifiedIcon } from '../../../assets/icons/common/VerifiedIcon';
 import { STRINGS } from '../../../constants/strings';
 import { colors } from '../../../theme';
@@ -110,6 +109,7 @@ export const SelfieCameraScreen: React.FC = () => {
         </SafeAreaView>
       </View>
     );
+    
   }
 
   if (!device) {
@@ -130,29 +130,18 @@ export const SelfieCameraScreen: React.FC = () => {
     );
   }
 
-  // Verifying screen (after selfie taken, show user's selfie + verifying state)
+  // Verifying screen – Figma 886-3797: blurred selfie bg, white circle with photo, dark button at bottom
   if (screenState === 'verifying' && capturedPhotoUri) {
     return (
       <View style={styles.wrapper}>
-        <LinearGradient
-          colors={[
-            'rgba(221, 170, 249, 0)',
-            'rgba(221, 170, 249, 0.18)',
-            'rgba(221, 170, 249, 0.18)',
-            'rgba(221, 170, 249, 0)',
-          ]}
-          locations={[0, 0.38, 0.62, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={styles.backgroundGlow}
+        <Image
+          source={{ uri: capturedPhotoUri }}
+          style={styles.verifyingBackgroundImage}
+          resizeMode="cover"
         />
+        <View style={styles.verifyingBackgroundOverlay} />
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
         <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
-          <View style={styles.headerContainer}>
-            {/* <TouchableOpacity onPress={() => { setScreenState('camera'); setCapturedPhotoUri(null); }}>
-              <BackArrowIcon size={48} backgroundColor="rgba(255, 255, 255, 0.2)" strokeColor="white" />
-            </TouchableOpacity> */}
-          </View>
           <View style={styles.verifyingContent}>
             <View style={styles.verifyingSelfieCircle}>
               <Image
@@ -161,9 +150,11 @@ export const SelfieCameraScreen: React.FC = () => {
                 resizeMode="cover"
               />
             </View>
-            <View style={styles.verifyingPill}>
+          </View>
+          <View style={styles.verifyingButtonContainer}>
+            <View style={styles.verifyingButton}>
               <ActivityIndicator size="small" color={colors.white} />
-              <Text style={styles.verifyingPillText}>Verifying...</Text>
+              <Text style={styles.verifyingButtonText}>Verifying...</Text>
             </View>
           </View>
         </SafeAreaView>
@@ -222,21 +213,19 @@ export const SelfieCameraScreen: React.FC = () => {
     );
   }
 
-  // Camera screen with default camera icon overlay
+  // Camera screen – Figma 814-3543: instruction, circle, tip box, circular capture button
   return (
     <View style={styles.wrapper}>
-      <LinearGradient
-        colors={[
-          'rgba(221, 170, 249, 0)',
-          'rgba(221, 170, 249, 0.18)',
-          'rgba(221, 170, 249, 0.18)',
-          'rgba(221, 170, 249, 0)',
-        ]}
-        locations={[0, 0.38, 0.62, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.backgroundGlow}
-      />
+      <View style={styles.cameraFullScreen}>
+        <Camera
+          ref={camera}
+          style={StyleSheet.absoluteFill}
+          device={device}
+          isActive={true}
+          photo={true}
+        />
+        <View style={styles.cameraOverlay} pointerEvents="none" />
+      </View>
 
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
@@ -247,43 +236,40 @@ export const SelfieCameraScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.content}>
-          <Text style={styles.subtitle}>
-            {STRINGS.PROFILE_SETUP.SELFIE_CAMERA.SUBTITLE}
-          </Text>
+        <Text style={styles.instructionText}>
+          {STRINGS.PROFILE_SETUP.SELFIE_CAMERA.SUBTITLE}
+        </Text>
 
-          <View style={styles.cameraContainer}>
-            <View style={styles.cameraFrame}>
-              <Camera
-                ref={camera}
-                style={styles.camera}
-                device={device}
-                isActive={true}
-                photo={true}
-              />
-              <View style={styles.circleFrame}>
-                <View style={styles.circleBorder} />
-                <View style={styles.defaultCameraIconOverlay} pointerEvents="none">
-                  <CameraIcon size={80} color="rgba(255, 255, 255, 0.9)" />
-                </View>
-              </View>
-              <View style={styles.overlayTop} />
-              <View style={styles.overlayBottom} />
-              <View style={styles.overlayLeft} />
-              <View style={styles.overlayRight} />
+        <View style={styles.cameraContainer}>
+          <View style={styles.cameraFrame}>
+            <View style={styles.circleFrame}>
+              <View style={styles.circleBorder} />
             </View>
+            <View style={styles.overlayTop} />
+            <View style={styles.overlayBottom} />
+            <View style={styles.overlayLeft} />
+            <View style={styles.overlayRight} />
           </View>
         </View>
 
-        <View style={styles.buttonContainer}>
-          <Button
-            title={STRINGS.PROFILE_SETUP.SELFIE_CAMERA.BUTTON}
+        <View style={styles.tipBox}>
+          <Text style={styles.tipBullet}>• {STRINGS.PROFILE_SETUP.SELFIE_CAMERA.TIP_1}</Text>
+          <Text style={styles.tipBullet}>• {STRINGS.PROFILE_SETUP.SELFIE_CAMERA.TIP_2}</Text>
+        </View>
+
+        <View style={styles.captureButtonContainer}>
+          <TouchableOpacity
+            style={styles.captureButtonOuter}
             onPress={handleTakePhoto}
-            variant="primary"
             disabled={isCapturing}
-            loading={isCapturing}
-            style={styles.button}
-          />
+            activeOpacity={0.85}
+          >
+            {isCapturing ? (
+              <ActivityIndicator size="small" color={colors.white} style={styles.captureButtonSpinner} />
+            ) : (
+              <View style={styles.captureButtonInner} />
+            )}
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     </View>

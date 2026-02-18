@@ -11,10 +11,10 @@ export const styles = StyleSheet.create({
   },
   backgroundGlow: {
     position: 'absolute',
-    width: '100%',
-    height: 600,
-    alignSelf: 'center',
-    top: '15%',
+    top: 0,
+    left: 0,
+    width: '50%',
+    height: 280,
   },
   headerContainer: {
     paddingTop: 16,

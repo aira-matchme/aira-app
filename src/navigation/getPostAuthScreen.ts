@@ -38,10 +38,11 @@ export function getPostAuthScreen(
   if (shouldShowEnableNotifications) return 'EnableNotifications';
   if (!user) return 'EnableNotifications';
 
-  if (user.questionnaireCompleted) return 'PreferencesMatch';
-  if (!user.isProfileComplete) return 'ProfileIntro';
-  if (user.livenessCheck)
-    return user.galleryPhotosUploaded ? 'OnboardingIntro' : 'ProfilePhotos';
-  if (user.profilePhoto) return 'VideoVerification';
+  // if (user.questionnaireCompleted) return 'PreferencesMatch';
+  // if (!user.isProfileComplete) return 'ProfileIntro';
+  // if (user.livenessCheck)
+  //   return user.galleryPhotosUploaded ? 'OnboardingIntro' : 'ProfilePhotos';
+  // if (user.profilePhoto) return 'VideoVerification';
   return 'FaceVerification';
+
 }

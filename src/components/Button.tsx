@@ -19,6 +19,8 @@ interface ButtonProps {
   loading?: boolean;
   success?: boolean;
   successIcon?: React.ReactNode;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
   style?: ViewStyle;
   textStyle?: TextStyle;
 }
@@ -34,6 +36,8 @@ export const Button: React.FC<ButtonProps> = ({
   loading = false,
   success = false,
   successIcon,
+  leftIcon,
+  rightIcon,
   style,
   textStyle,
 }) => {
@@ -64,15 +68,17 @@ export const Button: React.FC<ButtonProps> = ({
       return (
         <Pressable style={[styles.wrapper, style]} disabled>
           <LinearGradient
-            colors={[colors.secondary.lavender, colors.primary.purple]}
+            colors={[...colors.gradients.primary.colors]}
             start={{ x: 0, y: 0 }}
             end={{ x: 0.88, y: 1 }}
             style={styles.gradientLoading}
           >
-            <ActivityIndicator size="small" color={colors.white} />
-            <Text style={[styles.text, styles.loadingText, textStyle]}>
-              {title}
-            </Text>
+            <View style={styles.contentRow}>
+              <ActivityIndicator size="small" color={colors.white} />
+              <Text style={[styles.text, styles.loadingText, textStyle]}>
+                {title}
+              </Text>
+            </View>
           </LinearGradient>
         </Pressable>
       );
@@ -92,12 +98,16 @@ export const Button: React.FC<ButtonProps> = ({
         ]}
       >
         <LinearGradient
-          colors={[colors.secondary.lavender, colors.primary.purple]}
+          colors={[...colors.gradients.primary.colors]}
           start={{ x: 0, y: 0 }}
           end={{ x: 0.88, y: 1 }}
           style={styles.gradient}
         >
-          <Text style={[styles.text, textStyle]}>{title}</Text>
+          <View style={styles.contentRow}>
+            {leftIcon ? leftIcon : null}
+            <Text style={[styles.text, textStyle]}>{title}</Text>
+            {rightIcon ? rightIcon : null}
+          </View>
         </LinearGradient>
       </Pressable>
     );
@@ -152,6 +162,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
+  contentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+
   text: {
     ...typography.button,
     color: colors.text.primary,
@@ -195,6 +212,6 @@ const styles = StyleSheet.create({
 
   loadingText: {
     color: colors.white,
-    marginLeft: spacing.sm,
+    marginLeft: 0,
   },
 });

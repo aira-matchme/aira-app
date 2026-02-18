@@ -4,7 +4,7 @@ import { colors, spacing, typography } from '../../../theme';
 export const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.gradients.onboardingIntro.colors[1],
   },
   safeArea: {
     flex: 1,
@@ -19,22 +19,12 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
   },
   
   gradientBackground: {
     ...StyleSheet.absoluteFillObject,
   },
-  
-  glow: {
-    position: 'absolute',
-    top: -140,
-    width: 520,
-    height: 520,
-    borderRadius: 260,
-    alignSelf: 'center',
-  },
-  
+
   onboardingImage: {
     width: '85%',
     height: '85%',

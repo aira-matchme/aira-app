@@ -13,25 +13,37 @@ export const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  // Full-screen camera with dark overlay (Figma 814-3543)
+  cameraFullScreen: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  cameraOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
   backgroundGlow: {
-    position: 'absolute',
-    width: '100%',
-    height: 600,
-    alignSelf: 'center',
-    top: '15%',
+    ...StyleSheet.absoluteFillObject,
     opacity: 0.3,
   },
   headerContainer: {
-  // Align back arrow with other profile screens
-  paddingTop: 16,
-  paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingHorizontal: 20,
     zIndex: 10,
+  },
+  instructionText: {
+    fontSize: 16,
+    fontFamily: typography.fontFamily.regular,
+    color: 'rgba(255, 255, 255, 0.95)',
+    lineHeight: 22,
+    textAlign: 'center',
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.lg,
   },
   content: {
     flex: 1,
-    // paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: 28,
@@ -48,7 +60,6 @@ export const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
     opacity: 0.8,
-    marginBottom: spacing.xl * 2,
   },
   cameraContainer: {
     flex: 1,
@@ -62,14 +73,6 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    overflow: 'hidden',
-  },
-  camera: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_WIDTH,
-    position: 'absolute',
-    top: 0,
-    left: 0,
   },
   circleFrame: {
     width: CIRCLE_SIZE,
@@ -85,14 +88,6 @@ export const styles = StyleSheet.create({
     borderRadius: CIRCLE_RADIUS,
     borderWidth: 3,
     borderColor: colors.white,
-    borderStyle: 'dashed',
-  },
-  defaultCameraIconOverlay: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    height: '100%',
   },
   // Overlay masks outside the circle
   overlayTop: {
@@ -101,7 +96,7 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: (SCREEN_WIDTH - CIRCLE_SIZE) / 2,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    // backgroundColor: 'rgba(0, 0, 0, 0.5)',
     zIndex: 1,
   },
   overlayBottom: {
@@ -110,7 +105,7 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: (SCREEN_WIDTH - CIRCLE_SIZE) / 2,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    // backgroundColor: 'rgba(0, 0, 0, 0.5)',
     zIndex: 1,
   },
   overlayLeft: {
@@ -119,7 +114,7 @@ export const styles = StyleSheet.create({
     left: 0,
     width: (SCREEN_WIDTH - CIRCLE_SIZE) / 2,
     height: CIRCLE_SIZE,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    // backgroundColor: 'rgba(0, 0, 0, 0.5)',
     zIndex: 1,
   },
   overlayRight: {
@@ -128,8 +123,48 @@ export const styles = StyleSheet.create({
     right: 0,
     width: (SCREEN_WIDTH - CIRCLE_SIZE) / 2,
     height: CIRCLE_SIZE,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    // backgroundColor: 'rgba(0, 0, 0, 0.5)',
     zIndex: 1,
+  },
+  // Tip box below circle (Figma)
+  tipBox: {
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    borderRadius: 12,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.xl,
+    gap: spacing.xs,
+  },
+  tipBullet: {
+    fontSize: 14,
+    fontFamily: typography.fontFamily.regular,
+    color: 'rgba(255, 255, 255, 0.9)',
+    lineHeight: 22,
+  },
+  // Circular capture button (Figma: white inner, dark outer ring)
+  captureButtonContainer: {
+    alignItems: 'center',
+    paddingBottom: spacing.xl * 1.5,
+  },
+  captureButtonOuter: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  captureButtonInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.white,
+  },
+  captureButtonSpinner: {
+    position: 'absolute',
   },
   buttonContainer: {
     paddingHorizontal: spacing.lg,
@@ -141,7 +176,14 @@ export const styles = StyleSheet.create({
     height: 54,
     borderRadius: 100,
   },
-  // Verifying screen
+  // Verifying screen (Figma 886-3797)
+  verifyingBackgroundImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  verifyingBackgroundOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+  },
   verifyingContent: {
     flex: 1,
     justifyContent: 'center',
@@ -155,23 +197,26 @@ export const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 3,
     borderColor: colors.white,
-    marginBottom: spacing.xl * 2,
   },
   verifyingSelfieImage: {
     width: '100%',
     height: '100%',
   },
-  verifyingPill: {
+  verifyingButtonContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl * 1.5,
+  },
+  verifyingButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl * 1.5,
-    borderRadius: 100,
+    backgroundColor: 'rgba(80, 80, 80, 0.95)',
+    paddingVertical: 16,
+    paddingHorizontal: spacing.xl,
+    borderRadius: 12,
     gap: spacing.sm,
   },
-  verifyingPillText: {
+  verifyingButtonText: {
     fontSize: 16,
     fontFamily: typography.fontFamily.medium,
     color: colors.white,

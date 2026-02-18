@@ -1,6 +1,7 @@
 import { StyleSheet, Dimensions } from 'react-native';
 import { colors, spacing, typography } from '../../../theme';
 
+// Figma 802-3084: 2x3 grid, consistent spacing
 const CARD_GAP = 12;
 const HORIZONTAL_PADDING = 20;
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -12,9 +13,11 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   backgroundGlow: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '50%',
+    height: 280,
   },
   safeArea: {
     flex: 1,
@@ -44,22 +47,22 @@ export const styles = StyleSheet.create({
     gap: CARD_GAP,
     marginBottom: spacing.xl,
   },
+  // Figma 802-3084: rounded rect, light gray dashed border, white background
   photoCard: {
     width: CARD_SIZE,
     height: CARD_SIZE,
     borderRadius: 16,
     overflow: 'hidden',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: colors.neutral[100],
-    backgroundColor: colors.neutral[50],
+    borderColor: colors.neutral[200],
+    backgroundColor: colors.white,
   },
   photoImage: {
     width: '100%',
     height: '100%',
   },
   placeholder: {
-    flex: 1,
     width: '100%',
     height: '100%',
     alignItems: 'center',

@@ -6,6 +6,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Button } from '../../../components/Button';
 import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
+import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import {
   navigateToFirstQuestion,
   navigateToResumeQuestion,
@@ -13,6 +14,7 @@ import {
 } from '../../../modules/onboarding/questionManager';
 import { LinearGradient } from 'react-native-linear-gradient';
 import { useOnboardingStore } from '../../../store/onboarding.store';
+import { colors } from '../../../theme';
 import { styles } from './styles';
 
 // Placeholder for the onboarding image - replace with actual asset
@@ -41,31 +43,47 @@ export const OnboardingIntroScreen: React.FC = () => {
   return (
     <View style={styles.wrapper}>
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-      {/* <SafeAreaView style={styles.safeArea}> */}
+      <View style={styles.gradientBackground}>
+  <Svg height="100%" width="100%" style={{ position: 'absolute' }}>
+    <Defs>
+      {/*
+        RadialGradient usage:
+        - id="grad"       : Unique ID for referencing (used in fill="url(#grad)")
+        - cx="50%"        : Center X of ellipse (horizontally centered)
+        - cy="30%"        : Center Y of ellipse (30% from top)
+        - rx="60%"        : Radius X of ellipse (horizontal spread)
+        - ry="60%"        : Radius Y of ellipse (vertical spread)
+        - fx="50%"        : Focus X (gradient radiates from this point)
+        - fy="40%"        : Focus Y (slightly below center for top-down glow)
+        - Stop offset="0%": Inner color #C87BF5 at 80% opacity
+        - Stop offset="100%": Outer color #FFFFFF at full opacity
+      */}
+      <RadialGradient
+        id="grad"
+        cx="50%"
+        cy="35%"
+        rx="70%"
+        ry="50%"
+        fx="40%"
+        fy="32%"
+      >
+        <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="1" />
+        <Stop offset="0%" stopColor="#C87BF5" stopOpacity="0.7" />
+        <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="1" />
+      </RadialGradient>
+    </Defs>
+    {/* Full-size rect filled with the radial gradient */}
+    <Rect width="100%" height="100%" fill="url(#grad)" />
+  </Svg>
+</View>
         <View style={styles.container}>
           {/* Image Section - 60% */}
           <View style={styles.imageSection}>
-            <LinearGradient
-    colors={['#FFFFFF', '#FFFFFF']}
-    style={styles.gradientBackground}
-  />
-
-  {/* Purple glow */}
-  <LinearGradient
-    colors={[
-      'rgba(203, 123, 245, 0.55)', // purpleLight
-      'rgba(119, 66, 240, 0.35)',  // purple
-      'rgba(255, 255, 255, 0)',
-    ]}
-    start={{ x: 0.5, y: 0 }}
-    end={{ x: 0.5, y: 1 }}
-    style={styles.glow}
-  />
-            <Image 
-              source={ONBOARDING_IMAGE} 
-              style={styles.onboardingImage} 
-              resizeMode="cover" 
-            />
+            {/* <Image
+              source={ONBOARDING_IMAGE}
+              style={styles.onboardingImage}
+              resizeMode="cover"
+            /> */}
           </View>
 
           {/* Content Section - 40% */}

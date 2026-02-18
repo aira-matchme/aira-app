@@ -186,6 +186,8 @@ export const STRINGS = {
     SELFIE_CAMERA: {
       TITLE: 'Selfie verification',
       SUBTITLE: 'Keep your face within the frame',
+      TIP_1: 'Make sure your face is well lit',
+      TIP_2: 'Hold still for a moment',
       BUTTON: 'Take Photo',
       VERIFYING_TITLE: 'Verifying your selfie',
       VERIFYING_SUBTITLE: 'Please wait while we verify your identity',

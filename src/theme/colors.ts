@@ -80,6 +80,23 @@ export const colors = {
     dark: '#999999', // neutral.400
   },
   
+  // Figma Primary Gradient - from Color style details
+  // Use for primary gradient backgrounds (e.g. Personalise, profile screens)
+  gradients: {
+    primary: {
+      colors: ['#CB7BF5', '#7742F0'] as const,
+      start: { x: 0.5, y: 0 } as const,
+      end: { x: 0.5, y: 1 } as const,
+    },
+    // Light gradient for Onboarding Intro and similar screens
+    onboardingIntro: {
+      colors: ['#DDD2FE', '#ffffff'] as const,
+      start: { x: 0.5, y: 0 } as const,
+      end: { x: 0.5, y: 1 } as const,
+    },
+    
+  },
+
   // Status / Semantic colors (aligned with Figma)
   semantic: {
     success: '#009900', // #090 in 6-digit hex - success green from Figma
