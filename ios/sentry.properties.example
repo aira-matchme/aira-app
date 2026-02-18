@@ -1,0 +1,9 @@
+# Sentry build config for iOS (sourcemaps / dSYM upload).
+# Copy to ios/sentry.properties and set auth.token from Sentry (Settings → Auth Tokens).
+# Or set SENTRY_AUTH_TOKEN in the environment and leave auth.token blank.
+#
+# auth.token=your-sentry-auth-token
+#
+defaults.org=your-org-slug
+defaults.project=your-project-slug
+defaults.url=https://sentry.io/

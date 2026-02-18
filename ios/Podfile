@@ -1,3 +1,6 @@
+# New architecture is explicitly disabled via :new_arch_enabled => false in use_react_native! below.
+# Do not remove that option or the build may default to new architecture and break the app.
+
 def node_require(script)
   require Pod::Executable.execute_command('node', ['-p',
     "require.resolve(

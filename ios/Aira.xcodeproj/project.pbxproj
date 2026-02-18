@@ -265,7 +265,7 @@
 			outputPaths = (
 			);
 			shellPath = /bin/sh;
-			shellScript = "/bin/sh ../node_modules/@sentry/react-native/scripts/sentry-xcode-debug-files.sh";
+			shellScript = "/bin/sh \"$SRCROOT/../node_modules/@sentry/react-native/scripts/sentry-xcode-debug-files.sh\"";
 		};
 /* End PBXShellScriptBuildPhase section */
 

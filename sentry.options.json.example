@@ -1,0 +1,5 @@
+{
+  "dsn": "YOUR_SENTRY_DSN_FROM_PROJECT_SETTINGS",
+  "environment": "development",
+  "debug": false
+}

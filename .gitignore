@@ -10,6 +10,12 @@
 .env.sentry-build-plugin
 .watchmanconfig
 
+# Sentry (credentials – use .example files as templates)
+android/sentry.properties
+ios/sentry.properties
+sentry.options.json
+android/app/src/main/assets/sentry.options.json
+
 # Buck
 buck-out/
 \.buckd/
