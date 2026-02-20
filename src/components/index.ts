@@ -1,3 +1,4 @@
+export * from './AttachmentOptionsBottomSheet';
 export * from './Button';
 export * from './BottomSheet';
 export * from './LoginOptionsBottomSheet';

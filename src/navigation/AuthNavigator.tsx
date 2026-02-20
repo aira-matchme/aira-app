@@ -26,6 +26,7 @@ import { OnboardingCardQuestionScreen } from '../screens/onboarding/OnboardingCa
 import { OnboardingBooleanQuestionScreen } from '../screens/onboarding/OnboardingBooleanQuestionScreen';
 import { OnboardingPhotoQuestionScreen } from '../screens/onboarding/OnboardingPhotoQuestionScreen';
 import { PreferencesMatchScreen } from '../screens/preferences/PreferencesMatchScreen';
+import { LikesScreen } from '../screens/LikesScreen';
 import { AuthStackParamList } from './types';
 import { useAuthStore } from '../store/auth.store';
 import { getPostAuthScreen } from './getPostAuthScreen';
@@ -169,6 +170,7 @@ export const AuthNavigator = () => {
         component={PreferencesMatchScreen}
         options={profileScreenOptions}
       />
+      <Stack.Screen name="Likes" component={LikesScreen} />
     </Stack.Navigator>
   );
 };

@@ -71,10 +71,23 @@ export type AuthStackParamList = {
     questionOrder: number;
   };
   PreferencesMatch: undefined;
+  Likes: undefined;
 };
 
 export type TabStackParamList = {
   Home: undefined;
+  Chat: undefined;
+  Match: undefined; // Center "ai" tab
+  Likes: undefined;
   Profile: undefined;
+};
+
+export type ChatStackParamList = {
+  ChatList: undefined;
+  ChatDetail: {
+    chatId: string;
+    name: string;
+    avatar?: number;
+  };
 };
 

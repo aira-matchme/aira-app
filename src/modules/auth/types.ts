@@ -11,6 +11,7 @@ export interface RegisterRequest {
 
 export interface SendOtpRequest {
   email: string;
+
 }
 
 export interface SendOtpResponseData {
@@ -43,6 +44,9 @@ export interface SocialLoginRequest {
 export interface VerifyOtpRequest {
   email: string;
   otp: string;
+  deviceToken: string;
+  deviceId: string;
+  deviceType?: 'android' | 'ios' | 'web';
 }
 
 export interface AuthResponse {

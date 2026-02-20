@@ -18,6 +18,7 @@ import type { AuthStackParamList } from '../../../navigation/types';
 import { useSendOtp } from '../../../modules/auth/hooks';
 import Toast from 'react-native-toast-message';
 import { styles } from './styles';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type EmailLoginNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'EmailLogin'>;
 

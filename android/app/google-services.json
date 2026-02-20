@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "303092384223",
+    "project_id": "aira-55e7d",
+    "storage_bucket": "aira-55e7d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:303092384223:android:8908563977e6fe0006446a",
+        "android_client_info": {
+          "package_name": "com.aira.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBj57iJz1Ahvjn1oXg5TKzsIL63_1u6Ak8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

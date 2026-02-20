@@ -10,12 +10,15 @@ import { EmailLoginScreen } from '../screens/auth/EmailLoginScreen';
 import { LostAccessEmailScreen } from '../screens/auth/LostAccessEmailScreen';
 import { OTPVerificationScreen } from '../screens/auth/OTPVerificationScreen';
 import { useAuthStore } from '../store/auth.store';
+import { getPostAuthScreen } from './getPostAuthScreen';
 
 const RootStack = createNativeStackNavigator();
 
 export const RootNavigator = () => {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, isLoading, user, shouldShowEnableNotifications } = useAuthStore();
   console.log('🚀 RootNavigator - isAuthenticated:', isAuthenticated, 'isLoading:', isLoading);
+  const postAuthScreen = getPostAuthScreen(user ?? null, shouldShowEnableNotifications);
+  const shouldShowTabs = isAuthenticated && postAuthScreen === 'Likes';
 
   useEffect(() => {
     // Disable Android back button behavior
@@ -40,11 +43,11 @@ export const RootNavigator = () => {
           <RootStack.Screen name="Splash" component={SplashScreen} />
         ) : (
           <>
-            {/* Always include AuthStack - it will show ProfileIntro if authenticated, Welcome if not */}
-            <RootStack.Screen 
-              name="AuthStack" 
-              component={AuthNavigator}
-            />
+            {shouldShowTabs ? (
+              <RootStack.Screen name="Tabs" component={TabNavigator} />
+            ) : (
+              <RootStack.Screen name="AuthStack" component={AuthNavigator} />
+            )}
             <RootStack.Screen
               name="EmailLogin"
               component={EmailLoginScreen}

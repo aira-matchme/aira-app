@@ -23,6 +23,7 @@ import { Alert } from 'react-native';
 import appleAuth from '@invertase/react-native-apple-authentication';
 import { apiClient } from '../services/api/client';
 import { endpoints } from '../services/api/endpoints';
+import { getDeviceToken } from '../services/firebase/messaging';
 
 const DEVICE_ID_KEY = '@device_id';
 
@@ -113,6 +114,8 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
       idToken: idToken,
       deviceType: Platform.OS === 'android' ? 'android' : 'ios',
       deviceId: await getDeviceId(),
+      deviceToken: await getDeviceToken(),
+
     };
 console.log('🔑 Google Login Payload:', payload);
     const response = await apiClient.post(endpoints.auth.googleLogin, payload);
@@ -170,6 +173,7 @@ console.log('🔑 Google Login Payload:', payload);
         idToken:identityToken,
         deviceType: Platform.OS === 'android' ? 'android' : 'ios',
         deviceId: await getDeviceId(),
+        deviceToken: await getDeviceToken(),
       };
 
       const response = await apiClient.post(endpoints.auth.appleLogin, payload);

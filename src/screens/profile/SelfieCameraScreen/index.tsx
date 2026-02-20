@@ -109,7 +109,7 @@ export const SelfieCameraScreen: React.FC = () => {
         </SafeAreaView>
       </View>
     );
-    
+
   }
 
   if (!device) {

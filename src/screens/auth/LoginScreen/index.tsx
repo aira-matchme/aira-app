@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { useAuthStore } from '../../../store/auth.store';
+import { getApps } from '@react-native-firebase/app';
 // import { loginApi } from '../../../services/api/auth.service';
 import { styles } from './styles';
 
@@ -9,7 +10,7 @@ export const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const setTokens = useAuthStore((state) => state.setTokens);
-
+  console.log('Firebase apps:', getApps());
   const handleLogin = async () => {
     if (!email || !password) {
       return;

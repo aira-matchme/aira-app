@@ -21,6 +21,7 @@ export type PostAuthScreen = keyof Pick<
   | 'PreferencesMatch'
   | 'VideoVerification'
   | 'FaceVerification'
+  | 'Likes'
 >;
 
 /**
@@ -43,6 +44,7 @@ export function getPostAuthScreen(
   // if (user.livenessCheck)
   //   return user.galleryPhotosUploaded ? 'OnboardingIntro' : 'ProfilePhotos';
   // if (user.profilePhoto) return 'VideoVerification';
-  return 'FaceVerification';
+  // return 'FaceVerification';
+  return 'Likes';
 
 }

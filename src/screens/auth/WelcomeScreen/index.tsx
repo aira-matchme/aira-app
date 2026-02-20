@@ -12,6 +12,7 @@ import { Button } from '../../../components/Button';
 import { LoginOptionsBottomSheet } from '../../../components/LoginOptionsBottomSheet';
 import { LogoWordmark } from '../../../assets/icons/branding/LogoWordmark';
 import { styles } from './styles';
+import { getApps } from '@react-native-firebase/app';
 
 const IMAGE_BACKGROUND = require('../../../assets/images/welcomescreen.png');
 
@@ -19,6 +20,7 @@ export const WelcomeScreen: React.FC = () => {
   const [showLoginOptions, setShowLoginOptions] = useState(false);
 
   const handleGetStarted = () => {
+    console.log('Firebase apps:', getApps());
     setShowLoginOptions(true);
   };
 
