@@ -1,7 +1,5 @@
-import { StyleSheet } from 'react-native';
-import { colors, typography, spacing } from '../../../theme';
-
-const HORIZONTAL_PADDING = 24;
+import { StyleSheet, Platform } from 'react-native';
+import { colors, spacing, typography } from '../../../theme';
 
 export const styles = StyleSheet.create({
   wrapper: {
@@ -11,125 +9,73 @@ export const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  backgroundGradient: {
-    position: 'absolute',
-    width: '100%',
-    height: 600,
-    alignSelf: 'center',
-    top: '15%',
-  },
   headerContainer: {
-    paddingTop: 16,
-    paddingHorizontal: HORIZONTAL_PADDING,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
   },
-  scrollContent: {
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingTop: 8,
-    paddingBottom: spacing.lg,
+  backButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
   },
-  header: {
-    marginBottom: 20,
+  content: {
+    flex: 1,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.lg,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '600',
-    fontFamily: typography.fontFamily.medium,
-    color: colors.neutral[900],
-    lineHeight: 32,
+    fontSize: 36,
+    fontWeight: '500',
+    lineHeight: 44,
     letterSpacing: 0,
-    marginBottom: 8,
+    color: colors.black,
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 14,
-    fontWeight: '400',
-    fontFamily: typography.fontFamily.regular,
+    ...typography.bodyMedium,
     color: colors.neutral[600],
-    lineHeight: 20,
-    letterSpacing: 0,
+    marginBottom: spacing.xl,
   },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 24,
+  optionsContainer: {
+    gap: spacing.sm,
   },
-  chip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
+  optionRow: {
+    height: 64,
+    borderRadius: 40,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    justifyContent: 'center',
     backgroundColor: colors.white,
   },
-  chipSelected: {
+  optionRowSelected: {
+    borderWidth: 2,
     borderColor: colors.primary.purple,
-    backgroundColor: colors.white,
   },
-  chipText: {
-    fontSize: 14,
-    fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
-    color: colors.neutral[900],
-  },
-  chipTextSelected: {
-    color: colors.primary.purple,
-  },
-  optionsSection: {
-    marginBottom: 24,
-  },
-  sliderSection: {
-    marginBottom: 24,
-    minHeight: 340,
-  },
-  optionButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 100,
+  optionRowUnselected: {
     borderWidth: 1,
-    borderColor: colors.neutral[200],
-    backgroundColor: colors.white,
-    marginBottom: 10,
-  },
-  optionButtonSelected: {
-    borderColor: colors.primary.purple,
+    borderColor: colors.neutral[100],
   },
   optionText: {
-    fontSize: 16,
-    fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
-    color: colors.neutral[900],
+    ...typography.bodyMedium,
+    color: colors.black,
   },
   optionTextSelected: {
     color: colors.primary.purple,
   },
-  bottomContainer: {
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl * 1.5,
+  actions: {
+    width: '100%',
+    paddingHorizontal: spacing.md,
+    paddingBottom: Platform.OS === 'ios' ? spacing.xl * 2 : spacing.xl,
   },
-  bottomButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  cancelButton: {
-    flex: 1,
+  primaryButton: {
+    width: '100%',
     height: 54,
     borderRadius: 100,
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
-    backgroundColor: colors.neutral[50],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
-    color: colors.neutral[900],
-  },
-  saveButton: {
-    flex: 1,
-    height: 54,
-    minWidth: 0,
   },
 });

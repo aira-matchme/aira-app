@@ -49,6 +49,7 @@ export const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.regular,
     color: colors.neutral[600],
     lineHeight: 22,
+    paddingBottom: spacing.sm * 2,
   },
   optionsContainer: {
     gap: spacing.sm,

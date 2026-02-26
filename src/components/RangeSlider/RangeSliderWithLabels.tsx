@@ -5,7 +5,9 @@ import { Thumb, Rail, RailSelected, Label } from './RangeSliderParts';
 
 const SLIDER_HEIGHT = 60;
 const SECTION_MIN_HEIGHT = 340;
-const LABEL_OFFSET = 36;
+const LABEL_OFFSET = 10;
+const SLIDER_MARGIN_TOP = 40;
+const LABEL_BELOW_TOP = SLIDER_MARGIN_TOP + SLIDER_HEIGHT; // exactly below the range rail
 
 interface RangeSliderWithLabelsProps {
   min: number;
@@ -84,7 +86,7 @@ const styles = StyleSheet.create({
   slider: {
     width: '100%',
     height: SLIDER_HEIGHT,
-    marginTop: 40,
+    marginTop: SLIDER_MARGIN_TOP,
   },
   labelAbove: {
     position: 'absolute',
@@ -94,7 +96,7 @@ const styles = StyleSheet.create({
   },
   labelBelow: {
     position: 'absolute',
-    bottom: 0,
+    top: LABEL_BELOW_TOP,
     zIndex: 1,
     alignItems: 'center',
   },

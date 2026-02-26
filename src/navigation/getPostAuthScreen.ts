@@ -40,11 +40,14 @@ export function getPostAuthScreen(
   if (!user) return 'EnableNotifications';
 
   // if (user.questionnaireCompleted) return 'PreferencesMatch';
-  // if (!user.isProfileComplete) return 'ProfileIntro';
+  // if (!user.isProfileComplete) return 'ProfileIntro';π
   // if (user.livenessCheck)
   //   return user.galleryPhotosUploaded ? 'OnboardingIntro' : 'ProfilePhotos';
   // if (user.profilePhoto) return 'VideoVerification';
+  // return 'ProfileIntro';
   // return 'FaceVerification';
-  return 'Likes';
+  // return 'OnboardingIntro';
+  // return 'Likes';
+  return 'PreferencesMatch';
 
 }

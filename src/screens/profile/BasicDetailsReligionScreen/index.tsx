@@ -20,7 +20,7 @@ import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { RELIGION_OPTIONS } from '../../../constants/profile';
 import { styles } from './styles';
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
 
 type NavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -56,44 +56,12 @@ export const BasicDetailsReligionScreen: React.FC = () => {
   const onSubmit = (data: ReligionFormData) => {
     setReligion(data.religion);
     setCurrentStep(CURRENT_STEP + 1);
-    navigation.navigate('BasicDetailsPincode');
+    navigation.navigate('BasicDetailsMaritalStatus');
   };
 
   return (
     <View style={styles.wrapper}>
-       <View style={styles.backgroundGlow}>
-        <Svg height="100%" width="100%" style={{ position: 'absolute' }}>
-          <Defs>
-            <RadialGradient
-              id="nameScreenGrad"
-              cx="0%"
-              cy="0%"
-              rx="120%"
-              ry="120%"
-              fx="0%"
-              fy="0%"
-            >
-              <Stop offset="0%" stopColor="#C87BF5" stopOpacity="0.2" />
-              <Stop offset="70%" stopColor="#C87BF5" stopOpacity="0.06" />
-              <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-            </RadialGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#nameScreenGrad)" />
-        </Svg>
-      </View>
-      <LinearGradient
-        colors={[
-          'rgba(203, 123, 245, 0)',
-          'rgba(203, 123, 245, 0.08)',
-          'rgba(203, 123, 245, 0.14)',
-          'rgba(203, 123, 245, 0.08)',
-          'rgba(203, 123, 245, 0)',
-        ]}
-        locations={[0, 0.15, 0.3, 0.5, 1]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={styles.middleGradient}
-      />  
+      <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>

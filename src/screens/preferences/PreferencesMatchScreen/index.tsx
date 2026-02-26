@@ -1,311 +1,132 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StatusBar,
   TouchableOpacity,
-  ScrollView,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import LinearGradient from 'react-native-linear-gradient';
-
-import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
+import type { RouteProp } from '@react-navigation/native';
 import { Button } from '../../../components/Button';
-import { Thumb, Rail, RailSelected } from '../../../components/RangeSlider/RangeSliderParts';
-import { RangeSliderWithLabels } from '../../../components/RangeSlider/RangeSliderWithLabels';
+import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
+import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { STRINGS } from '../../../constants/strings';
-import {
-  EDUCATION_OPTIONS,
-  EMPLOYMENT_OPTIONS,
-  INCOME_OPTIONS,
-} from '../../../constants/profile';
-import {
-  PREFERENCE_CATEGORIES,
-  GENDER_PREFERENCE_OPTIONS,
-  AGE_MIN,
-  AGE_MAX,
-  HEIGHT_MIN,
-  HEIGHT_MAX,
-  DISTANCE_MIN,
-  DISTANCE_MAX,
-  type PreferenceCategoryKey,
-} from '../../../modules/preferences/constants';
 import type { AuthStackParamList } from '../../../navigation/types';
+import { usePreferencesStore } from '../../../store/preferences.store';
 import { styles } from './styles';
 
-type NavigationProp = NativeStackNavigationProp<AuthStackParamList, 'PreferencesMatch'>;
+type PreferencesMatchNavigationProp = NativeStackNavigationProp<
+  AuthStackParamList,
+  'PreferencesMatch'
+>;
+type PreferencesMatchRouteProp = RouteProp<AuthStackParamList, 'PreferencesMatch'>;
+
+export type GenderOption = 'man' | 'woman';
 
 export const PreferencesMatchScreen: React.FC = () => {
-  const navigation = useNavigation<NavigationProp>();
-  const [selectedCategory, setSelectedCategory] = useState<PreferenceCategoryKey>('gender');
-  const [selectedGender, setSelectedGender] = useState<string | null>('man');
-  const [selectedEducation, setSelectedEducation] = useState<string | null>(null);
-  const [selectedEmployment, setSelectedEmployment] = useState<string | null>(null);
-  const [selectedIncome, setSelectedIncome] = useState<string | null>(null);
-  const [ageLow, setAgeLow] = useState(AGE_MIN);
-  const [ageHigh, setAgeHigh] = useState(30);
-  const [heightLow, setHeightLow] = useState(HEIGHT_MIN);
-  const [heightHigh, setHeightHigh] = useState(180);
-  const [distanceLow, setDistanceLow] = useState(DISTANCE_MIN);
-  const [distanceHigh, setDistanceHigh] = useState(30);
+  const navigation = useNavigation<PreferencesMatchNavigationProp>();
+  const route = useRoute<PreferencesMatchRouteProp>();
+  const openedEditFromSummary = usePreferencesStore((s) => s.openedEditFromSummary);
+  const returnToSummary = (route.params?.returnToSummary ?? false) || openedEditFromSummary;
+  const lookingForGender = usePreferencesStore((s) => s.lookingForGender);
+  const setLookingForGender = usePreferencesStore((s) => s.setLookingForGender);
+  const setOpenedEditFromSummary = usePreferencesStore((s) => s.setOpenedEditFromSummary);
+  const [selected, setSelected] = useState<GenderOption | null>(
+    lookingForGender.length > 0 ? lookingForGender[0] : null
+  );
 
-  const renderThumb = useCallback(() => <Thumb />, []);
-  const renderRail = useCallback(() => <Rail />, []);
-  const renderRailSelected = useCallback(() => <RailSelected />, []);
+  useEffect(() => {
+    setSelected(lookingForGender.length > 0 ? lookingForGender[0] : null);
+  }, [lookingForGender]);
 
-  const formatAgeLabel = useCallback((v: number) => STRINGS.PREFERENCES.AGE_YEARS(v), []);
-  const formatHeightLabel = useCallback((v: number) => STRINGS.PREFERENCES.HEIGHT_CM(v), []);
-  const formatDistanceLabel = useCallback((v: number) => STRINGS.PREFERENCES.DISTANCE_MILES(v), []);
+  const handleSelect = (value: GenderOption) => {
+    setSelected((prev) => (prev === value ? null : value));
+  };
 
-  const handleCancel = () => {
+  const handleBack = () => {
     navigation.goBack();
   };
 
   const handleSave = () => {
-    // TODO: Save preferences via API, then navigate to main app (Dashboard/Tabs)
-    navigation.goBack();
+    setLookingForGender(selected ? [selected] : []);
+    if (returnToSummary) {
+      setOpenedEditFromSummary(false);
+      navigation.goBack();
+    } else {
+      navigation.navigate('PreferencesAge', {});
+    }
   };
 
   return (
     <View style={styles.wrapper}>
-       <LinearGradient
-        colors={[
-          'rgba(221, 170, 249, 0)',
-          'rgba(221, 170, 249, 0.18)',
-          'rgba(221, 170, 249, 0.18)',
-          'rgba(221, 170, 249, 0)',
-        ]}
-        locations={[0, 0.38, 0.62, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.backgroundGradient}
-      />
-
+      <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-
       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
         <View style={styles.headerContainer}>
-          <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.8}>
+          <TouchableOpacity
+            onPress={handleBack}
+            style={styles.backButton}
+            activeOpacity={0.7}
+            accessibilityLabel="Go back"
+          >
             <BackArrowIcon size={48} backgroundColor="#FFFFFF" strokeColor="#000000" />
           </TouchableOpacity>
         </View>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.header}>
-            <Text style={styles.title}>
-              {STRINGS.PREFERENCES.FINE_TUNE_TITLE}
-            </Text>
-            <Text style={styles.subtitle}>
-              {STRINGS.PREFERENCES.FINE_TUNE_SUBTITLE}
-            </Text>
-          </View>
 
-          <View style={styles.chipsRow}>
-            {PREFERENCE_CATEGORIES.map((cat) => (
-              <TouchableOpacity
-                key={cat.key}
-                style={[styles.chip, selectedCategory === cat.key && styles.chipSelected]}
-                onPress={() => setSelectedCategory(cat.key)}
-                activeOpacity={0.8}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    selectedCategory === cat.key && styles.chipTextSelected,
-                  ]}
-                >
-                  {cat.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        <View style={styles.content}>
+          <Text style={styles.title}>
+            {STRINGS.PREFERENCES_GENDER.TITLE}
+          </Text>
+          <Text style={styles.subtitle}>
+            {STRINGS.PREFERENCES_GENDER.SUBTITLE}
+          </Text>
 
-          {selectedCategory === 'gender' && (
-            <View style={styles.optionsSection}>
-              {GENDER_PREFERENCE_OPTIONS.map((opt) => (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={[
-                    styles.optionButton,
-                    selectedGender === opt.key && styles.optionButtonSelected,
-                  ]}
-                  onPress={() => setSelectedGender(opt.key)}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      selectedGender === opt.key && styles.optionTextSelected,
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {selectedCategory === 'education' && (
-            <View style={styles.optionsSection}>
-              {EDUCATION_OPTIONS.map((opt) => (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={[
-                    styles.optionButton,
-                    selectedEducation === opt.key && styles.optionButtonSelected,
-                  ]}
-                  onPress={() => setSelectedEducation(opt.key)}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      selectedEducation === opt.key && styles.optionTextSelected,
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {selectedCategory === 'employment' && (
-            <View style={styles.optionsSection}>
-              {EMPLOYMENT_OPTIONS.map((opt) => (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={[
-                    styles.optionButton,
-                    selectedEmployment === opt.key && styles.optionButtonSelected,
-                  ]}
-                  onPress={() => setSelectedEmployment(opt.key)}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      selectedEmployment === opt.key && styles.optionTextSelected,
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {selectedCategory === 'income' && (
-            <View style={styles.optionsSection}>
-              {INCOME_OPTIONS.map((opt) => (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={[
-                    styles.optionButton,
-                    selectedIncome === opt.key && styles.optionButtonSelected,
-                  ]}
-                  onPress={() => setSelectedIncome(opt.key)}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      selectedIncome === opt.key && styles.optionTextSelected,
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {selectedCategory === 'age' && (
-            <View style={styles.sliderSection}>
-              <RangeSliderWithLabels
-                min={AGE_MIN}
-                max={AGE_MAX}
-                step={1}
-                minRange={1}
-                low={ageLow}
-                high={ageHigh}
-                onValueChanged={(low, high) => {
-                  setAgeLow(low);
-                  setAgeHigh(high);
-                }}
-                formatLabel={formatAgeLabel}
-                renderThumb={renderThumb}
-                renderRail={renderRail}
-                renderRailSelected={renderRailSelected}
-              />
-            </View>
-          )}
-
-          {selectedCategory === 'height' && (
-            <View style={styles.sliderSection}>
-              <RangeSliderWithLabels
-                min={HEIGHT_MIN}
-                max={HEIGHT_MAX}
-                step={5}
-                minRange={5}
-                low={heightLow}
-                high={heightHigh}
-                onValueChanged={(low, high) => {
-                  setHeightLow(low);
-                  setHeightHigh(high);
-                }}
-                formatLabel={formatHeightLabel}
-                renderThumb={renderThumb}
-                renderRail={renderRail}
-                renderRailSelected={renderRailSelected}
-              />
-            </View>
-          )}
-
-          {selectedCategory === 'distance' && (
-            <View style={styles.sliderSection}>
-              <RangeSliderWithLabels
-                min={DISTANCE_MIN}
-                max={DISTANCE_MAX}
-                step={1}
-                minRange={1}
-                low={distanceLow}
-                high={distanceHigh}
-                onValueChanged={(low, high) => {
-                  setDistanceLow(low);
-                  setDistanceHigh(high);
-                }}
-                formatLabel={formatDistanceLabel}
-                renderThumb={renderThumb}
-                renderRail={renderRail}
-                renderRailSelected={renderRailSelected}
-              />
-            </View>
-          )}
-        </ScrollView>
-
-        <View style={styles.bottomContainer}>
-          <View style={styles.bottomButtons}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleCancel}
-              activeOpacity={0.8}
+          <View style={styles.optionsContainer}>
+            <Pressable
+              onPress={() => handleSelect('man')}
+              style={[
+                styles.optionRow,
+                selected === 'man' ? styles.optionRowSelected : styles.optionRowUnselected,
+              ]}
             >
-              <Text style={styles.cancelButtonText}>
-                {STRINGS.PREFERENCES.CANCEL}
+              <Text
+                style={[
+                  styles.optionText,
+                  selected === 'man' && styles.optionTextSelected,
+                ]}
+              >
+                {STRINGS.PREFERENCES_GENDER.MAN}
               </Text>
-            </TouchableOpacity>
-            <Button
-              title={STRINGS.PREFERENCES.SAVE}
-              onPress={handleSave}
-              variant="primary"
-              style={styles.saveButton}
-            />
+            </Pressable>
+            <Pressable
+              onPress={() => handleSelect('woman')}
+              style={[
+                styles.optionRow,
+                selected === 'woman' ? styles.optionRowSelected : styles.optionRowUnselected,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.optionText,
+                  selected === 'woman' && styles.optionTextSelected,
+                ]}
+              >
+                {STRINGS.PREFERENCES_GENDER.WOMAN}
+              </Text>
+            </Pressable>
           </View>
+        </View>
+
+        <View style={styles.actions}>
+          <Button
+            title={STRINGS.PREFERENCES.SAVE}
+            onPress={handleSave}
+            variant="primary"
+            style={styles.primaryButton}
+          />
         </View>
       </SafeAreaView>
     </View>

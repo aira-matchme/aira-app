@@ -31,6 +31,15 @@ export interface ProfileSetupData {
 
   // Step 8: Religion
   religion: string | null;
+
+  // Step 9: Marital status
+  maritalStatus: string | null;
+
+  // Step 10: Children
+  children: string | null;
+
+  // Step 11: Interests
+  interests: string[] | null;
 }
 
 interface ProfileState extends ProfileSetupData {
@@ -46,6 +55,9 @@ interface ProfileState extends ProfileSetupData {
   setEmployment: (employment: string) => void;
   setFinalChoice: (finalChoice: string) => void;
   setReligion: (religion: string) => void;
+  setMaritalStatus: (maritalStatus: string) => void;
+  setChildren: (children: string) => void;
+  setInterests: (interests: string[]) => void;
   setCurrentStep: (step: number) => void;
   resetProfile: () => void;
   isStepComplete: (step: number) => boolean;
@@ -60,12 +72,15 @@ const initialState: ProfileSetupData = {
   employment: null,
   finalChoice: null,
    religion: null,
+  maritalStatus: null,
+  children: null,
+  interests: null,
 };
 
 export const useProfileStore = create<ProfileState>((set, get) => ({
   ...initialState,
   currentStep: 1,
-  totalSteps: 9,
+  totalSteps: 12,
 
   setName: (name) => set({ name }),
   
@@ -84,7 +99,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   setFinalChoice: (finalChoice) => set({ finalChoice }),
   
   setReligion: (religion) => set({ religion }),
-  
+  setMaritalStatus: (maritalStatus) => set({ maritalStatus }),
+  setChildren: (children) => set({ children }),
+  setInterests: (interests) => set({ interests }),
+
   setCurrentStep: (step) => set({ currentStep: step }),
   
   resetProfile: () => set({ ...initialState, currentStep: 1 }),
@@ -112,6 +130,12 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         return !!state.finalChoice;
       case 8:
         return !!state.religion;
+      case 9:
+        return !!state.maritalStatus;
+      case 10:
+        return !!state.children;
+      case 11:
+        return !!state.interests && state.interests.length > 0;
       default:
         return false;
     }

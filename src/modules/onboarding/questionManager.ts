@@ -110,7 +110,7 @@ export const navigateToNextQuestion = (
         console.error('Failed to submit onboarding answers', error);
       } finally {
         clearOnboarding();
-        navigation.navigate('PreferencesMatch');
+        navigation.navigate('PreferencesStart');
       }
     })();
   }

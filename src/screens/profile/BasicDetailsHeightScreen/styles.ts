@@ -1,6 +1,9 @@
 import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../../theme';
 
+const PICKER_ROW_HEIGHT = 52;
+const PICKER_VISIBLE_HEIGHT = 180; // 3 rows visible, center selected
+
 export const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
@@ -13,20 +16,22 @@ export const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    width: '50%',
-    height: 280,
-  },
-  middleGradient: {
-    position: 'absolute',
-    top: '30%',
-    left: 0,
-    right: 0,
-    height:480,
+    width: '100%',
+    height: 320,
   },
   content: {
     flex: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm * 2,
+  },
+  backButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.primary[50],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
   header: {
     marginBottom: spacing.xl * 2,
@@ -35,7 +40,7 @@ export const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: '500',
     fontFamily: typography.fontFamily.medium,
-    color: colors.black,
+    color: colors.neutral[900],
     lineHeight: 44,
     marginBottom: spacing.sm,
   },
@@ -47,55 +52,43 @@ export const styles = StyleSheet.create({
     lineHeight: 22,
     letterSpacing: 0.32,
   },
-  inputWrapper: {
-    width: '100%',
-    maxWidth: 343,
-    alignSelf: 'center',
-  },
-  inputContainer: {
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.white,
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 3,
-  },
-  input: {
-    height: 52,
-    paddingHorizontal: 20,
-    paddingRight: 96,
-    fontSize: 16,
-    color: colors.black,
-  },
-  unitToggle: {
-    position: 'absolute',
-    right: 6,
-    top: 6,
-    bottom: 6,
+  pickerContainer: {
     flexDirection: 'row',
-    backgroundColor: colors.neutral[50],
-    borderRadius: 100,
-    padding: 2,
-  },
-  unitButton: {
-    paddingHorizontal: 12,
-    borderRadius: 100,
     justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.xl,
+    paddingHorizontal: spacing.lg,
   },
-  unitButtonActive: {
-    backgroundColor: colors.white,
+  pickerColumn: {
+    height: PICKER_VISIBLE_HEIGHT,
+    minWidth: 80,
   },
-  unitText: {
-    fontSize: 14,
+  scrollContent: {
+    paddingVertical: (PICKER_VISIBLE_HEIGHT - PICKER_ROW_HEIGHT) / 2,
+  },
+  pickerRow: {
+    height: PICKER_ROW_HEIGHT,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  pickerRowSelected: {
+    backgroundColor: colors.primary[50],
+    paddingHorizontal: spacing.lg,
+  },
+  pickerText: {
+    fontSize: 22,
     fontFamily: typography.fontFamily.regular,
-    color: colors.neutral[500],
+    paddingHorizontal: spacing.lg,
+    color: colors.neutral[400],
+    lineHeight: 28,
   },
-  unitTextActive: {
+  pickerTextSelected: {
+    fontSize: 28,
     fontFamily: typography.fontFamily.medium,
-    color: colors.black,
+    color: colors.primary.purple,
+    lineHeight: 36,
   },
   buttonContainer: {
     paddingHorizontal: spacing.lg,
@@ -107,4 +100,3 @@ export const styles = StyleSheet.create({
     height: 54,
   },
 });
-

@@ -24,4 +24,17 @@ export const endpoints = {
     getQuestions: '/questions',
     answerQuestion: '/questions/answers',
   },
+  preferences: {
+    editPreference: '/auth/preference',
+  },
+  chat: {
+    getChats: '/chat/get-chat-list',
+    getChatMessages: '/chat/messages',
+    sendMessage: '/chat/messages',
+    readMessage: '/chat/messages/read',
+    deleteMessage: '/chat/messages/delete',
+    deleteChat: '/chat/delete',
+    blockUser: '/chat/block',
+    unblockUser: '/chat/unblock',
+  },
 };

@@ -172,26 +172,26 @@ export const OTPVerificationScreen: React.FC = () => {
         deviceId: await getDeviceId() ?? '',
         deviceType: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web',
       });
-
+console.log('OTP Verification Response:', response, await getDeviceToken(), await getDeviceId());
       if (response.data?.accessToken && response.data?.refreshToken) {
         await setTokens(response.data.accessToken, response.data.refreshToken);
         let userData = response.data?.user;
-        try {
-          const profileResponse = await getProfileApi();
-          if (profileResponse?.data) {
-            userData = profileResponse.data;
-            setUser(userData);
-          } else if (response.data?.user) {
-            userData = response.data.user;
-            setUser(userData);
-          }
-        } catch (profileError) {
-          console.warn('Profile fetch after verify failed, using verify response user', profileError);
-          if (response.data?.user) {
-            userData = response.data.user;
-            setUser(userData);
-          }
-        }
+        // try {
+        //   const profileResponse = await getProfileApi();
+        //   if (profileResponse?.data) {
+        //     userData = profileResponse.data;
+        //     setUser(userData);
+        //   } else if (response.data?.user) {
+        //     userData = response.data.user;
+        //     setUser(userData);
+        //   }
+        // } catch (profileError) {
+        //   console.warn('Profile fetch after verify failed, using verify response user', profileError);
+        //   if (response.data?.user) {
+        //     userData = response.data.user;
+        //     setUser(userData);
+        //   }
+        // }
 
         let shouldShowNotifications = false;
         try {

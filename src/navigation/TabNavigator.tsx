@@ -10,7 +10,7 @@ import { ChatStackNavigator } from './ChatStackNavigator';
 import { MatchScreen } from '../screens/MatchScreen';
 // import { LikesScreen } from '../screens/LikesScreen';
 import { LikesScreen } from '../screens/LikesScreen/index';
-import { ProfileTabScreen } from '../screens/ProfileTabScreen';
+import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { TabStackParamList } from './types';
 import { colors } from '../theme';
 
@@ -146,7 +146,7 @@ export const TabNavigator = () => {
       />
       <Tab.Screen
         name="Profile"
-        component={ProfileTabScreen}
+        component={ProfileStackNavigator}
         options={{
           tabBarLabel: 'Profile',
           tabBarIcon: ({ color }) => (

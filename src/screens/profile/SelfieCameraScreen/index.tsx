@@ -67,7 +67,7 @@ export const SelfieCameraScreen: React.FC = () => {
       setScreenState('verifying');
       try {
         await uploadSelfieApi(photo.path);
-        setScreenState('verified');
+        navigation.navigate('VideoVerification');
       } catch (err: unknown) {
         const message =
           (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data

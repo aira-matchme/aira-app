@@ -12,8 +12,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
-import LinearGradient from 'react-native-linear-gradient';
+import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
 
 import { Button } from '../../../components/Button';
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
@@ -107,27 +106,8 @@ export const BasicDetailsDobScreen: React.FC = () => {
 
   return (
     <View style={styles.wrapper}>
-      <View style={styles.backgroundGlow}>
-        <Svg height="100%" width="100%" style={{ position: 'absolute' }}>
-          <Defs>
-            <RadialGradient
-              id="dobScreenGrad"
-              cx="0%"
-              cy="0%"
-              rx="120%"
-              ry="120%"
-              fx="0%"
-              fy="0%"
-            >
-              <Stop offset="0%" stopColor="#C87BF5" stopOpacity="0.2" />
-              <Stop offset="70%" stopColor="#C87BF5" stopOpacity="0.06" />
-              <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-            </RadialGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#dobScreenGrad)" />
-        </Svg>
-      </View>
-      <LinearGradient
+      <ProfileScreenGradient />
+      {/* <LinearGradient
         colors={[
           'rgba(203, 123, 245, 0)',
           'rgba(203, 123, 245, 0.08)',
@@ -139,7 +119,7 @@ export const BasicDetailsDobScreen: React.FC = () => {
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={styles.middleGradient}
-      />
+      /> */}
 
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 

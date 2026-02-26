@@ -53,19 +53,13 @@ export const OnboardingCardQuestionScreen: React.FC = () => {
 
   return (
     <View style={styles.wrapper}>
-      <LinearGradient
-        colors={['#F3E8FF', '#F5E7FF', '#F3E8FF']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.backgroundGlow}
-      />
 
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <View style={styles.headerContainer}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <BackArrowIcon size={48} />
+          <BackArrowIcon size={48} backgroundColor='#F1ECFE' />
           </TouchableOpacity>
         </View>
 

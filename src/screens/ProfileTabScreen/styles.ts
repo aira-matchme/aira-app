@@ -1,0 +1,193 @@
+import { StyleSheet } from 'react-native';
+import { colors, typography, spacing } from '../../theme';
+
+export const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.light,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: spacing.md,
+    paddingTop: 64,
+    paddingBottom: 120,
+  },
+  profileSection: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  avatarWrapper: {
+    width: 100,
+    height: 100,
+    marginBottom: 8,
+  },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 1000,
+    backgroundColor: colors.neutral[200],
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 1000,
+  },
+  progressRing: {
+    position: 'absolute',
+    top: -3,
+    left: -3,
+    width: 106,
+    height: 106,
+  },
+  progressBadge: {
+    position: 'absolute',
+    bottom: 0,
+    alignSelf: 'center',
+    backgroundColor: colors.primary.purple,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 1000,
+  },
+  progressBadgeText: {
+    ...typography.small,
+    fontWeight: '500',
+    color: colors.white,
+    letterSpacing: 0.48,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  name: {
+    ...typography.bodyMedium,
+    fontSize: 16,
+    color: colors.black,
+    letterSpacing: 0.32,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  editButtonText: {
+    ...typography.small,
+    fontWeight: '500',
+    color: colors.black,
+    letterSpacing: 0.48,
+  },
+  airaPlusCard: {
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: colors.secondary.lavender,
+    overflow: 'hidden',
+    height: 188,
+    marginBottom: spacing.lg,
+  },
+  airaPlusBackgroundImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  airaPlusGradientOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 1,
+  },
+  airaPlusOverlayTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  airaPlusTitle: {
+    color: colors.white,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  airaPlusOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    padding: 24,
+    justifyContent: 'space-between',
+  },
+  airaPlusLogo: {
+    width: 66,
+    height: 48,
+  },
+  airaPlusText: {
+    ...typography.label,
+    fontSize: 14,
+    color: colors.white,
+    letterSpacing: 0.28,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  airaPlusButton: {
+    alignSelf: 'flex-start',
+    minWidth: 160,
+  },
+  menuList: {
+    gap: 8,
+    marginBottom: spacing.lg,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.white,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    borderRadius: 160,
+  },
+  menuRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  menuRowLabel: {
+    ...typography.bodyMedium,
+    fontSize: 16,
+    color: colors.black,
+    letterSpacing: 0.32,
+    paddingVertical: 8,
+  },
+  footer: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  footerLogo: {
+    marginBottom: 16,
+  },
+  version: {
+    ...typography.body,
+    fontSize: 14,
+    fontWeight: '400',
+    color: colors.neutral[700],
+    letterSpacing: 0.28,
+    marginBottom: spacing.lg,
+  },
+  logoutButton: {
+    width: '100%',
+    height: 54,
+    borderRadius: 100,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+    overflow: 'hidden',
+  },
+  logoutGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutText: {
+    ...typography.button,
+    color: colors.white,
+  },
+});

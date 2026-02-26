@@ -108,24 +108,8 @@ export const styles = StyleSheet.create({
   circularButton: {
     width: 64,
     height: 64,
-    borderRadius: 32,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-  },
-  circularButtonGradient: {
-    width: '100%',
-    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  circularButtonDisabled: {
-    opacity: 0.5,
   },
 });
 

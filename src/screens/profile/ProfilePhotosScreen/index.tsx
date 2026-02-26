@@ -17,7 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { AddPhotoIcon } from '../../../assets/icons/common/AddPhotoIcon';
 import { ActionSheetCameraIcon } from '../../../assets/icons/common/ActionSheetCameraIcon';
@@ -55,6 +55,7 @@ export const ProfilePhotosScreen: React.FC = () => {
   const [pendingGalleryIndex, setPendingGalleryIndex] = useState<number | null>(null);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [uploadingSlot, setUploadingSlot] = useState<number | null>(null);
+  const [uploadedSlots, setUploadedSlots] = useState<Set<number>>(new Set());
 
   const handlePickerResponse = async (
     response: { didCancel?: boolean; errorCode?: string; errorMessage?: string; assets?: Array<{ uri?: string }> },
@@ -73,11 +74,17 @@ export const ProfilePhotosScreen: React.FC = () => {
       next[index] = uri;
       return next;
     });
+    setUploadedSlots((prev) => {
+      const next = new Set(prev);
+      next.delete(index);
+      return next;
+    });
 
     const order = index + 1; // 1-based: 1st slot = 1, 6th slot = 6
     setUploadingSlot(index);
     try {
       await uploadProfilePhotoApi(uri, order);
+      setUploadedSlots((prev) => new Set(prev).add(index));
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ||
@@ -87,6 +94,11 @@ export const ProfilePhotosScreen: React.FC = () => {
       setPhotos((prev) => {
         const next = [...prev];
         next[index] = null;
+        return next;
+      });
+      setUploadedSlots((prev) => {
+        const next = new Set(prev);
+        next.delete(index);
         return next;
       });
     } finally {
@@ -247,8 +259,8 @@ export const ProfilePhotosScreen: React.FC = () => {
     }
   };
 
-  const photoCount = photos.filter(Boolean).length;
-  const canContinue = photoCount >= MIN_PHOTOS_REQUIRED;
+  const successfulUploadCount = uploadedSlots.size;
+  const canContinue = successfulUploadCount >= MIN_PHOTOS_REQUIRED;
 
   const handleContinue = () => {
     if (!canContinue) return;
@@ -257,27 +269,7 @@ export const ProfilePhotosScreen: React.FC = () => {
 
   return (
     <View style={styles.wrapper}>
-      <View style={styles.backgroundGlow}>
-        <Svg height="100%" width="100%" style={{ position: 'absolute' }}>
-          <Defs>
-            <RadialGradient
-              id="nameScreenGrad"
-              cx="0%"
-              cy="0%"
-              rx="120%"
-              ry="120%"
-              fx="0%"
-              fy="0%"
-            >
-              <Stop offset="0%" stopColor="#C87BF5" stopOpacity="0.2" />
-              <Stop offset="70%" stopColor="#C87BF5" stopOpacity="0.06" />
-              <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-            </RadialGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#nameScreenGrad)" />
-        </Svg>
-      </View>
-
+      <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>

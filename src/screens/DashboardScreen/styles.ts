@@ -1,0 +1,359 @@
+
+import { StyleSheet, Dimensions, Platform } from 'react-native';
+import { colors, typography } from '../../theme';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const H_PADDING = 26;
+// Figma 1399-7490: card with prominent rounded bottom corners, subtle shadow
+const CARD_BORDER_RADIUS_TOP = 20;
+const CARD_BORDER_RADIUS_BOTTOM = 28;
+const CARD_HORIZONTAL_MARGIN = 10;
+const CARD_WIDTH = SCREEN_WIDTH - CARD_HORIZONTAL_MARGIN * 2;
+const HEADER_BUTTON_SIZE = 40;
+const OVERLAY_TOP_RADIUS = 16;
+const ACTION_BUTTON_SIZE = 56;
+const MATCH_CHIP_BORDER_RADIUS = 12;
+
+export const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: H_PADDING,
+    marginTop: 8,
+    marginBottom: 8,
+    backgroundColor: colors.white,
+  },
+  logoWrap: {
+    width: 100,
+    height: 32,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerButton: {
+    width: HEADER_BUTTON_SIZE,
+    height: HEADER_BUTTON_SIZE,
+    borderRadius: HEADER_BUTTON_SIZE / 2,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    alignSelf: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 28,
+    padding: 4,
+    marginTop: 14,
+  },
+  toggleButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  toggleButtonInactive: {
+    backgroundColor: colors.neutral[200],
+  },
+  toggleButtonGradient: {
+    overflow: 'hidden',
+  },
+  cardContainer: {
+    flex: 1,
+    // paddingHorizontal: CARD_HORIZONTAL_MARGIN,
+    // paddingBottom: 24,
+  },
+  scrollView: {
+    flex: 1,
+    paddingHorizontal: CARD_HORIZONTAL_MARGIN,
+    // paddingBottom: 24,
+  },
+  scrollContent: {
+    paddingTop: 8,
+    // paddingHorizontal: 0,
+  },
+  /** Figma 1399-7489: one full-screen card per slide, 5% of next card visible */
+  slide: {
+    width: '100%',
+  },
+  cardSection: {
+    marginBottom: 20,
+  },
+  card: {
+    width: CARD_WIDTH,
+    flex: 1,
+    borderTopLeftRadius: CARD_BORDER_RADIUS_TOP,
+    borderTopRightRadius: CARD_BORDER_RADIUS_TOP,
+    borderBottomLeftRadius: CARD_BORDER_RADIUS_BOTTOM,
+    borderBottomRightRadius: CARD_BORDER_RADIUS_BOTTOM,
+    overflow: 'hidden',
+    backgroundColor: colors.neutral[200],
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  cardImageGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '55%',
+  },
+  cardTopOverlayWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: CARD_BORDER_RADIUS_TOP,
+    borderTopRightRadius: CARD_BORDER_RADIUS_TOP,
+    overflow: 'hidden',
+  },
+  cardTopOverlayGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  cardTopOverlay: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  cardOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 40,
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  nameBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  name: {
+    ...typography.bodyMedium,
+    fontSize: 24,
+    fontWeight: '500',
+    lineHeight: 32,
+    letterSpacing: -1,
+    color: colors.white,
+  },
+  verifiedBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.primary[400],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  nameProgressSegments: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 3,
+    marginTop: 6,
+  },
+  nameProgressSegment: {
+    width: 12,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  nameProgressSegmentFilled: {
+    backgroundColor: colors.white,
+  },
+  /** Figma 2101-24750: more options button – 40px, rounded 16px, subtle white fill + border */
+  optionsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  /** Figma 1399-7541: match overlay – one rounded dark panel */
+  matchOverlay: {
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderTopLeftRadius: OVERLAY_TOP_RADIUS,
+    borderTopRightRadius: OVERLAY_TOP_RADIUS,
+    borderBottomLeftRadius: CARD_BORDER_RADIUS_BOTTOM,
+    borderBottomRightRadius: CARD_BORDER_RADIUS_BOTTOM,
+    overflow: 'hidden',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 14,
+  },
+  overallRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  overallLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  overallPercent: {
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 22,
+    color: colors.white,
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  chip: {
+    flex: 1,
+    minWidth: 84,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: MATCH_CHIP_BORDER_RADIUS,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chipLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    lineHeight: 20,
+    letterSpacing: 0.28,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  chipPercent: {
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 22,
+    color: colors.white,
+  },
+  knowMoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  knowMoreText: {
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+    color: colors.white,
+  },
+  knowMoreArrow: {
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+    color: colors.white,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+    marginTop: 16,
+  },
+  actionButtonGradient: {
+    width: ACTION_BUTTON_SIZE,
+    height: ACTION_BUTTON_SIZE,
+    borderRadius: ACTION_BUTTON_SIZE / 2,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionButtonDark: {
+    width: ACTION_BUTTON_SIZE,
+    height: ACTION_BUTTON_SIZE,
+    borderRadius: ACTION_BUTTON_SIZE / 2,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  /** Figma 1576-8233: match empty state – illustration, headline, body */
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 48,
+  },
+  emptyIllustrationWrap: {
+    marginBottom: 24,
+  },
+  emptyTitle: {
+    ...typography.h3,
+    color: colors.neutral[800],
+    marginBottom: 12,
+    textAlign: 'center',
+    maxWidth: 280,
+  },
+  emptySubtitle: {
+    ...typography.body,
+    color: colors.neutral[600],
+    textAlign: 'center',
+    maxWidth: 320,
+    lineHeight: 24,
+  },
+  /** End-of-stack strip: same 5% area as next-card peek, rounded top, so layout matches */
+  peekStrip: {
+    width: CARD_WIDTH,
+    alignSelf: 'center',
+    borderTopLeftRadius: CARD_BORDER_RADIUS_TOP,
+    borderTopRightRadius: CARD_BORDER_RADIUS_TOP,
+    backgroundColor: colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  peekStripText: {
+    ...typography.bodyMedium,
+    fontSize: 13,
+    color: colors.neutral[500],
+  },
+});

@@ -12,6 +12,14 @@ const ATTACH_BUTTON_SIZE = 40;
 const IMAGE_BUBBLE_SIZE = 200;
 const SEND_BUTTON_SIZE = 40;
 export const BUBBLE_MAX_WIDTH = SCREEN_WIDTH * 0.75;
+// Figma 1690-7152: generating bar and cancel (height must fit icon + text + padding)
+const GENERATING_BAR_HEIGHT = 44;
+const GENERATING_CANCEL_SIZE = 40;
+const GENERATING_BAR_GAP = 8;
+const GENERATING_PILL_BORDER_RADIUS = 20;
+const GENERATING_PILL_PADDING_V = 10;
+const GENERATING_PILL_PADDING_H = 14;
+const GENERATING_PILL_GAP = 8;
 
 export const styles = StyleSheet.create({
   screen: {
@@ -266,6 +274,36 @@ export const styles = StyleSheet.create({
     borderBottomRightRadius: 20,
     borderBottomLeftRadius: 6,
   },
+  bubbleReplyTo: {
+    borderLeftWidth: 3,
+    paddingLeft: 8,
+    marginBottom: 6,
+  },
+  bubbleReplyToSent: {
+    borderLeftColor: 'rgba(255,255,255,0.8)',
+  },
+  bubbleReplyToReceived: {
+    borderLeftColor: colors.primary.purple,
+  },
+  bubbleReplyToLabel: {
+    ...typography.bodyMedium,
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.neutral[500],
+    marginBottom: 2,
+  },
+  bubbleReplyToLabelSent: {
+    color: 'rgba(255,255,255,0.9)',
+  },
+  bubbleReplyToPreview: {
+    ...typography.bodyMedium,
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.neutral[700],
+  },
+  bubbleReplyToPreviewSent: {
+    color: 'rgba(255,255,255,0.95)',
+  },
   bubbleText: {
     ...typography.bodyMedium,
     fontSize: 16,
@@ -382,25 +420,101 @@ export const styles = StyleSheet.create({
     color: colors.black,
     margin: 0,
   },
-  askAiraChip: {
+  askAiraChipGradientWrap: {
+    alignSelf: 'center',
+    borderRadius: 20,
+    padding: 1,
+    overflow: 'hidden',
+  },
+  askAiraChipInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'center',
     gap: 6,
     paddingVertical: 8,
     paddingHorizontal: 8,
-    borderRadius: 20,
-    borderWidth: 1,
+    borderRadius: 19,
     backgroundColor: colors.white,
-    borderColor: colors.primary.purple,
-    // marginRight: 4,
-    // marginLeft: 4,
   },
   askAiraChipText: {
     ...typography.bodyMedium,
     fontSize: 14,
     fontWeight: '600',
     color: colors.primary.purple,
+  },
+  insertButton: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: colors.neutral[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  insertButtonText: {
+    ...typography.bodyMedium,
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.neutral[600],
+  },
+  insertButtonGradientWrap: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  insertButtonGradientText: {
+    ...typography.bodyMedium,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  generatedRepliesStrip: {
+    maxHeight: 88,
+    paddingTop: 8,
+    paddingBottom: 8,
+    backgroundColor: colors.white,
+  },
+  generatedRepliesStripContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  generatedReplyChipTouchable: {
+    maxWidth: SCREEN_WIDTH * 0.7,
+  },
+  generatedReplyChipGradientWrap: {
+    borderRadius: 20,
+    padding: 1,
+    overflow: 'hidden',
+  },
+  generatedReplyChipInner: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 19,
+    backgroundColor: colors.white,
+    maxWidth: SCREEN_WIDTH * 0.7 - 2,
+  },
+  generatedReplyChipTextSelected: {
+    ...typography.bodyMedium,
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.neutral[800],
+  },
+  generatedReplyChipUnselected: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: colors.neutral[100],
+    maxWidth: SCREEN_WIDTH * 0.7,
+  },
+  generatedReplyChipTextUnselected: {
+    ...typography.bodyMedium,
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.neutral[600],
   },
   sendButton: {
     width: SEND_BUTTON_SIZE,
@@ -420,24 +534,73 @@ export const styles = StyleSheet.create({
   inputArea: {
     backgroundColor: colors.white,
   },
+  replyToBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+marginHorizontal: 16,
+borderRadius: 16,
+    // paddingHorizontal: 16,
+    paddingLeft: 0,
+    paddingRight: 12,
+    backgroundColor:'#f3f3f3',
+    // borderTopWidth: StyleSheet.hairlineWidth,
+    // borderTopColor: colors.neutral[200],
+  },
+  replyToBarGradientBorder: {
+    width: 4,
+    borderTopLeftRadius: 32,
+    borderBottomLeftRadius: 32,
+    marginRight: 12,
+    alignSelf: 'stretch',
+  },
+  replyToBarContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  replyToBarLabel: {
+    ...typography.bodyMedium,
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.neutral[500],
+    marginBottom: 2,
+  },
+  replyToBarPreview: {
+    ...typography.bodyMedium,
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.neutral[800],
+  },
+  replyToBarDismiss: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    // backgroundColor: colors.neutral[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   generatingBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: GENERATING_BAR_HEIGHT,
     paddingTop: 8,
     paddingBottom: 8,
-    gap: 8,
+    gap: GENERATING_BAR_GAP,
     backgroundColor: colors.white,
   },
-  generatingBubble: {
-    flex: 1,
+  generatingBubbleGradientWrap: {
+    alignSelf: 'flex-start',
+    borderRadius: GENERATING_PILL_BORDER_RADIUS,
+    padding: 1,
+    overflow: 'hidden',
+  },
+  generatingBubbleInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
+    gap: GENERATING_PILL_GAP,
+    paddingVertical: GENERATING_PILL_PADDING_V,
+    paddingHorizontal: GENERATING_PILL_PADDING_H,
+    borderRadius: GENERATING_PILL_BORDER_RADIUS - 1,
     backgroundColor: colors.white,
   },
   generatingBubbleText: {
@@ -446,20 +609,31 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.primary.purple,
   },
-  // Mask for gradient text: opaque so gradient (#CB7BF5 → #7742F0) shows through
+  // Mask for gradient text: mask must be opaque (black) so gradient shows through text shape
   generatingBubbleTextMask: {
     backgroundColor: 'transparent',
     color: colors.black,
   },
+  generatingGradientTextWrap: {
+    position: 'relative',
+    alignSelf: 'flex-start',
+  },
+  generatingGradientTextPlaceholder: {
+    opacity: 0,
+  },
+  generatingGradientTextOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
   generatingCancel: {
-    width: 40,
-    height: 40,
+    width: GENERATING_CANCEL_SIZE,
+    height: GENERATING_CANCEL_SIZE,
+    justifyContent: 'center',
+    alignItems: 'center',
+    // backgroundColor: 'transparent',
     borderRadius: 20,
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.neutral[200],
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   voiceBar: {
     flexDirection: 'row',

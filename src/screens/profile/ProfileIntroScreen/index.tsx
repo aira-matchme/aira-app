@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LinearGradient from 'react-native-linear-gradient';
 import { Button } from '../../../components/Button';
+import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
 import { colors } from '../../../theme';
 import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
@@ -23,6 +24,7 @@ export const ProfileIntroScreen: React.FC = () => {
 
   return (
     <View style={styles.wrapper}>
+      <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
       <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
         <View style={styles.container}>

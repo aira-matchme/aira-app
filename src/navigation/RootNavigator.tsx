@@ -6,16 +6,20 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthNavigator } from './AuthNavigator';
 import { TabNavigator } from './TabNavigator';
 import { SplashScreen } from '../screens/SplashScreen';
-import { EmailLoginScreen } from '../screens/auth/EmailLoginScreen';            
+import { EmailLoginScreen } from '../screens/auth/EmailLoginScreen';
 import { LostAccessEmailScreen } from '../screens/auth/LostAccessEmailScreen';
 import { OTPVerificationScreen } from '../screens/auth/OTPVerificationScreen';
 import { useAuthStore } from '../store/auth.store';
+import { useApiErrorStore } from '../store/apiError.store';
 import { getPostAuthScreen } from './getPostAuthScreen';
+import { ApiErrorModal } from '../components/ApiErrorModal';
+import { RequestTimeoutModal } from '../components/RequestTimeoutModal';
 
 const RootStack = createNativeStackNavigator();
 
 export const RootNavigator = () => {
   const { isAuthenticated, isLoading, user, shouldShowEnableNotifications } = useAuthStore();
+  const { visible: apiErrorVisible, message: apiErrorMessage, hideError: hideApiError } = useApiErrorStore();
   console.log('🚀 RootNavigator - isAuthenticated:', isAuthenticated, 'isLoading:', isLoading);
   const postAuthScreen = getPostAuthScreen(user ?? null, shouldShowEnableNotifications);
   const shouldShowTabs = isAuthenticated && postAuthScreen === 'Likes';
@@ -37,6 +41,12 @@ export const RootNavigator = () => {
 
   return (
     <NavigationContainer>
+      <ApiErrorModal
+        visible={apiErrorVisible}
+        onClose={hideApiError}
+        message={apiErrorMessage}
+      />
+      <RequestTimeoutModal />
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {/* Show SplashScreen while checking authentication */}
         {isLoading ? (

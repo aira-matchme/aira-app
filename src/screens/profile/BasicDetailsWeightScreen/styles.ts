@@ -33,9 +33,10 @@ export const styles = StyleSheet.create({
   },
   optionsScrollView: {
     flex: 1,
+
   },
   optionsScrollContainer: {
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.lg,
   },
   title: {
     fontSize: 36,
@@ -49,6 +50,7 @@ export const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.regular,
     color: colors.neutral[600],
     lineHeight: 22,
+    paddingBottom: spacing.sm * 2,
   },
   optionsContainer: {
     gap: spacing.sm,

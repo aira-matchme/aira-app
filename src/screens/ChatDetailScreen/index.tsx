@@ -15,7 +15,7 @@ import {
   Linking,
   StatusBar,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { pick } from '@react-native-documents/picker';
@@ -39,10 +39,10 @@ import { PauseIcon } from '../../assets/icons/common/PauseIcon';
 import { DeleteIcon } from '../../assets/icons/common/DeleteIcon';
 import { ReplyIcon } from '../../assets/icons/common/ReplyIcon';
 import { AskAiraIcon } from '../../assets/icons/common/AskAiraIcon';
-import { CloseIcon } from '../../assets/icons/common/CloseIcon';
+import { GeneratingCloseIcon } from '../../assets/icons/common/GeneratingCloseIcon';
 import { ActionSheetFileIcon } from '../../assets/icons/common/ActionSheetFileIcon';
 import { AttachmentOptionsBottomSheet, type AttachmentOption } from '../../components/AttachmentOptionsBottomSheet';
-import MaskedView from '@react-native-masked-view/masked-view';
+import { GradientText } from '../../components/GradientText';
 import LinearGradient from 'react-native-linear-gradient';
 import { STRINGS } from '../../constants/strings';
 import { colors, typography } from '../../theme';
@@ -52,7 +52,7 @@ import { styles, H_PADDING } from './styles';
 type Props = NativeStackScreenProps<ChatStackParamList, 'ChatDetail'>;
 
 type ChatMessage =
-  | { type: 'text'; text: string; timestamp: string; sent: boolean }
+  | { type: 'text'; text: string; timestamp: string; sent: boolean; replyTo?: { senderName: string; preview: string } }
   | { type: 'voice'; timestamp: string; sent: boolean }
   | { type: 'image'; uri: string; timestamp: string; sent: boolean }
   | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean };
@@ -85,8 +85,13 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [voicePaused, setVoicePaused] = useState(false);
   const voiceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [askAiraGenerating, setAskAiraGenerating] = useState(false);
+  const [generatedReplies, setGeneratedReplies] = useState<string[] | null>(null);
+  const [selectedReplyIndex, setSelectedReplyIndex] = useState(0);
   const [messageContextIndex, setMessageContextIndex] = useState<number | null>(null);
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{ index: number; message: ChatMessage; senderName: string } | null>(null);
+  const generatedRepliesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<TextInput>(null);
 
   const getFileTypeLabel = (name: string) => {
     const ext = name.split('.').pop()?.toUpperCase() ?? 'FILE';
@@ -117,6 +122,40 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       }
     };
   }, [voiceBarVisible, voicePaused]);
+
+  // Simulate "replies generated" after a short delay when Ask AIRA is active
+  useEffect(() => {
+    if (!askAiraGenerating) return;
+    if (generatedRepliesTimeoutRef.current) clearTimeout(generatedRepliesTimeoutRef.current);
+    generatedRepliesTimeoutRef.current = setTimeout(() => {
+      setAskAiraGenerating(false);
+      setGeneratedReplies([
+        'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.',
+        'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.',
+        'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.',
+      ]);
+      setSelectedReplyIndex(0);
+      generatedRepliesTimeoutRef.current = null;
+    }, 2500);
+    return () => {
+      if (generatedRepliesTimeoutRef.current) clearTimeout(generatedRepliesTimeoutRef.current);
+    };
+  }, [askAiraGenerating]);
+
+  const handleInsertReply = () => {
+    if (!generatedReplies?.length || selectedReplyIndex >= generatedReplies.length) return;
+    setInputText(generatedReplies[selectedReplyIndex]);
+    setGeneratedReplies(null);
+    setSelectedReplyIndex(0);
+  };
+
+  const getMessagePreview = (msg: ChatMessage): string => {
+    if (msg.type === 'text') return msg.text;
+    if (msg.type === 'voice') return 'Voice message';
+    if (msg.type === 'image') return 'Photo';
+    if (msg.type === 'file') return msg.name;
+    return '';
+  };
 
   const handleMicPress = () => {
     if (inputText.trim() || pendingAttachments.length) return;
@@ -260,8 +299,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     if (!trimmed && !hasAttachments) return;
     const newMessages: ChatMessage[] = [];
     if (trimmed) {
-      newMessages.push({ type: 'text', text: trimmed, timestamp: now(), sent: true });
+      const replyTo = replyingTo
+        ? { senderName: replyingTo.senderName, preview: getMessagePreview(replyingTo.message) }
+        : undefined;
+      newMessages.push({ type: 'text', text: trimmed, timestamp: now(), sent: true, replyTo });
       setInputText('');
+      setReplyingTo(null);
     }
     pendingAttachments.forEach((att) => {
       if (att.type === 'image') {
@@ -305,6 +348,16 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               activeOpacity={1}
               onLongPress={() => handleMessageLongPress(index)}
             >
+              {msg.replyTo != null && (
+                <View style={[styles.bubbleReplyTo, msg.sent ? styles.bubbleReplyToSent : styles.bubbleReplyToReceived]}>
+                  <Text style={[styles.bubbleReplyToLabel, msg.sent && styles.bubbleReplyToLabelSent]} numberOfLines={1}>
+                    {STRINGS.CHAT.REPLYING_TO} {msg.replyTo.senderName}
+                  </Text>
+                  <Text style={[styles.bubbleReplyToPreview, msg.sent && styles.bubbleReplyToPreviewSent]} numberOfLines={2}>
+                    {msg.replyTo.preview}
+                  </Text>
+                </View>
+              )}
               <Text style={[styles.bubbleText, msg.sent && styles.bubbleTextSent]}>{msg.text}</Text>
             </TouchableOpacity>
           </View>
@@ -384,13 +437,14 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.screen, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
-    >
-      <StatusBar barStyle="dark-content" translucent backgroundColor={colors.white}/>
-      <View style={styles.headerBar}>
+    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+      <KeyboardAvoidingView
+        style={styles.screen}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
+      >
+        <StatusBar barStyle="dark-content" translucent backgroundColor={colors.white}/>
+        <View style={styles.headerBar}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <BackArrowIcon size={24} backgroundColor="transparent" strokeColor={colors.black} />
         </TouchableOpacity>
@@ -460,8 +514,18 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 <TouchableOpacity
                   style={styles.messageContextItem}
                   onPress={() => {
+                    if (messageContextIndex !== null) {
+                      const message = messages[messageContextIndex];
+                      if (message) {
+                        setReplyingTo({
+                          index: messageContextIndex,
+                          message,
+                          senderName: message.sent ? STRINGS.CHAT.YOU : name,
+                        });
+                      }
+                    }
                     setMessageContextIndex(null);
-                    // TODO: focus input and quote/reply to message at messageContextIndex
+                    setTimeout(() => inputRef.current?.focus(), 100);
                   }}
                   activeOpacity={0.7}
                 >
@@ -565,29 +629,104 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         <View style={styles.inputArea}>
           {askAiraGenerating && (
             <View style={[styles.generatingBar, { paddingHorizontal: H_PADDING }]}>
-              <View style={styles.generatingBubble}>
-                <AskAiraIcon size={18} color={colors.primary.purple} />
-                <MaskedView
-                  maskElement={
-                    <Text style={[styles.generatingBubbleText, styles.generatingBubbleTextMask]}>
-                      {STRINGS.CHAT.GENERATING_REPLIES}
-                    </Text>
-                  }
-                >
-                  <LinearGradient
+              <LinearGradient
+                colors={[...colors.gradients.primary.colors]}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.generatingBubbleGradientWrap}
+              >
+                <View style={styles.generatingBubbleInner}>
+                  <AskAiraIcon size={18} useGradient />
+                  <GradientText
+                    style={{ fontSize: 15, fontWeight: '500' }}
                     colors={['#CB7BF5', '#7742F0']}
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                </MaskedView>
-              </View>
+                  >
+                    {STRINGS.CHAT.GENERATING_REPLIES}
+                  </GradientText>
+                </View>
+              </LinearGradient>
               <TouchableOpacity
                 style={styles.generatingCancel}
-                onPress={() => setAskAiraGenerating(false)}
+                onPress={() => {
+                  if (generatedRepliesTimeoutRef.current) {
+                    clearTimeout(generatedRepliesTimeoutRef.current);
+                    generatedRepliesTimeoutRef.current = null;
+                  }
+                  setAskAiraGenerating(false);
+                }}
                 activeOpacity={0.8}
               >
-                <CloseIcon size={22} color={colors.neutral[700]} />
+                <GeneratingCloseIcon size={18} color={colors.black} />
+              </TouchableOpacity>
+            </View>
+          )}
+          {generatedReplies != null && generatedReplies.length > 0 && (
+            <ScrollView
+              style={styles.generatedRepliesStrip}
+              contentContainerStyle={[styles.generatedRepliesStripContent, { paddingHorizontal: H_PADDING }]}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+            >
+              {generatedReplies.map((text, index) => {
+                const selected = index === selectedReplyIndex;
+                const chip = (
+                  <TouchableOpacity
+                    key={index}
+                    activeOpacity={0.8}
+                    onPress={() => setSelectedReplyIndex(index)}
+                    style={styles.generatedReplyChipTouchable}
+                  >
+                    {selected ? (
+                      <LinearGradient
+                        colors={[...colors.gradients.primary.colors]}
+                        start={{ x: 0, y: 0.5 }}
+                        end={{ x: 1, y: 0.5 }}
+                        style={styles.generatedReplyChipGradientWrap}
+                      >
+                        <View style={styles.generatedReplyChipInner}>
+                          <Text style={styles.generatedReplyChipTextSelected} numberOfLines={3}>
+                            {text}
+                          </Text>
+                        </View>
+                      </LinearGradient>
+                    ) : (
+                      <View style={styles.generatedReplyChipUnselected}>
+                        <Text style={styles.generatedReplyChipTextUnselected} numberOfLines={3}>
+                          {text}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+                return chip;
+              })}
+            </ScrollView>
+          )}
+          {replyingTo != null && (
+            <View style={[styles.replyToBar, { paddingHorizontal: H_PADDING }]}>
+              <LinearGradient
+                colors={[...colors.gradients.primary.colors]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={styles.replyToBarGradientBorder}
+              />
+              <View style={styles.replyToBarContent}>
+                <Text style={styles.replyToBarLabel}>
+                  {STRINGS.CHAT.REPLYING_TO} {replyingTo.senderName}
+                </Text>
+                <Text style={styles.replyToBarPreview} numberOfLines={2}>
+                  {getMessagePreview(replyingTo.message)}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.replyToBarDismiss}
+                onPress={() => setReplyingTo(null)}
+                activeOpacity={0.8}
+              >
+                {/* <CloseIcon size={18} color={colors.neutral[600]} /> */}
+                <GeneratingCloseIcon size={22} color={colors.black} />
               </TouchableOpacity>
             </View>
           )}
@@ -624,6 +763,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 <PlusIcon size={18} color={colors.black} />
               </TouchableOpacity>
               <TextInput
+                ref={inputRef}
                 style={styles.input}
                 placeholder={STRINGS.CHAT.START_CHAT_PLACEHOLDER}
                 placeholderTextColor={colors.neutral[600]}
@@ -634,10 +774,49 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 cursorColor={colors.primary.purple}
                 selectionColor={colors.primary[50]}
               />
-              {!inputText.trim() && !askAiraGenerating && (
-                <TouchableOpacity style={styles.askAiraChip} activeOpacity={0.8} onPress={() => setAskAiraGenerating(true)}>
-                  <AskAiraIcon size={14} color={colors.primary.purple} />
-                  <Text style={styles.askAiraChipText}>{STRINGS.CHAT.ASK_AIRA}</Text>
+              {!inputText.trim() && askAiraGenerating && (
+                <View style={styles.insertButton}>
+                  <Text style={styles.insertButtonText}>{STRINGS.CHAT.INSERT}</Text>
+                </View>
+              )}
+              {!inputText.trim() && generatedReplies != null && generatedReplies.length > 0 && (
+                <TouchableOpacity
+                  style={styles.insertButtonGradientWrap}
+                  activeOpacity={0.8}
+                  onPress={handleInsertReply}
+                >
+                  <LinearGradient
+                    colors={[...colors.gradients.primary.colors]}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  <Text style={styles.insertButtonGradientText}>{STRINGS.CHAT.INSERT}</Text>
+                </TouchableOpacity>
+              )}
+              {!inputText.trim() && !askAiraGenerating && generatedReplies == null && (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setAskAiraGenerating(true)}
+                >
+                  <LinearGradient
+                    colors={[...colors.gradients.primary.colors]}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.askAiraChipGradientWrap}
+                  >
+                    <View style={styles.askAiraChipInner}>
+                      <AskAiraIcon size={14} useGradient />
+                      <GradientText
+                        style={{ fontSize: 14, fontWeight: '600' }}
+                        colors={['#CB7BF5', '#7742F0']}
+                        start={{ x: 0, y: 0.5 }}
+                        end={{ x: 1, y: 0.5 }}
+                      >
+                        {STRINGS.CHAT.ASK_AIRA}
+                      </GradientText>
+                    </View>
+                  </LinearGradient>
                 </TouchableOpacity>
               )}
             </View>
@@ -722,7 +901,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           />
         </View>
       </ReusableBottomSheet>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 

@@ -32,6 +32,9 @@ export type AuthStackParamList = {
   BasicDetailsEmployment: undefined;
   BasicDetailsIncome: undefined;
   BasicDetailsReligion: undefined;
+  BasicDetailsMaritalStatus: undefined;
+  BasicDetailsChildren: undefined;
+  BasicDetailsInterests: undefined;
   BasicDetailsPincode: undefined;
   FaceVerification: undefined;
   SelfieCamera: undefined;
@@ -70,7 +73,17 @@ export type AuthStackParamList = {
     totalSteps: number;
     questionOrder: number;
   };
-  PreferencesMatch: undefined;
+  PreferencesStart: undefined;
+  PreferencesMatch: { returnToSummary?: boolean };
+  PreferencesAge: { returnToSummary?: boolean };
+  PreferencesHeight: { returnToSummary?: boolean };
+  PreferencesDistance: { returnToSummary?: boolean };
+  PreferencesEducation: { returnToSummary?: boolean };
+  PreferencesEmployment: { returnToSummary?: boolean };
+  PreferencesIncome: { returnToSummary?: boolean };
+  PreferencesMaritalStatus: { returnToSummary?: boolean };
+  PreferencesBodyType: { returnToSummary?: boolean };
+  PreferencesSummary: undefined;
   Likes: undefined;
 };
 
@@ -82,12 +95,27 @@ export type TabStackParamList = {
   Profile: undefined;
 };
 
+export type ProfileStackParamList = {
+  ProfileMain: undefined;
+  EditProfile: undefined;
+  PreferencesSummary: undefined;
+  PreferencesMatch: { returnToSummary?: boolean };
+  PreferencesAge: { returnToSummary?: boolean };
+  PreferencesHeight: { returnToSummary?: boolean };
+  PreferencesDistance: { returnToSummary?: boolean };
+  PreferencesEducation: { returnToSummary?: boolean };
+  PreferencesEmployment: { returnToSummary?: boolean };
+  PreferencesIncome: { returnToSummary?: boolean };
+  PreferencesMaritalStatus: { returnToSummary?: boolean };
+  PreferencesBodyType: { returnToSummary?: boolean };
+};
+
 export type ChatStackParamList = {
   ChatList: undefined;
   ChatDetail: {
     chatId: string;
     name: string;
-    avatar?: number;
+    avatar?: number | { uri: string };
   };
 };
 

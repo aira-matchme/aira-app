@@ -15,10 +15,10 @@ export const styles = StyleSheet.create({
   },
   imageSection: {
     flex: 0.55,
-    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    
   },
   
   gradientBackground: {
@@ -29,6 +29,7 @@ export const styles = StyleSheet.create({
     width: '85%',
     height: '85%',
     zIndex: 2,
+    marginTop: spacing.lg,
   },
   
   contentSection: {

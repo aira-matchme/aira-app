@@ -18,7 +18,7 @@ import { colors } from '../../../theme';
 import { styles } from './styles';
 
 // Placeholder for the onboarding image - replace with actual asset
-const ONBOARDING_IMAGE = require('../../../assets/images/Union.png'); // TODO: Replace with actual onboarding image
+const ONBOARDING_IMAGE = require('../../../assets/images/onboardingintro.png'); // TODO: Replace with actual onboarding image
 
 type OnboardingIntroNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'OnboardingIntro'>;
 
@@ -46,18 +46,6 @@ export const OnboardingIntroScreen: React.FC = () => {
       <View style={styles.gradientBackground}>
   <Svg height="100%" width="100%" style={{ position: 'absolute' }}>
     <Defs>
-      {/*
-        RadialGradient usage:
-        - id="grad"       : Unique ID for referencing (used in fill="url(#grad)")
-        - cx="50%"        : Center X of ellipse (horizontally centered)
-        - cy="30%"        : Center Y of ellipse (30% from top)
-        - rx="60%"        : Radius X of ellipse (horizontal spread)
-        - ry="60%"        : Radius Y of ellipse (vertical spread)
-        - fx="50%"        : Focus X (gradient radiates from this point)
-        - fy="40%"        : Focus Y (slightly below center for top-down glow)
-        - Stop offset="0%": Inner color #C87BF5 at 80% opacity
-        - Stop offset="100%": Outer color #FFFFFF at full opacity
-      */}
       <RadialGradient
         id="grad"
         cx="50%"
@@ -79,11 +67,11 @@ export const OnboardingIntroScreen: React.FC = () => {
         <View style={styles.container}>
           {/* Image Section - 60% */}
           <View style={styles.imageSection}>
-            {/* <Image
+            <Image
               source={ONBOARDING_IMAGE}
               style={styles.onboardingImage}
               resizeMode="cover"
-            /> */}
+            />
           </View>
 
           {/* Content Section - 40% */}

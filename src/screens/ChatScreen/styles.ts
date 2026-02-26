@@ -3,12 +3,14 @@ import { colors, typography } from '../../theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Figma 1640-9551: Messages / Chat list
-export const H_PADDING = 16;
-export const CARD_RADIUS = 16;
-export const AVATAR_SIZE = 56;
+// Figma 2101-27838: Chat list item
+export const H_PADDING = 15;
+export const CARD_RADIUS = 20;
+export const AVATAR_SIZE = 44;
 export const CARD_VERTICAL_PADDING = 12;
-export const CARD_HORIZONTAL_PADDING = 16;
+export const CARD_HORIZONTAL_PADDING = 15;
+export const CARD_AVATAR_GAP = 8;
+export const CARD_NAME_PREVIEW_GAP = 2;
 
 export const styles = StyleSheet.create({
   screen: {
@@ -21,6 +23,7 @@ export const styles = StyleSheet.create({
   },
   safe: {
     flex: 1,
+
   },
   headerGradient: {
     paddingHorizontal: H_PADDING,
@@ -32,6 +35,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: H_PADDING,
     marginTop: 8,
   },
   title: {
@@ -63,6 +67,31 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: H_PADDING,
     paddingTop: 12,
+  },
+  loadMoreFooter: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: H_PADDING,
+  },
+  emptyStateContent: {
+    alignItems: 'center',
+    maxWidth: 220,
+  },
+  emptyStateText: {
+    marginTop: 16,
+    ...typography.bodyMedium,
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
+    letterSpacing: 0.28,
+    color: colors.neutral[900],
+    textAlign: 'center',
   },
   card: {
     flexDirection: 'row',
@@ -143,63 +172,89 @@ export const styles = StyleSheet.create({
     borderRadius: AVATAR_SIZE / 2,
     backgroundColor: colors.neutral[200],
   },
+  avatarPlaceholder: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
+    backgroundColor: colors.primary[200],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitials: {
+    ...typography.bodyMedium,
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.primary.purple,
+  },
   body: {
     flex: 1,
-    marginLeft: 14,
+    marginLeft: CARD_AVATAR_GAP,
     minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  bodyTextCol: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: CARD_NAME_PREVIEW_GAP,
+    flexWrap: 'nowrap',
+  },
+  nameWrap: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 6,
   },
   name: {
     ...typography.bodyMedium,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
+    lineHeight: 22,
+    letterSpacing: 0.32,
     color: colors.black,
-    marginRight: 6,
   },
   unreadBadge: {
-    backgroundColor: colors.primary.purple,
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.secondary[400],
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 6,
+    flexShrink: 0,
   },
   unreadCount: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
+    lineHeight: 18,
+    letterSpacing: 0.48,
     color: colors.white,
   },
-  previewRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   preview: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 22,
+    letterSpacing: 0.32,
     color: colors.neutral[600],
-    marginRight: 8,
   },
   previewDraft: {
     color: colors.primary.purple,
   },
-  previewMuted: {
-    color: colors.neutral[400],
-  },
-  rightCol: {
+  timeCol: {
     alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    marginLeft: 8,
   },
   time: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '400',
+    lineHeight: 18,
+    letterSpacing: 0.48,
     color: colors.neutral[500],
-    marginBottom: 4,
   },
   pinnedIconWrap: {
     marginTop: 2,

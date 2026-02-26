@@ -14,8 +14,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
-import LinearGradient from 'react-native-linear-gradient';
 import { TextInput } from '../../../components/TextInput';
 import { Button } from '../../../components/Button';
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
@@ -23,6 +21,7 @@ import { STRINGS } from '../../../constants/strings';
 import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './styles';
+import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
 
 type NavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -68,41 +67,7 @@ export const BasicDetailsNameScreen: React.FC = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
     >
-      <View style={styles.backgroundGlow}>
-        <Svg height="100%" width="100%" style={{ position: 'absolute' }}>
-          <Defs>
-            <RadialGradient
-              id="nameScreenGrad"
-              cx="0%"
-              cy="0%"
-              rx="120%"
-              ry="120%"
-              fx="0%"
-              fy="0%"
-            >
-              <Stop offset="0%" stopColor="#C87BF5" stopOpacity="0.2" />
-              <Stop offset="70%" stopColor="#C87BF5" stopOpacity="0.06" />
-              <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-            </RadialGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#nameScreenGrad)" />
-        </Svg>
-      </View>
-      <LinearGradient
-        colors={[
-          'rgba(203, 123, 245, 0)',
-          'rgba(203, 123, 245, 0.08)',
-          'rgba(203, 123, 245, 0.14)',
-          'rgba(203, 123, 245, 0.08)',
-          'rgba(203, 123, 245, 0)',
-        ]}
-        locations={[0, 0.15, 0.3, 0.5, 1]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={styles.middleGradient}
-      />
-
-
+      <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
