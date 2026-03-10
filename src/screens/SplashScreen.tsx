@@ -28,9 +28,7 @@ export const SplashScreen: React.FC = () => {
   // Initialize auth state on mount (load tokens from storage)
   useEffect(() => {
     const init = async () => {
-      console.log('🔄 SplashScreen: Initializing auth...');
       await initialize();
-      console.log('✅ SplashScreen: Initialization complete');
       setIsInitialized(true);
     };
     init();
@@ -38,46 +36,28 @@ export const SplashScreen: React.FC = () => {
 
   // Handle navigation based on auth state
   useEffect(() => {
-    // Prevent multiple navigations
     if (hasNavigatedRef.current) {
-      console.log('⏸️ SplashScreen: Already navigated, skipping...');
       return;
     }
 
-    // Wait for initialization to complete
     if (!isInitialized) {
-      console.log('⏳ SplashScreen: Waiting for initialization...');
       return;
     }
-
-    console.log('🔍 SplashScreen: Checking auth state', {
-      hasToken,
-      isFetchingProfile,
-      hasData: !!data,
-      hasError: !!error,
-    });
 
     if (!hasToken) {
-      // No token, set loading to false - RootNavigator will show AuthStack with Welcome
       if (hasNavigatedRef.current) return;
-      console.log('❌ SplashScreen: No token, setting loading to false');
       hasNavigatedRef.current = true;
       setLoading(false);
       return;
     }
 
-    // We have a token, check if profile is being fetched
     if (isFetchingProfile) {
-      console.log('⏳ SplashScreen: Fetching profile...');
       setLoading(true);
       return;
     }
 
-    // Profile fetch completed
     if (data?.data) {
-      // Successfully fetched profile, set user data
       if (hasNavigatedRef.current) return;
-      console.log('✅ SplashScreen: Profile fetched successfully');
       hasNavigatedRef.current = true;
       setUser(data.data);
 
@@ -86,20 +66,16 @@ export const SplashScreen: React.FC = () => {
         try {
           const notificationStatus = await checkNotificationPermission();
           if (notificationStatus !== 'granted') {
-            console.log('🔔 SplashScreen: Notification permission not granted, redirecting to EnableNotifications');
             setShouldShowEnableNotifications(true);
           }
         } catch (e) {
-          console.warn('SplashScreen: Error checking notification permission', e);
           setShouldShowEnableNotifications(true);
         }
         setLoading(false);
       })();
       return;
     } else if (error) {
-      // Profile fetch failed (e.g., token expired), logout
       if (hasNavigatedRef.current) return;
-      console.log('❌ SplashScreen: Profile fetch failed, logging out');
       hasNavigatedRef.current = true;
       logout();
       setLoading(false);

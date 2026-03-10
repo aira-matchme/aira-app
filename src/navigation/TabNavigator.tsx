@@ -79,6 +79,7 @@ export const TabNavigator = () => {
 
   return (
     <Tab.Navigator
+      initialRouteName="Home"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary.purple,
@@ -126,6 +127,8 @@ export const TabNavigator = () => {
           tabBarLabel: '',
           tabBarIcon: () => null,
           tabBarButton: (props) => <CenterTabButton {...props} />,
+          // Figma 2101-14980: no bottom navigation visible on this screen
+          tabBarStyle: { display: 'none' },
         }}
       />
       <Tab.Screen
@@ -147,11 +150,16 @@ export const TabNavigator = () => {
       <Tab.Screen
         name="Profile"
         component={ProfileStackNavigator}
-        options={{
-          tabBarLabel: 'Profile',
-          tabBarIcon: ({ color }) => (
-            <TabProfileIcon color={color} width={TAB_ICON_SIZE} height={TAB_ICON_SIZE} />
-          ),
+        options={({ route }) => {
+          const routeName = getFocusedRouteNameFromRoute(route) ?? 'ProfileMain';
+          const hideTabBar = routeName !== 'ProfileMain';
+          return {
+            tabBarLabel: 'Profile',
+            tabBarIcon: ({ color }) => (
+              <TabProfileIcon color={color} width={TAB_ICON_SIZE} height={TAB_ICON_SIZE} />
+            ),
+            tabBarStyle: hideTabBar ? { display: 'none' } : tabBarStyle,
+          };
         }}
       />
     </Tab.Navigator>

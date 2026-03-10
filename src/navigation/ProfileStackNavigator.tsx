@@ -3,6 +3,19 @@ import { View, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ProfileTabScreen } from '../screens/ProfileTabScreen';
 import { EditProfileScreen } from '../screens/profile/EditProfileScreen';
+import { BasicDetailsNameScreen } from '../screens/profile/BasicDetailsNameScreen';
+import { BasicDetailsDobScreen } from '../screens/profile/BasicDetailsDobScreen';
+import { BasicDetailsWeightScreen } from '../screens/profile/BasicDetailsWeightScreen';
+import { BasicDetailsBodyTypeScreen } from '../screens/profile/BasicDetailsBodyTypeScreen';
+import { BasicDetailsHeightScreen } from '../screens/profile/BasicDetailsHeightScreen';
+import { BasicDetailsEducationScreen } from '../screens/profile/BasicDetailsEducationScreen';
+import { BasicDetailsEmploymentScreen } from '../screens/profile/BasicDetailsEmploymentScreen';
+import { BasicDetailsIncomeScreen } from '../screens/profile/BasicDetailsIncomeScreen';
+import { BasicDetailsReligionScreen } from '../screens/profile/BasicDetailsReligionScreen';
+import { BasicDetailsMaritalStatusScreen } from '../screens/profile/BasicDetailsMaritalStatusScreen';
+import { BasicDetailsChildrenScreen } from '../screens/profile/BasicDetailsChildrenScreen';
+import { BasicDetailsInterestsScreen } from '../screens/profile/BasicDetailsInterestsScreen';
+import { BasicDetailsPincodeScreen } from '../screens/profile/BasicDetailsPincodeScreen';
 import { PreferencesSummaryScreen } from '../screens/preferences/PreferencesSummaryScreen';
 import { PreferencesMatchScreen } from '../screens/preferences/PreferencesMatchScreen';
 import { PreferencesAgeScreen } from '../screens/preferences/PreferencesAgeScreen';
@@ -11,6 +24,7 @@ import { PreferencesDistanceScreen } from '../screens/preferences/PreferencesDis
 import { PreferencesEducationScreen } from '../screens/preferences/PreferencesEducationScreen';
 import { PreferencesEmploymentScreen } from '../screens/preferences/PreferencesEmploymentScreen';
 import { PreferencesIncomeScreen } from '../screens/preferences/PreferencesIncomeScreen';
+import { PreferencesReligionScreen } from '../screens/preferences/PreferencesReligionScreen';
 import { PreferencesMaritalStatusScreen } from '../screens/preferences/PreferencesMaritalStatusScreen';
 import type { ProfileStackParamList } from './types';
 
@@ -47,6 +61,71 @@ export const ProfileStackNavigator = () => (
     <Stack.Screen
       name="EditProfile"
       component={EditProfileScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="BasicDetailsName"
+      component={BasicDetailsNameScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="BasicDetailsDob"
+      component={BasicDetailsDobScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="BasicDetailsWeight"
+      component={BasicDetailsWeightScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="BasicDetailsBodyType"
+      component={BasicDetailsBodyTypeScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="BasicDetailsHeight"
+      component={BasicDetailsHeightScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="BasicDetailsEducation"
+      component={BasicDetailsEducationScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="BasicDetailsEmployment"
+      component={BasicDetailsEmploymentScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="BasicDetailsIncome"
+      component={BasicDetailsIncomeScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="BasicDetailsReligion"
+      component={BasicDetailsReligionScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="BasicDetailsMaritalStatus"
+      component={BasicDetailsMaritalStatusScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="BasicDetailsChildren"
+      component={BasicDetailsChildrenScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="BasicDetailsInterests"
+      component={BasicDetailsInterestsScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="BasicDetailsPincode"
+      component={BasicDetailsPincodeScreen}
       options={profileScreenOptions}
     />
     <Stack.Screen
@@ -87,6 +166,11 @@ export const ProfileStackNavigator = () => (
     <Stack.Screen
       name="PreferencesIncome"
       component={PreferencesIncomeScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="PreferencesReligion"
+      component={PreferencesReligionScreen}
       options={profileScreenOptions}
     />
     <Stack.Screen

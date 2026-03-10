@@ -12,15 +12,28 @@ interface Props {
   width?: number;
   height?: number;
   style?: ViewStyle;
+  size?: number;
 }
 
 const TabAICenterIcon: React.FC<Props> = ({
-  width = 56,
-  height = 56,
+  size,
+  width = size || 56,
+  height = size || 56,
   style,
 }) => {
+  const radius = Math.min(width, height) / 2;
   return (
-    <View style={[styles.shadowWrapper, style]}>
+    <View
+      style={[
+        styles.shadowWrapper,
+        {
+          borderRadius: radius,
+          width,
+          height,
+        },
+        style,
+      ]}
+    >
       <Svg width={width} height={height} viewBox="0 0 56 56">
         <Defs>
           {/* FIXED GRADIENT */}

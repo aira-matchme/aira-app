@@ -16,6 +16,7 @@ import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { usePreferencesStore } from '../../../store/preferences.store';
+import { buildAddPreferencePayload, patchEditPreference } from '../../../modules/preferences/api';
 import { styles } from './styles';
 
 type PreferencesMatchNavigationProp = NativeStackNavigationProp<
@@ -50,10 +51,16 @@ export const PreferencesMatchScreen: React.FC = () => {
     navigation.goBack();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setLookingForGender(selected ? [selected] : []);
     if (returnToSummary) {
       setOpenedEditFromSummary(false);
+      try {
+        const payload = buildAddPreferencePayload(usePreferencesStore.getState());
+        await patchEditPreference(payload);
+      } catch {
+        // Best-effort: ignore patch errors here; global error handling will show feedback.
+      }
       navigation.goBack();
     } else {
       navigation.navigate('PreferencesAge', {});
@@ -126,6 +133,7 @@ export const PreferencesMatchScreen: React.FC = () => {
             onPress={handleSave}
             variant="primary"
             style={styles.primaryButton}
+            disabled={!selected}
           />
         </View>
       </SafeAreaView>

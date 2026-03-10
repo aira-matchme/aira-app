@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,9 @@ import {
   Modal,
   TouchableWithoutFeedback,
   StyleSheet,
-  Alert,
   Linking,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -26,6 +26,8 @@ import {
   requestCameraPermission,
   checkPhotoLibraryPermission,
   requestPhotoLibraryPermission,
+  checkMicrophonePermission,
+  requestMicrophonePermission,
 } from '../../config/permissions';
 import { BackArrowIcon } from '../../assets/icons/common/BackArrowIcon';
 import { MoreVertIcon } from '../../assets/icons/common/MoreVertIcon';
@@ -47,15 +49,18 @@ import LinearGradient from 'react-native-linear-gradient';
 import { STRINGS } from '../../constants/strings';
 import { colors, typography } from '../../theme';
 import type { ChatStackParamList } from '../../navigation/types';
+import { setChatRequestActionApi, blockUserApi, reportUserApi, getChatMessagesApi, mapApiMessageToChatMessage, markChatSeenApi, sendMessageApi, uploadChatFileApi } from '../../modules/chat/api';
+import { useAuthStore } from '../../store/auth.store';
+import socketService, { type MessageReceivePayload, type MessageDeletePayload, type TypingPayload } from '../../services/socket/socketService';
 import { styles, H_PADDING } from './styles';
 
 type Props = NativeStackScreenProps<ChatStackParamList, 'ChatDetail'>;
 
 type ChatMessage =
-  | { type: 'text'; text: string; timestamp: string; sent: boolean; replyTo?: { senderName: string; preview: string } }
-  | { type: 'voice'; timestamp: string; sent: boolean }
-  | { type: 'image'; uri: string; timestamp: string; sent: boolean }
-  | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean };
+  | { type: 'text'; text: string; timestamp: string; sent: boolean; replyTo?: { senderName: string; preview: string }; messageId?: string }
+  | { type: 'voice'; timestamp: string; sent: boolean; messageId?: string }
+  | { type: 'image'; uri: string; timestamp: string; sent: boolean; messageId?: string }
+  | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean; messageId?: string };
 
 const VOICE_WAVEFORM = [8, 12, 6, 14, 10, 16, 8, 14, 12, 10];
 
@@ -64,34 +69,86 @@ const now = () => {
   return `${d.getHours() > 12 ? d.getHours() - 12 : d.getHours()}:${d.getMinutes().toString().padStart(2, '0')} ${d.getHours() >= 12 ? 'pm' : 'am'}`;
 };
 
+/** Format timestamp from socket (ISO string or ms number) for display; fallback to now(). */
+function formatMessageTimestamp(value: string | number | undefined): string {
+  if (value == null) return now();
+  const d = typeof value === 'number' ? new Date(value) : new Date(value);
+  if (Number.isNaN(d.getTime())) return now();
+  const h = d.getHours();
+  const m = d.getMinutes();
+  const hour = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  const ampm = h >= 12 ? 'pm' : 'am';
+  return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
 export const ChatDetailScreen = ({ route, navigation }: Props) => {
-  const { name, avatar } = route.params;
+  const { name, avatar, chatId, isRequest, otherUserId } = route.params;
   const insets = useSafeAreaInsets();
+  const currentUserId = useAuthStore((s) => s.user?.id);
+  const [requestActionLoading, setRequestActionLoading] = useState<'accept' | 'decline' | 'block' | null>(null);
+  const [messagesLoading, setMessagesLoading] = useState(!!chatId);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [attachmentSheetOpen, setAttachmentSheetOpen] = useState(false);
   const [showCameraPermissionSheet, setShowCameraPermissionSheet] = useState(false);
   const [showGalleryPermissionSheet, setShowGalleryPermissionSheet] = useState(false);
+  const [showMicrophonePermissionSheet, setShowMicrophonePermissionSheet] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { type: 'text', text: STRINGS.CHAT.SENT_MSG, timestamp: STRINGS.CHAT.TIME_8_12, sent: true },
-    { type: 'text', text: STRINGS.CHAT.RECEIVED_MSG, timestamp: STRINGS.CHAT.TIME_8_13, sent: false },
-    { type: 'voice', timestamp: STRINGS.CHAT.TIME_8_15, sent: true },
-    { type: 'text', text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit,.', timestamp: STRINGS.CHAT.TIME_8_13, sent: false },
-  ]);
   const [pendingAttachments, setPendingAttachments] = useState<Array<{ type: 'image'; uri: string } | { type: 'file'; uri: string; name: string }>>([]);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
+  const [showReportSheet, setShowReportSheet] = useState(false);
+  const [reportMessageInput, setReportMessageInput] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
   const [voiceBarVisible, setVoiceBarVisible] = useState(false);
   const [voiceSeconds, setVoiceSeconds] = useState(0);
   const [voicePaused, setVoicePaused] = useState(false);
+  const [voiceSendLoading, setVoiceSendLoading] = useState(false);
   const voiceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isRecordingRef = useRef(false);
   const [askAiraGenerating, setAskAiraGenerating] = useState(false);
   const [generatedReplies, setGeneratedReplies] = useState<string[] | null>(null);
   const [selectedReplyIndex, setSelectedReplyIndex] = useState(0);
   const [messageContextIndex, setMessageContextIndex] = useState<number | null>(null);
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
-  const [replyingTo, setReplyingTo] = useState<{ index: number; message: ChatMessage; senderName: string } | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{ index: number; message: ChatMessage; senderName: string; messageId?: string } | null>(null);
+  const [sendLoading, setSendLoading] = useState(false);
+  const [otherUserTyping, setOtherUserTyping] = useState(false);
   const generatedRepliesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const getMessageTypeFromAttachment = (
+    att: { type: 'image'; uri: string } | { type: 'file'; uri: string; name: string }
+  ): 'image' | 'audio' | 'video' => {
+    if (att.type === 'image') return 'image';
+    const name = (att as { type: 'file'; name: string }).name?.toLowerCase() ?? '';
+    const ext = name.split('.').pop() ?? '';
+    if (['mp4', 'mov', 'webm', 'mkv'].includes(ext)) return 'video';
+    if (['mp3', 'm4a', 'wav', 'aac', 'ogg'].includes(ext)) return 'audio';
+    return 'video';
+  };
+
+  const getMimeTypeFromAttachment = (
+    att: { type: 'image'; uri: string } | { type: 'file'; uri: string; name: string }
+  ): string => {
+    if (att.type === 'image') return 'image/jpeg';
+    const name = (att as { type: 'file'; name: string }).name?.toLowerCase() ?? '';
+    const ext = name.split('.').pop() ?? '';
+    if (['mp4', 'mov', 'webm', 'mkv'].includes(ext)) return 'video/mp4';
+    if (['mp3', 'm4a', 'wav', 'aac', 'ogg'].includes(ext)) return 'audio/mpeg';
+    return 'application/octet-stream';
+  };
+
+  const getSoundRecorder = (): { start: (path: string) => Promise<void>; stop: () => Promise<{ path: string; duration: number }>; pause: () => Promise<void>; resume: () => Promise<void>; PATH_CACHE: string } | null => {
+    try {
+      const SR = require('react-native-sound-recorder');
+      return SR?.start && SR?.PATH_CACHE ? SR : null;
+    } catch {
+      return null;
+    }
+  };
 
   const getFileTypeLabel = (name: string) => {
     const ext = name.split('.').pop()?.toUpperCase() ?? 'FILE';
@@ -142,6 +199,106 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     };
   }, [askAiraGenerating]);
 
+  useEffect(() => {
+    if (!chatId) return;
+    markChatSeenApi(chatId).catch(() => {});
+  }, [chatId]);
+
+  useEffect(() => {
+    if (!chatId) {
+      setMessagesLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setMessagesLoading(true);
+    getChatMessagesApi({ chatId })
+      .then((res) => {
+        if (cancelled) return;
+        const raw = res.data?.list ?? res.data?.messages ?? [];
+        const list = Array.isArray(raw)
+          ? raw
+              .map((item) => mapApiMessageToChatMessage(item, currentUserId ?? undefined))
+              .filter((m): m is ChatMessage => m != null)
+          : [];
+        setMessages(list);
+      })
+      .catch(() => {
+        if (!cancelled) setMessages([]);
+      })
+      .finally(() => {
+        if (!cancelled) setMessagesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [chatId, currentUserId]);
+
+  useEffect(() => {
+    if (!chatId || !currentUserId || !otherUserId) return;
+    console.log('[Socket] ChatDetailScreen: join + subscribe', { chatId, currentUserId, otherUserId });
+    socketService.join(chatId);
+    const unsubMessage = socketService.on<MessageReceivePayload>('message_send', (data) => {
+      const isForMe = data.receiver === currentUserId;
+      const isFromMe = data.sender === currentUserId;
+      console.log('[Socket] ChatDetailScreen: message_send received', { sender: data.sender, receiver: data.receiver, isForMe, isFromMe });
+      if (!isForMe) return;
+      // Own message echoed back: we already added it optimistically on send; skip to avoid duplicate.
+      if (isFromMe) return;
+      const timestamp = formatMessageTimestamp(data.timestamp ?? data.createdAt);
+      setMessages((prev) => [
+        ...prev,
+        { type: 'text', text: data.message, timestamp, sent: false, messageId: data.messageId },
+      ]);
+    });
+    const unsubDelete = socketService.on<MessageDeletePayload>('message_delete', (data) => {
+      console.log('[Socket] ChatDetailScreen: message_delete received', { messageId: data.messageId });
+      setMessages((prev) => prev.filter((m) => (m as { messageId?: string }).messageId !== data.messageId));
+    });
+    const unsubTyping = socketService.on<TypingPayload>('typing', (data) => {
+      const applies = data.sender === otherUserId && data.receiver === currentUserId;
+      console.log('[Socket] ChatDetailScreen: typing received', { sender: data.sender, receiver: data.receiver, isTyping: data.isTyping, applies });
+      if (applies) {
+        setOtherUserTyping(data.isTyping);
+      }
+    });
+    return () => {
+      console.log('[Socket] ChatDetailScreen: unsubscribe (leave chat or params changed)');
+      unsubMessage();
+      unsubDelete();
+      unsubTyping();
+    };
+  }, [chatId, currentUserId, otherUserId]);
+
+  useEffect(() => {
+    if (!chatId || !currentUserId || !otherUserId) return;
+    if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+    if (typingStopRef.current) clearTimeout(typingStopRef.current);
+    if (inputText.trim().length > 0) {
+      typingDebounceRef.current = setTimeout(() => {
+        console.log('[Socket] ChatDetailScreen: sending typing true');
+        socketService.typing(currentUserId, otherUserId, true);
+        if (typingStopRef.current) clearTimeout(typingStopRef.current);
+        typingStopRef.current = setTimeout(() => {
+          console.log('[Socket] ChatDetailScreen: sending typing false (idle 2s)');
+          socketService.typing(currentUserId, otherUserId, false);
+        }, 2000);
+      }, 300);
+    } else {
+      console.log('[Socket] ChatDetailScreen: sending typing false (input empty)');
+      socketService.typing(currentUserId, otherUserId, false);
+    }
+    return () => {
+      if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+      if (typingStopRef.current) clearTimeout(typingStopRef.current);
+    };
+  }, [chatId, currentUserId, otherUserId, inputText]);
+
+  useEffect(() => {
+    if (messagesLoading || messages.length === 0) return;
+    const id = setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: false });
+    }, 100);
+    return () => clearTimeout(id);
+  }, [messagesLoading, messages.length]);
+
   const handleInsertReply = () => {
     if (!generatedReplies?.length || selectedReplyIndex >= generatedReplies.length) return;
     setInputText(generatedReplies[selectedReplyIndex]);
@@ -157,25 +314,122 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     return '';
   };
 
-  const handleMicPress = () => {
+  const startVoiceRecording = useCallback(async () => {
+    const SoundRecorder = getSoundRecorder();
+    if (!SoundRecorder) {
+      return;
+    }
+    try {
+      const path = `${SoundRecorder.PATH_CACHE}/voice_${Date.now()}.mp4`;
+      await SoundRecorder.start(path);
+      isRecordingRef.current = true;
+    } catch (err) {
+      setVoiceBarVisible(false);
+    }
+  }, []);
+
+  const handleMicPress = async () => {
     if (inputText.trim() || pendingAttachments.length) return;
+    const status = await checkMicrophonePermission();
+    if (status !== 'granted') {
+      setShowMicrophonePermissionSheet(true);
+      return;
+    }
     setVoiceBarVisible(true);
     setVoiceSeconds(0);
     setVoicePaused(false);
+    await startVoiceRecording();
+  };
+
+  const handleAllowMicrophonePermission = async () => {
+    setIsRequestingPermission(true);
+    try {
+      const requested = await requestMicrophonePermission();
+      setShowMicrophonePermissionSheet(false);
+      if (requested === 'granted') {
+        setVoiceBarVisible(true);
+        setVoiceSeconds(0);
+        setVoicePaused(false);
+        await startVoiceRecording();
+      } else {
+        setShowMicrophonePermissionSheet(false);
+      }
+    } catch {
+      setShowMicrophonePermissionSheet(false);
+    } finally {
+      setIsRequestingPermission(false);
+    }
   };
 
   const handleVoiceTrash = () => {
+    if (isRecordingRef.current) {
+      const SoundRecorder = getSoundRecorder();
+      SoundRecorder?.stop?.().catch(() => {});
+      isRecordingRef.current = false;
+    }
     setVoiceBarVisible(false);
     setVoiceSeconds(0);
     setVoicePaused(false);
   };
 
   const handleVoicePlayPause = () => {
+    if (!isRecordingRef.current) return;
+    const SoundRecorder = getSoundRecorder();
+    if (!SoundRecorder) return;
+    if (voicePaused) {
+      SoundRecorder.resume().catch(() => {});
+    } else {
+      SoundRecorder.pause().catch(() => {});
+    }
     setVoicePaused((p) => !p);
   };
 
-  const handleVoiceSend = () => {
-    setMessages((prev) => [...prev, { type: 'voice', timestamp: now(), sent: true }]);
+  const handleVoiceSend = async () => {
+    if (!chatId) return;
+    if (isRecordingRef.current) {
+      const SoundRecorder = getSoundRecorder();
+      if (!SoundRecorder?.stop) {
+        isRecordingRef.current = false;
+        setVoiceBarVisible(false);
+        setVoiceSeconds(0);
+        setVoicePaused(false);
+        return;
+      }
+      try {
+        const result = await SoundRecorder.stop();
+        isRecordingRef.current = false;
+        const path = result?.path;
+        if (!path) {
+          setVoiceBarVisible(false);
+          setVoiceSeconds(0);
+          setVoicePaused(false);
+          return;
+        }
+        setVoiceSendLoading(true);
+        try {
+          const { url, key } = await uploadChatFileApi(path, {
+            mimeType: 'audio/mp4',
+            fileName: `voice_${Date.now()}.mp4`,
+          });
+          await sendMessageApi({
+            chatId,
+            content: '',
+            messageType: 'audio',
+            files: [{ url, key }],
+            replyTo: replyingTo?.messageId ?? null,
+          });
+          setMessages((prev) => [...prev, { type: 'voice', timestamp: now(), sent: true }]);
+        } catch (err: unknown) {
+          // Send failed
+        } finally {
+          setVoiceSendLoading(false);
+        }
+      } catch (err) {
+        isRecordingRef.current = false;
+      }
+    } else {
+      setMessages((prev) => [...prev, { type: 'voice', timestamp: now(), sent: true }]);
+    }
     setVoiceBarVisible(false);
     setVoiceSeconds(0);
     setVoicePaused(false);
@@ -233,21 +487,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       if (status === 'granted') {
         openCamera();
       } else {
-        Alert.alert(
-          STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.CAMERA_PERMISSION_TITLE,
-          'Please enable camera access in Settings to send photos in chat.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => (Platform.OS === 'ios' ? Linking.openURL('app-settings:') : Linking.openSettings()) },
-          ]
-        );
+        setShowCameraPermissionSheet(false);
       }
     } catch {
       setShowCameraPermissionSheet(false);
-      Alert.alert('Error', 'Failed to request camera permission.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open Settings', onPress: () => (Platform.OS === 'ios' ? Linking.openURL('app-settings:') : Linking.openSettings()) },
-      ]);
     } finally {
       setIsRequestingPermission(false);
     }
@@ -273,49 +516,110 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       if (hasAccess) {
         openGallery();
       } else {
-        Alert.alert(
-          STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.PHOTOS_PERMISSION_TITLE,
-          'Please enable photo access in Settings to send images in chat.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => (Platform.OS === 'ios' ? Linking.openURL('app-settings:') : Linking.openSettings()) },
-          ]
-        );
+        setShowGalleryPermissionSheet(false);
       }
     } catch {
       setShowGalleryPermissionSheet(false);
-      Alert.alert('Error', 'Failed to request photo permission.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open Settings', onPress: () => (Platform.OS === 'ios' ? Linking.openURL('app-settings:') : Linking.openSettings()) },
-      ]);
     } finally {
       setIsRequestingPermission(false);
     }
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = inputText.trim();
     const hasAttachments = pendingAttachments.length > 0;
     if (!trimmed && !hasAttachments) return;
+    if (!chatId || !currentUserId || !otherUserId) return;
+    setSendLoading(true);
+    const replyToPayload = replyingTo?.messageId ?? null;
     const newMessages: ChatMessage[] = [];
-    if (trimmed) {
-      const replyTo = replyingTo
-        ? { senderName: replyingTo.senderName, preview: getMessagePreview(replyingTo.message) }
-        : undefined;
-      newMessages.push({ type: 'text', text: trimmed, timestamp: now(), sent: true, replyTo });
-      setInputText('');
-      setReplyingTo(null);
-    }
-    pendingAttachments.forEach((att) => {
-      if (att.type === 'image') {
-        newMessages.push({ type: 'image', uri: att.uri, timestamp: now(), sent: true });
-      } else {
-        newMessages.push({ type: 'file', uri: att.uri, name: att.name, timestamp: now(), sent: true });
+    try {
+      if (trimmed) {
+        // Notify other user in real time via socket; we show message optimistically (no refetch).
+        socketService.typing(currentUserId, otherUserId, false);
+        socketService.messageSend(currentUserId, otherUserId, trimmed);
+        const replyToUi = replyingTo
+          ? { senderName: replyingTo.senderName, preview: getMessagePreview(replyingTo.message) }
+          : undefined;
+        newMessages.push({ type: 'text', text: trimmed, timestamp: now(), sent: true, replyTo: replyToUi });
+        setInputText('');
+        setReplyingTo(null);
+        // Persist to backend; do not refetch — list is updated via socket + optimistic add.
+        sendMessageApi({
+          chatId,
+          content: trimmed,
+          messageType: 'text',
+          files: [],
+          replyTo: replyToPayload,
+        }).catch(() => {});
       }
-    });
-    if (newMessages.length > 0) {
-      setMessages((prev) => [...prev, ...newMessages]);
-      if (hasAttachments) setPendingAttachments([]);
+      for (const att of pendingAttachments) {
+        const messageType = getMessageTypeFromAttachment(att);
+        const mimeType = getMimeTypeFromAttachment(att);
+        const fileName = att.type === 'image' ? `image_${Date.now()}.jpg` : att.name;
+        const { url, key } = await uploadChatFileApi(att.uri, { mimeType, fileName });
+        await sendMessageApi({
+          chatId,
+          content: '',
+          messageType,
+          files: [{ url, key }],
+          replyTo: replyToPayload,
+        });
+        if (att.type === 'image') {
+          newMessages.push({ type: 'image', uri: att.uri, timestamp: now(), sent: true });
+        } else {
+          newMessages.push({ type: 'file', uri: att.uri, name: att.name, timestamp: now(), sent: true });
+        }
+      }
+      if (newMessages.length > 0) {
+        setMessages((prev) => [...prev, ...newMessages]);
+        setPendingAttachments([]);
+      }
+    } catch (err: unknown) {
+      // Send failed
+    } finally {
+      setSendLoading(false);
+    }
+  };
+
+  const handleRequestAccept = async () => {
+    if (!chatId) return;
+    setRequestActionLoading('accept');
+    try {
+      await setChatRequestActionApi({ chatId, action: 'accept' });
+      navigation.goBack();
+    } catch (err: unknown) {
+      // Action failed
+    } finally {
+      setRequestActionLoading(null);
+    }
+  };
+
+  const handleRequestDecline = async () => {
+    if (!chatId) return;
+    setRequestActionLoading('decline');
+    try {
+      await setChatRequestActionApi({ chatId, action: 'reject' });
+      navigation.goBack();
+    } catch (err: unknown) {
+      // Action failed
+    } finally {
+      setRequestActionLoading(null);
+    }
+  };
+
+  const handleBlockAndReport = async () => {
+    if (!otherUserId) {
+      return;
+    }
+    setRequestActionLoading('block');
+    try {
+      await blockUserApi({ blockUserId: otherUserId, type: 'block' });
+      navigation.goBack();
+    } catch (err: unknown) {
+      // Block failed
+    } finally {
+      setRequestActionLoading(null);
     }
   };
 
@@ -445,9 +749,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       >
         <StatusBar barStyle="dark-content" translucent backgroundColor={colors.white}/>
         <View style={styles.headerBar}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <BackArrowIcon size={24} backgroundColor="transparent" strokeColor={colors.black} />
-        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <BackArrowIcon size={48} />
+          </TouchableOpacity>
         {avatar != null ? (
           <Image source={avatar} style={styles.headerAvatar} resizeMode="cover" />
         ) : (
@@ -473,7 +777,14 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   style={styles.moreMenuItem}
                   onPress={() => {
                     setMoreMenuVisible(false);
-                    // TODO: Block user
+                    if (!otherUserId) {
+                      return;
+                    }
+                    blockUserApi({ blockUserId: otherUserId, type: 'block' })
+                      .then(() => navigation.goBack())
+                      .catch(() => {
+                        // Block failed
+                      });
                   }}
                   activeOpacity={0.7}
                 >
@@ -486,7 +797,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   style={styles.moreMenuItem}
                   onPress={() => {
                     setMoreMenuVisible(false);
-                    // TODO: Report
+                    if (!otherUserId) {
+                      return;
+                    }
+                    setReportMessageInput('');
+                    setShowReportSheet(true);
                   }}
                   activeOpacity={0.7}
                 >
@@ -521,6 +836,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                           index: messageContextIndex,
                           message,
                           senderName: message.sent ? STRINGS.CHAT.YOU : name,
+                          messageId: message.messageId,
                         });
                       }
                     }
@@ -590,15 +906,25 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       </Modal>
 
       <ScrollView
+        ref={scrollViewRef}
         style={styles.screen}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.datePill}>
-          <Text style={styles.datePillText}>{STRINGS.CHAT.TODAY}</Text>
-        </View>
-        {messages.map((msg, index) => renderMessage(msg, index))}
+        {messagesLoading ? (
+          <View style={styles.messagesLoadingWrap}>
+            <ActivityIndicator size="large" color={colors.primary.purple} />
+            <Text style={styles.messagesLoadingText}>{STRINGS.CHAT.LOADING_MESSAGES}</Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.datePill}>
+              <Text style={styles.datePillText}>{STRINGS.CHAT.TODAY}</Text>
+            </View>
+            {messages.map((msg, index) => renderMessage(msg, index))}
+          </>
+        )}
       </ScrollView>
 
       {voiceBarVisible ? (
@@ -621,8 +947,52 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             </View>
             <Text style={styles.voiceBarTimer}>{formatVoiceTime(voiceSeconds)}</Text>
           </View>
-          <TouchableOpacity style={styles.voiceBarSend} onPress={handleVoiceSend} activeOpacity={0.8}>
-            <ForwardArrowIcon size={22} color={colors.white} />
+          <TouchableOpacity
+            style={styles.voiceBarSend}
+            onPress={handleVoiceSend}
+            activeOpacity={0.8}
+            disabled={voiceSendLoading}
+          >
+            {voiceSendLoading ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <ForwardArrowIcon size={22} color={colors.white} />
+            )}
+          </TouchableOpacity>
+        </View>
+      ) : isRequest ? (
+        <View style={[styles.requestActionBar, { paddingBottom: 24 + insets.bottom }]}>
+          <View style={styles.requestActionRow}>
+            <TouchableOpacity
+              style={styles.requestDeclineButton}
+              onPress={handleRequestDecline}
+              disabled={requestActionLoading !== null}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.requestDeclineLabel}>{STRINGS.CHAT.DECLINE}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.requestAcceptButton}
+              onPress={handleRequestAccept}
+              disabled={requestActionLoading !== null}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={[...colors.gradients.primary.colors]}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <Text style={styles.requestAcceptLabel}>{STRINGS.CHAT.ACCEPT}</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={styles.requestBlockReportWrap}
+            onPress={handleBlockAndReport}
+            disabled={requestActionLoading !== null}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.requestBlockReportText}>{STRINGS.CHAT.BLOCK_AND_REPORT}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -731,7 +1101,13 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             </View>
           )}
           <View style={[styles.inputBar, { paddingBottom: 12 + insets.bottom }]}>
-            <View style={styles.inputWrap}>
+            <View style={styles.inputBarContent}>
+              {otherUserTyping && (
+                <View style={styles.typingIndicatorWrap}>
+                  <Text style={styles.typingIndicatorText} numberOfLines={1}>{STRINGS.CHAT.TYPING_INDICATOR}</Text>
+                </View>
+              )}
+              <View style={styles.inputWrap}>
             {pendingAttachments.length > 0 && (
               <View style={styles.attachmentsInsidePill}>
                 {pendingAttachments.map((att, i) => (
@@ -769,6 +1145,22 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 placeholderTextColor={colors.neutral[600]}
                 value={inputText}
                 onChangeText={setInputText}
+                onFocus={() => {
+                  if (currentUserId && otherUserId) {
+                    if (typingStopRef.current) clearTimeout(typingStopRef.current);
+                    typingStopRef.current = null;
+                    socketService.typing(currentUserId, otherUserId, true);
+                  }
+                }}
+                onBlur={() => {
+                  if (currentUserId && otherUserId) {
+                    if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+                    typingDebounceRef.current = null;
+                    if (typingStopRef.current) clearTimeout(typingStopRef.current);
+                    typingStopRef.current = null;
+                    socketService.typing(currentUserId, otherUserId, false);
+                  }
+                }}
                 multiline
                 returnKeyType="default"
                 cursorColor={colors.primary.purple}
@@ -820,7 +1212,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 </TouchableOpacity>
               )}
             </View>
-          </View>
+            </View>
+            </View>
           <TouchableOpacity
             style={[styles.sendButton, !inputText.trim() && !pendingAttachments.length && styles.sendButtonMic]}
             activeOpacity={0.8}
@@ -829,8 +1222,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 ? handleSend
                 : handleMicPress
             }
+            disabled={sendLoading}
           >
-            {inputText.trim() || pendingAttachments.length ? (
+            {sendLoading ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : inputText.trim() || pendingAttachments.length ? (
               <ForwardArrowIcon size={22} color={colors.white} />
             ) : (
               <MicIcon size={24} color={colors.black} />
@@ -901,6 +1297,132 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           />
         </View>
       </ReusableBottomSheet>
+
+      <ReusableBottomSheet
+        isOpen={showMicrophonePermissionSheet}
+        onClose={() => setShowMicrophonePermissionSheet(false)}
+        snapPoints={['45%']}
+        showDragHandle
+        showCloseButton={false}
+        enablePanDownToClose
+        backgroundStyle={permissionSheetStyles.sheet}
+        scrollEnabled={false}
+      >
+        <View style={permissionSheetStyles.content}>
+          <Text style={permissionSheetStyles.title}>
+            {STRINGS.CHAT.MICROPHONE_PERMISSION_TITLE}
+          </Text>
+          <Text style={permissionSheetStyles.description}>
+            {STRINGS.CHAT.MICROPHONE_PERMISSION_DESCRIPTION}
+          </Text>
+          <TouchableOpacity
+            style={permissionSheetStyles.allowButton}
+            onPress={handleAllowMicrophonePermission}
+            disabled={isRequestingPermission}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={[...colors.gradients.primary.colors]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={permissionSheetStyles.allowButtonGradient}
+            >
+              {isRequestingPermission ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Text style={permissionSheetStyles.allowButtonLabel}>
+                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
+                </Text>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={permissionSheetStyles.dontAllowButton}
+            onPress={() => setShowMicrophonePermissionSheet(false)}
+            disabled={isRequestingPermission}
+            activeOpacity={0.8}
+          >
+            <Text style={permissionSheetStyles.dontAllowButtonLabel}>
+              {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.DONT_ALLOW}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ReusableBottomSheet>
+
+      <ReusableBottomSheet
+        isOpen={showReportSheet}
+        onClose={() => {
+          setShowReportSheet(false);
+          setReportMessageInput('');
+        }}
+        snapPoints={['40%']}
+        showDragHandle
+        showCloseButton={false}
+        enablePanDownToClose
+        backgroundStyle={permissionSheetStyles.sheet}
+        scrollEnabled={false}
+      >
+        <View style={permissionSheetStyles.content}>
+          <Text style={permissionSheetStyles.title}>Report user</Text>
+          <TextInput
+            style={reportSheetStyles.input}
+            placeholder="Describe the issue..."
+            placeholderTextColor={colors.neutral[500]}
+            value={reportMessageInput}
+            onChangeText={setReportMessageInput}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+            editable={!reportSubmitting}
+          />
+          <TouchableOpacity
+            style={permissionSheetStyles.allowButton}
+            onPress={() => {
+              const msg = reportMessageInput.trim();
+              if (!msg) {
+                return;
+              }
+              if (!otherUserId) return;
+              setReportSubmitting(true);
+              reportUserApi({ reportedAgainst: otherUserId, reportMessage: msg })
+                .then(() => {
+                  setShowReportSheet(false);
+                  setReportMessageInput('');
+                })
+                .catch(() => {
+                  // Report failed
+                })
+                .finally(() => setReportSubmitting(false));
+            }}
+            disabled={reportSubmitting}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={[...colors.gradients.primary.colors]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={permissionSheetStyles.allowButtonGradient}
+            >
+              {reportSubmitting ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Text style={permissionSheetStyles.allowButtonLabel}>Submit report</Text>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={permissionSheetStyles.dontAllowButton}
+            onPress={() => {
+              setShowReportSheet(false);
+              setReportMessageInput('');
+            }}
+            disabled={reportSubmitting}
+            activeOpacity={0.8}
+          >
+            <Text style={permissionSheetStyles.dontAllowButtonLabel}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </ReusableBottomSheet>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -937,5 +1459,48 @@ const permissionSheetStyles = StyleSheet.create({
   allowButton: {
     width: '100%',
     height: 54,
+    marginBottom: 8,
+    overflow: 'hidden',
+    borderRadius: 100,
+  },
+  allowButtonGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  allowButtonLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.white,
+  },
+  dontAllowButton: {
+    width: '100%',
+    height: 54,
+    borderRadius: 100,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dontAllowButtonLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.black,
+  },
+});
+
+const reportSheetStyles = StyleSheet.create({
+  input: {
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.neutral[900],
+    minHeight: 88,
+    marginBottom: 20,
   },
 });

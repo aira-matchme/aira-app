@@ -7,7 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { Button } from '../../../components/Button';
@@ -20,6 +20,10 @@ import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { INTEREST_CATEGORIES } from '../../../constants/profile';
 import { colors } from '../../../theme';
+import { apiClient } from '../../../services/api/client';
+import { endpoints } from '../../../services/api/endpoints';
+import { getProfileApi } from '../../../modules/auth/api';
+import { useAuthStore } from '../../../store/auth.store';
 import { styles } from './styles';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
 
@@ -28,14 +32,40 @@ type NavigationProp = NativeStackNavigationProp<
   'BasicDetailsInterests'
 >;
 
-const CURRENT_STEP = 11;
+const CURRENT_STEP = 12;
 
 export const BasicDetailsInterestsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { interests, setInterests, setCurrentStep } = useProfileStore();
+  const route = useRoute<any>();
+  const fromEditProfile = route.params?.fromEditProfile === true;
+  const authUser = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
+  const [isSaving, setIsSaving] = React.useState(false);
 
-  const [selectedKeys, setSelectedKeys] = React.useState<Set<string>>(() =>
-    interests?.length ? new Set(interests) : new Set()
+  const initialSelectedKeys = React.useMemo(() => {
+    if (fromEditProfile && authUser) {
+      const rawList = Array.isArray((authUser as any)?.hobbies)
+        ? (authUser as any).hobbies
+        : (authUser as any)?.interests;
+      if (Array.isArray(rawList)) {
+        const keys = rawList
+          .map((item: unknown) => {
+            if (typeof item === 'string') return item;
+            if (item && typeof item === 'object') {
+              return (item as any).id ?? (item as any).key ?? null;
+            }
+            return null;
+          })
+          .filter((v): v is string => typeof v === 'string');
+        if (keys.length) return new Set(keys);
+      }
+    }
+    return interests?.length ? new Set(interests) : new Set<string>();
+  }, [fromEditProfile, authUser, interests]);
+
+  const [selectedKeys, setSelectedKeys] = React.useState<Set<string>>(
+    () => initialSelectedKeys,
   );
   const [expandedId, setExpandedId] = React.useState<string | null>(
     INTEREST_CATEGORIES[0]?.id ?? null
@@ -54,10 +84,42 @@ export const BasicDetailsInterestsScreen: React.FC = () => {
     setExpandedId((prev) => (prev === id ? null : id));
   };
 
-  const isValid = selectedKeys.size > 0;
+  const MIN_PER_CATEGORY = 2;
+  const categoryCounts = React.useMemo(() => {
+    return INTEREST_CATEGORIES.map((category) => {
+      const count = category.options.filter((opt) => selectedKeys.has(opt.key)).length;
+      return { id: category.id, count, required: MIN_PER_CATEGORY, isValid: count >= MIN_PER_CATEGORY };
+    });
+  }, [selectedKeys]);
 
-  const onSubmit = () => {
-    setInterests(Array.from(selectedKeys));
+  const isValid = categoryCounts.every((c) => c.isValid);
+
+  const onSubmit = async () => {
+    const selected = Array.from(selectedKeys);
+
+    if (fromEditProfile) {
+      try {
+        setIsSaving(true);
+        await apiClient.patch(endpoints.user.editProfile, {
+          interests: selected,
+        });
+
+        const profile = await getProfileApi();
+        if ((profile as any)?.data) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setUser((profile as any).data);
+        }
+
+        navigation.goBack();
+      } catch (error: any) {
+        // Error handled silently
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
+    setInterests(selected);
     setCurrentStep(CURRENT_STEP + 1);
     navigation.navigate('BasicDetailsPincode');
   };
@@ -84,6 +146,9 @@ export const BasicDetailsInterestsScreen: React.FC = () => {
             <Text style={styles.title}>
               {STRINGS.PROFILE_SETUP.INTERESTS.TITLE}
             </Text>
+            <Text style={styles.subtitle}>
+              {STRINGS.PROFILE_SETUP.INTERESTS.SUBTITLE}
+            </Text>
           </View>
 
           <ScrollView
@@ -91,8 +156,10 @@ export const BasicDetailsInterestsScreen: React.FC = () => {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {INTEREST_CATEGORIES.map((category) => {
+            {INTEREST_CATEGORIES.map((category, index) => {
               const isExpanded = expandedId === category.id;
+              const categoryState = categoryCounts[index];
+              const countValid = categoryState?.isValid ?? false;
               return (
                 <View key={category.id} style={styles.categoryCard}>
                   <TouchableOpacity
@@ -114,6 +181,17 @@ export const BasicDetailsInterestsScreen: React.FC = () => {
                       )}
                     </View>
                     <Text style={styles.categoryLabel}>{category.label}</Text>
+                    <Text
+                      style={[
+                        styles.categoryCountText,
+                        { color: countValid ? colors.primary.purple : colors.neutral[500] },
+                      ]}
+                    >
+                      {STRINGS.PROFILE_SETUP.INTERESTS.SELECTED_COUNT(
+                        categoryState?.count ?? 0,
+                        MIN_PER_CATEGORY,
+                      )}
+                    </Text>
                   </TouchableOpacity>
                   {isExpanded && (
                     <View style={styles.categoryTags}>
@@ -156,10 +234,11 @@ export const BasicDetailsInterestsScreen: React.FC = () => {
 
         <View style={styles.buttonContainer}>
           <Button
-            title={STRINGS.PROFILE_SETUP.COMMON.CONTINUE}
+            title={fromEditProfile ? STRINGS.PREFERENCES.SAVE : STRINGS.PROFILE_SETUP.COMMON.CONTINUE}
             onPress={onSubmit}
             variant="primary"
-            disabled={!isValid}
+            disabled={!isValid || (fromEditProfile && isSaving)}
+            loading={fromEditProfile && isSaving}
             style={styles.button}
           />
         </View>

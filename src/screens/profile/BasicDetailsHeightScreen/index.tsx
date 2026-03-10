@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { Button } from '../../../components/Button';
@@ -18,6 +18,10 @@ import { STRINGS } from '../../../constants/strings';
 import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { colors } from '../../../theme';
+import { apiClient } from '../../../services/api/client';
+import { endpoints } from '../../../services/api/endpoints';
+import { getProfileApi } from '../../../modules/auth/api';
+import { useAuthStore } from '../../../store/auth.store';
 import { styles } from './styles';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
 
@@ -26,7 +30,7 @@ type BasicDetailsHeightNavigationProp = NativeStackNavigationProp<
   'BasicDetailsHeight'
 >;
 
-const CURRENT_STEP = 4;
+const CURRENT_STEP = 5;
 const ROW_HEIGHT = 52;
 const PICKER_VISIBLE_HEIGHT = 180;
 
@@ -47,7 +51,12 @@ function cmToFeetInches(cm: number): { feet: number; inches: number } {
 
 export const BasicDetailsHeightScreen: React.FC = () => {
   const navigation = useNavigation<BasicDetailsHeightNavigationProp>();
-  const { height, setHeight, setCurrentStep } = useProfileStore();
+  const { setHeight, setCurrentStep } = useProfileStore();
+  const route = useRoute<any>();
+  const fromEditProfile = route.params?.fromEditProfile === true;
+  const authUser = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
+  const [isSaving, setIsSaving] = React.useState(false);
 
   const feetScrollRef = useRef<ScrollView | null>(null);
   const inchesScrollRef = useRef<ScrollView | null>(null);
@@ -56,14 +65,35 @@ export const BasicDetailsHeightScreen: React.FC = () => {
   const [inchesIndex, setInchesIndex] = React.useState(4);
 
   useEffect(() => {
-    if (height?.value != null && height.unit === 'cm') {
-      const { feet, inches } = cmToFeetInches(height.value);
+    let cmSource: number | null = null;
+
+    if (fromEditProfile && authUser) {
+      const u = authUser as any;
+      const rawCm = u?.heightCm ?? u?.height;
+      if (typeof rawCm === 'number') {
+        cmSource = rawCm;
+      } else if (typeof rawCm === 'string') {
+        const parsed = parseFloat(rawCm);
+        if (!Number.isNaN(parsed)) cmSource = parsed;
+      }
+      // API may return heightFeet/heightInches instead of heightCm
+      if (cmSource == null && u?.heightFeet != null && u?.heightInches != null) {
+        const feet = Number(u.heightFeet);
+        const inches = Number(u.heightInches);
+        if (!Number.isNaN(feet) && !Number.isNaN(inches)) {
+          cmSource = feetInchesToCm(feet, inches);
+        }
+      }
+    }
+
+    if (cmSource != null) {
+      const { feet, inches } = cmToFeetInches(cmSource);
       const fi = FEET_OPTIONS.indexOf(feet);
       const ii = INCHES_OPTIONS.indexOf(inches);
       if (fi >= 0) setFeetIndex(fi);
       if (ii >= 0) setInchesIndex(ii);
     }
-  }, []);
+  }, [fromEditProfile, authUser]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -82,9 +112,31 @@ export const BasicDetailsHeightScreen: React.FC = () => {
   const feet = FEET_OPTIONS[feetIndex] ?? 5;
   const inches = INCHES_OPTIONS[inchesIndex] ?? 4;
 
-  const onSubmit = () => {
-    const cm = feetInchesToCm(feet, inches);
-    setHeight(cm, 'cm');
+  const onSubmit = async () => {
+    if (fromEditProfile) {
+      try {
+        setIsSaving(true);
+        await apiClient.patch(endpoints.user.editProfile, {
+        heightFeet: feet,
+        heightInches: inches,
+        });
+
+        const profile = await getProfileApi();
+        if ((profile as any)?.data) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setUser((profile as any).data);
+        }
+
+        navigation.goBack();
+      } catch (error: any) {
+        // Error handled silently
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+    // Persist selection in onboarding flow (store as feet/inches only)
+    setHeight(feet, inches);
     setCurrentStep(CURRENT_STEP + 1);
     navigation.navigate('BasicDetailsEducation');
   };
@@ -204,9 +256,11 @@ export const BasicDetailsHeightScreen: React.FC = () => {
 
         <View style={styles.buttonContainer}>
           <Button
-            title={STRINGS.PROFILE_SETUP.COMMON.CONTINUE}
+            title={fromEditProfile ? STRINGS.PREFERENCES.SAVE : STRINGS.PROFILE_SETUP.COMMON.CONTINUE}
             onPress={onSubmit}
             variant="primary"
+            loading={isSaving && fromEditProfile}
+            disabled={isSaving && fromEditProfile}
             style={styles.button}
           />
         </View>

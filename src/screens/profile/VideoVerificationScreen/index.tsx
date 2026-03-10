@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
-  Alert,
   StyleSheet,
   ActivityIndicator,
   NativeModules,
@@ -143,78 +142,23 @@ export const VideoVerificationScreen: React.FC = () => {
         setShowCamera(true);
         StatusBar.setHidden(true);
       } else if (status === 'denied') {
-        Alert.alert(
-          'Camera Permission Required',
-          'To verify your identity, please enable camera access in Settings.',
-          [
-            {
-              text: 'Cancel',
-              style: 'cancel',
-              onPress: () => setShowPermissionSheet(false),
-            },
-            {
-              text: 'Open Settings',
-              onPress: () => {
-                if (Platform.OS === 'ios') Linking.openURL('app-settings:');
-                else Linking.openSettings();
-              },
-            },
-          ],
-        );
+        setShowPermissionSheet(false);
       } else if (status === 'notDetermined') {
-        Alert.alert(
-          'Camera Permission Required',
-          'Camera permission is required. Please enable it in Settings to continue with video verification.',
-          [
-            {
-              text: 'Cancel',
-              style: 'cancel',
-              onPress: () => setShowPermissionSheet(false),
-            },
-            {
-              text: 'Open Settings',
-              onPress: () => {
-                if (Platform.OS === 'ios') Linking.openURL('app-settings:');
-                else Linking.openSettings();
-              },
-            },
-          ],
-        );
+        setShowPermissionSheet(false);
       }
     } catch {
-      Alert.alert(
-        'Error',
-        'Failed to request camera permission. Please enable camera access in Settings.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Open Settings',
-            onPress: () => {
-              if (Platform.OS === 'ios') Linking.openURL('app-settings:');
-              else Linking.openSettings();
-            },
-          },
-        ],
-      );
+      setShowPermissionSheet(false);
     } finally {
       setIsRequesting(false);
     }
   };
 
   const handleDontAllow = () => {
-    Alert.alert(
-      'Camera Permission Required',
-      'Video verification requires camera access. Please enable it to continue.',
-      [{ text: 'OK' }],
-    );
+    // User declined
   };
 
   const handleCloseSheet = () => {
-    Alert.alert(
-      'Permission Required',
-      'Camera permission is required for video verification. Please grant access to continue.',
-      [{ text: 'OK' }],
-    );
+    // Close sheet
   };
 
   /* ------------------------------------------------------------------ */

@@ -102,6 +102,7 @@ export function mapChatResponseToItem(
   unreadCount?: number;
   pinned?: boolean;
   previewDraft?: string;
+  otherUserId?: string;
 } {
   const participant = item.participantDetails ?? {};
   const name = participant.nickName ?? participant.name ?? 'Unknown';
@@ -126,6 +127,7 @@ export function mapChatResponseToItem(
     time,
     unreadCount: item.myUnreadCount,
     pinned: item.isPinnedForMe,
+    otherUserId: participant._id,
   };
 }
 
@@ -139,4 +141,256 @@ export async function getChatListApi(params: GetChatListParams): Promise<GetChat
     params: { page: params.page, limit: params.limit },
   });
   return data;
+}
+
+/** Pending chat list (message requests) - same response shape as getChatListApi */
+export async function getPendingChatsApi(params: GetChatListParams): Promise<GetChatListResponse> {
+  const { data } = await apiClient.post<GetChatListResponse>(endpoints.chat.getpPendingChats, {
+    page: params.page,
+    limit: params.limit,
+  });
+  return data;
+}
+
+export type SetChatRequestActionParams = {
+  chatId: string;
+  action: 'accept' | 'reject';
+};
+
+export async function setChatRequestActionApi(
+  params: SetChatRequestActionParams
+): Promise<{ statusCode?: number; message?: string; data?: unknown }> {
+  const { data } = await apiClient.post(endpoints.chat.setRequestAction, {
+    chatId: params.chatId,
+    action: params.action,
+  });
+  return data;
+}
+
+export type BlockUserParams = {
+  blockUserId: string;
+  type: 'block';
+};
+
+export async function blockUserApi(params: BlockUserParams): Promise<{ statusCode?: number; message?: string; data?: unknown }> {
+  const { data } = await apiClient.post(endpoints.chat.blockUser, {
+    blockUserId: params.blockUserId,
+    type: params.type,
+  });
+  return data;
+}
+
+export type ReportUserParams = {
+  reportedAgainst: string;
+  reportMessage: string;
+};
+
+export async function reportUserApi(params: ReportUserParams): Promise<{ statusCode?: number; message?: string; data?: unknown }> {
+  const { data } = await apiClient.post(endpoints.chat.reportUser, {
+    reportedAgainst: params.reportedAgainst,
+    reportMessage: params.reportMessage,
+  });
+  return data;
+}
+
+/** Payload: { "chatId": "<id>" } */
+export async function pinChatApi(chatId: string): Promise<{ statusCode?: number; message?: string; data?: unknown }> {
+  const { data } = await apiClient.post(endpoints.chat.pinChat, { chatId });
+  return data;
+}
+
+/** Payload: { "chatId": "<id>" } */
+export async function unpinChatApi(chatId: string): Promise<{ statusCode?: number; message?: string; data?: unknown }> {
+  const { data } = await apiClient.post(endpoints.chat.unpinChat, { chatId });
+  return data;
+}
+
+/** Payload: { "chatId": "<id>" } */
+export async function deleteChatApi(chatId: string): Promise<{ statusCode?: number; message?: string; data?: unknown }> {
+  const { data } = await apiClient.post(endpoints.chat.deleteChat, { chatId });
+  return data;
+}
+
+/** Mark chat as seen (e.g. when user opens the conversation). Payload: { "chatId": "<id>" } */
+export async function markChatSeenApi(chatId: string): Promise<{ statusCode?: number; message?: string; data?: unknown }> {
+  const { data } = await apiClient.post(endpoints.chat.markSeen, { chatId });
+  return data;
+}
+
+/** File item for send-message payload */
+export type SendMessageFileItem = { url: string; key: string };
+
+export type SendMessagePayload = {
+  chatId: string;
+  content: string;
+  messageType: 'text' | 'image' | 'audio' | 'video';
+  files: SendMessageFileItem[];
+  /** Message id as string when replying, otherwise null */
+  replyTo: string | null;
+};
+
+export async function sendMessageApi(payload: SendMessagePayload): Promise<{ statusCode?: number; message?: string; data?: unknown }> {
+  const { data } = await apiClient.post(endpoints.chat.sendMessage, {
+    chatId: payload.chatId,
+    content: payload.content,
+    messageType: payload.messageType,
+    files: payload.files,
+    replyTo: payload.replyTo,
+  });
+  return data;
+}
+
+/** Upload a file for chat (image/audio/video). Uses /aws-s3-files/upload. Returns { url, key } for use in sendMessage. */
+export type UploadChatFileResponse = { url?: string; key?: string; data?: { url?: string; key?: string } };
+
+export async function uploadChatFileApi(
+  fileUri: string,
+  options: { mimeType: string; fileName: string }
+): Promise<{ url: string; key: string }> {
+  const formData = new FormData();
+  const uri = fileUri.startsWith('file://') ? fileUri : `file://${fileUri}`;
+  formData.append('file', {
+    uri,
+    type: options.mimeType,
+    name: options.fileName,
+  } as unknown as Blob);
+
+  const { data } = await apiClient.post<UploadChatFileResponse>(endpoints.chat.fileUpload, formData, {
+    timeout: 60000,
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
+  const url = data?.url ?? data?.data?.url ?? '';
+  const key = data?.key ?? data?.data?.key ?? '';
+  if (!url || !key) throw new Error('Upload response missing url or key');
+  return { url, key };
+}
+
+/** API message item (shape from get-messages) */
+export type ChatMessageApiItem = {
+  _id?: string;
+  chatId?: string;
+  messageType?: 'text' | 'voice' | 'image' | 'file';
+  content?: string | { text?: string; type?: string };
+  files?: Array<{ url?: string; uri?: string; name?: string }>;
+  isMedia?: boolean;
+  isReply?: boolean;
+  isEdited?: boolean;
+  messageStatus?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  sender?: string;
+  receiver?: string;
+  isSentByMe?: boolean;
+  messageTimeStamp?: string;
+  statusForMe?: string;
+  /** Legacy/alternate fields */
+  type?: string;
+  text?: string;
+  url?: string;
+  uri?: string;
+  name?: string;
+  senderId?: string;
+  replyTo?: { senderName?: string; preview?: string };
+  [key: string]: unknown;
+};
+
+export type GetChatMessagesParams = {
+  chatId: string;
+  page?: number;
+  limit?: number;
+};
+
+export type GetChatMessagesResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: {
+    list?: ChatMessageApiItem[];
+    messages?: ChatMessageApiItem[];
+    chat?: unknown;
+    meta?: { total?: number; limit?: number; pageNo?: number; totalPages?: number; currentPage?: number };
+  };
+};
+
+export async function getChatMessagesApi(
+  params: GetChatMessagesParams
+): Promise<GetChatMessagesResponse> {
+  const { data } = await apiClient.post<GetChatMessagesResponse>(endpoints.chat.getChatMessages, {
+    chatId: params.chatId,
+    page: params.page ?? 1,
+    limit: params.limit ?? 20,
+  });
+  return data;
+}
+
+/** UI chat message (matches ChatDetailScreen ChatMessage union). messageId from API _id for replyTo. */
+export type ChatMessageUi =
+  | { type: 'text'; text: string; timestamp: string; sent: boolean; replyTo?: { senderName: string; preview: string }; messageId?: string }
+  | { type: 'voice'; timestamp: string; sent: boolean; messageId?: string }
+  | { type: 'image'; uri: string; timestamp: string; sent: boolean; messageId?: string }
+  | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean; messageId?: string };
+
+function formatMessageTime(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const h = d.getHours();
+  const m = d.getMinutes();
+  const hour = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  const ampm = h >= 12 ? 'pm' : 'am';
+  return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
+function getTextFromApiMessage(item: ChatMessageApiItem): string {
+  const c = item.content;
+  if (typeof c === 'string') return c;
+  if (item.text && typeof item.text === 'string') return item.text;
+  if (c && typeof c === 'object' && c !== null && 'text' in c) return String((c as { text?: unknown }).text ?? '');
+  return '';
+}
+
+/**
+ * Map one API message to UI ChatMessage. Uses isSentByMe from API when present.
+ */
+export function mapApiMessageToChatMessage(
+  item: ChatMessageApiItem,
+  _currentUserId?: string
+): ChatMessageUi | null {
+  const type = (item.messageType ?? item.type ?? 'text') as string;
+  const sent = item.isSentByMe === true;
+  const timestamp = formatMessageTime(item.messageTimeStamp ?? item.createdAt);
+
+  const messageId = item._id ?? undefined;
+  if (type === 'text') {
+    return {
+      type: 'text',
+      text: getTextFromApiMessage(item),
+      timestamp,
+      sent,
+      replyTo: item.replyTo?.senderName != null
+        ? { senderName: item.replyTo.senderName, preview: item.replyTo.preview ?? '' }
+        : undefined,
+      messageId,
+    };
+  }
+  if (type === 'voice') {
+    return { type: 'voice', timestamp, sent, messageId };
+  }
+  if (type === 'image') {
+    const file = item.files?.[0];
+    const uri = item.uri ?? item.url ?? file?.url ?? file?.uri ?? '';
+    return uri ? { type: 'image', uri, timestamp, sent, messageId } : null;
+  }
+  if (type === 'file') {
+    const file = item.files?.[0];
+    const uri = item.uri ?? item.url ?? file?.url ?? file?.uri ?? '';
+    const name = item.name ?? file?.name ?? 'File';
+    return uri ? { type: 'file', uri, name, timestamp, sent, messageId } : null;
+  }
+  return {
+    type: 'text',
+    text: getTextFromApiMessage(item),
+    timestamp,
+    sent,
+    messageId,
+  };
 }

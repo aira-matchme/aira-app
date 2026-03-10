@@ -23,8 +23,9 @@ export const GradientText: React.FC<GradientTextProps> = ({
 }) => {
   const fontSize = style.fontSize ?? 15;
   const fontWeight = style.fontWeight ?? '500';
-  // Approximate width: ~9px per character at 15px font
-  const width = Math.min(children.length * 9.5, 220);
+  // Approximate width: scale with fontSize and character count; no hard cap to avoid clipping
+  const approxPerChar = fontSize * 0.6;
+  const width = Math.max(children.length * approxPerChar, 80);
   const height = fontSize + 8;
   const gradientId = 'gradientTextGenerating';
 
@@ -45,12 +46,13 @@ export const GradientText: React.FC<GradientTextProps> = ({
           </LinearGradient>
         </Defs>
         <SvgText
-          x={0}
+          x={width / 2}
           y={fontSize + 2}
           fill={`url(#${gradientId})`}
           fontSize={fontSize}
           fontWeight={fontWeight}
           fontFamily={style.fontFamily}
+          textAnchor="middle"
         >
           {children}
         </SvgText>

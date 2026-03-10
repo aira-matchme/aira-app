@@ -10,6 +10,7 @@ import { ProfileIntroScreen } from '../screens/profile/ProfileIntroScreen';
 import { BasicDetailsNameScreen } from '../screens/profile/BasicDetailsNameScreen';
 import { BasicDetailsDobScreen } from '../screens/profile/BasicDetailsDobScreen';
 import { BasicDetailsWeightScreen } from '../screens/profile/BasicDetailsWeightScreen';
+import { BasicDetailsBodyTypeScreen } from '../screens/profile/BasicDetailsBodyTypeScreen';
 import { BasicDetailsHeightScreen } from '../screens/profile/BasicDetailsHeightScreen';
 import { BasicDetailsEducationScreen } from '../screens/profile/BasicDetailsEducationScreen';
 import { BasicDetailsEmploymentScreen } from '../screens/profile/BasicDetailsEmploymentScreen';
@@ -37,6 +38,7 @@ import { PreferencesDistanceScreen } from '../screens/preferences/PreferencesDis
 import { PreferencesEducationScreen } from '../screens/preferences/PreferencesEducationScreen';
 import { PreferencesEmploymentScreen } from '../screens/preferences/PreferencesEmploymentScreen';
 import { PreferencesIncomeScreen } from '../screens/preferences/PreferencesIncomeScreen';
+import { PreferencesReligionScreen } from '../screens/preferences/PreferencesReligionScreen';
 import { PreferencesMaritalStatusScreen } from '../screens/preferences/PreferencesMaritalStatusScreen';
 import { PreferencesSummaryScreen } from '../screens/preferences/PreferencesSummaryScreen';
 import { LikesScreen } from '../screens/LikesScreen';
@@ -116,6 +118,11 @@ export const AuthNavigator = () => {
       <Stack.Screen
         name="BasicDetailsWeight"
         component={BasicDetailsWeightScreen}
+        options={profileScreenOptions}
+      />
+      <Stack.Screen
+        name="BasicDetailsBodyType"
+        component={BasicDetailsBodyTypeScreen}
         options={profileScreenOptions}
       />
       <Stack.Screen
@@ -251,6 +258,11 @@ export const AuthNavigator = () => {
       <Stack.Screen
         name="PreferencesIncome"
         component={PreferencesIncomeScreen}
+        options={profileScreenOptions}
+      />
+      <Stack.Screen
+        name="PreferencesReligion"
+        component={PreferencesReligionScreen}
         options={profileScreenOptions}
       />
       <Stack.Screen

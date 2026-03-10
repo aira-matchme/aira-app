@@ -40,6 +40,12 @@ export const styles = StyleSheet.create({
     color: colors.neutral[900],
     lineHeight: 44,
   },
+  subtitle: {
+    fontSize: 14,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.neutral[600],
+    marginTop: spacing.xs,
+  },
   scrollContent: {
     paddingBottom: spacing.xl * 2,
   },
@@ -75,6 +81,10 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: typography.fontFamily.semibold,
     color: colors.neutral[900],
+  },
+  categoryCountText: {
+    fontSize: 13,
+    fontFamily: typography.fontFamily.medium,
   },
   categoryTags: {
     flexDirection: 'row',

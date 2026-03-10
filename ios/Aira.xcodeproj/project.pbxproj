@@ -302,6 +302,7 @@
 			baseConfigurationReference = E575963CBDA7899227BA3787 /* Pods-Aira.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Aira/Aira.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
@@ -333,6 +334,7 @@
 			baseConfigurationReference = ED53260D0F1C8DAC26E7FCDE /* Pods-Aira.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Aira/Aira.entitlements;
 				CURRENT_PROJECT_VERSION = 1;

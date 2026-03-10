@@ -12,6 +12,7 @@ import { Thumb, Rail, RailSelected } from '../../../components/RangeSlider/Range
 import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { usePreferencesStore } from '../../../store/preferences.store';
+import { buildAddPreferencePayload, patchEditPreference } from '../../../modules/preferences/api';
 import { styles } from './styles';
 
 const AGE_MIN = 18;
@@ -46,10 +47,16 @@ export const PreferencesAgeScreen: React.FC = () => {
     navigation.goBack();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setAgeRange(low, high);
     if (returnToSummary) {
       setOpenedEditFromSummary(false);
+      try {
+        const payload = buildAddPreferencePayload(usePreferencesStore.getState());
+        await patchEditPreference(payload);
+      } catch {
+        // Ignore here; global handlers will surface errors.
+      }
       navigation.goBack();
     } else {
       navigation.navigate('PreferencesHeight', {});

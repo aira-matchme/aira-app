@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
-  Alert,
   StyleSheet,
   Platform,
   Linking,
@@ -63,7 +62,6 @@ export const ProfilePhotosScreen: React.FC = () => {
   ) => {
     if (response.didCancel) return;
     if (response.errorCode) {
-      Alert.alert('Error', response.errorMessage ?? 'Failed to pick image');
       return;
     }
     const uri = response.assets?.[0]?.uri;
@@ -86,11 +84,6 @@ export const ProfilePhotosScreen: React.FC = () => {
       await uploadProfilePhotoApi(uri, order);
       setUploadedSlots((prev) => new Set(prev).add(index));
     } catch (err: unknown) {
-      const message =
-        (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ||
-        (err as { message?: string })?.message ||
-        'Failed to upload photo. Please try again.';
-      Alert.alert('Upload Failed', message);
       setPhotos((prev) => {
         const next = [...prev];
         next[index] = null;
@@ -148,39 +141,10 @@ export const ProfilePhotosScreen: React.FC = () => {
       setPendingCameraIndex(null);
       if (status === 'granted') {
         openCameraForSlot(index);
-      } else {
-        Alert.alert(
-          'Camera Permission Required',
-          'Please enable camera access in Settings to add photos.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Open Settings',
-              onPress: () => {
-                if (Platform.OS === 'ios') Linking.openURL('app-settings:');
-                else Linking.openSettings();
-              },
-            },
-          ]
-        );
       }
     } catch {
       setShowCameraPermissionSheet(false);
       setPendingCameraIndex(null);
-      Alert.alert(
-        'Error',
-        'Failed to request camera permission. Please enable camera access in Settings.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Open Settings',
-            onPress: () => {
-              if (Platform.OS === 'ios') Linking.openURL('app-settings:');
-              else Linking.openSettings();
-            },
-          },
-        ]
-      );
     } finally {
       setIsRequestingPermission(false);
     }
@@ -221,39 +185,10 @@ export const ProfilePhotosScreen: React.FC = () => {
       const hasAccess = status === 'granted' || status === 'limited';
       if (hasAccess) {
         openGalleryForSlot(index);
-      } else {
-        Alert.alert(
-          'Photo Permission Required',
-          'Please enable photo access in Settings to add photos.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Open Settings',
-              onPress: () => {
-                if (Platform.OS === 'ios') Linking.openURL('app-settings:');
-                else Linking.openSettings();
-              },
-            },
-          ]
-        );
       }
     } catch {
       setShowGalleryPermissionSheet(false);
       setPendingGalleryIndex(null);
-      Alert.alert(
-        'Error',
-        'Failed to request photo permission. Please enable photo access in Settings.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Open Settings',
-            onPress: () => {
-              if (Platform.OS === 'ios') Linking.openURL('app-settings:');
-              else Linking.openSettings();
-            },
-          },
-        ]
-      );
     } finally {
       setIsRequestingPermission(false);
     }

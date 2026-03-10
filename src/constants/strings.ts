@@ -114,6 +114,10 @@ export const STRINGS = {
         PREFER_NOT_TO_SAY: 'Other',
       },
     },
+    BODY_TYPE: {
+      TITLE: 'Select your body type',
+      SUBTITLE: 'How would you describe your body type?',
+    },
     HEIGHT: {
       TITLE: 'How tall are you?',
       SUBTITLE:
@@ -181,11 +185,14 @@ export const STRINGS = {
     },
     INTERESTS: {
       TITLE: 'What do you enjoy doing?',
+      SUBTITLE: 'Choose at least 2 from each section.',
+      SELECTED_COUNT: (current: number, min: number) => `${current}/${min} selected`,
     },
     PINCODE: {
       TITLE: "Let's find people around you",
       SUBTITLE: "We use this to prioritize nearby matches.",
       PLACEHOLDER: 'Enter your pincode',
+      ERROR_NOT_FOUND: "We couldn't find this postcode. Please check it and try again.",
     },
     FACE_VERIFICATION: {
       TITLE: 'Quick face\nverification',
@@ -363,6 +370,10 @@ export const STRINGS = {
     ABOVE_50: '> £50k',
     PREFER_NOT_TO_SAY: 'Prefer not to say',
   },
+  PREFERENCES_RELIGION: {
+    TITLE: 'Religious preference',
+    SUBTITLE: 'Select all the religions you are comfortable matching with.',
+  },
   PREFERENCES_MARITAL_STATUS: {
     TITLE: 'Marital status preference',
     SUBTITLE: "Select what you're comfortable with.",
@@ -393,6 +404,7 @@ export const STRINGS = {
     LABEL_EDUCATION: 'Education',
     LABEL_EMPLOYMENT: 'Employment',
     LABEL_INCOME: 'Income',
+    LABEL_RELIGION: 'Religion',
     LABEL_MARITAL_STATUS: 'Marital Status',
     LABEL_BODY_TYPE: 'Body type',
     REQUIRED: 'Required',
@@ -412,7 +424,10 @@ export const STRINGS = {
   },
   CHAT: {
     TITLE: 'Messages',
+    TAB_CHATS: 'Chats',
+    TAB_REQUESTS: 'Requests',
     EMPTY_MESSAGE: 'People who message you will show up here',
+    REQUESTS_EMPTY_MESSAGE: 'Message requests will show up here',
     PREVIEW_HEY: 'Hey there!',
     DRAFT_PREFIX: 'Draft:',
     DRAFT_PREVIEW: 'He',
@@ -442,6 +457,14 @@ export const STRINGS = {
     VOICE_DURATION: (min: number, sec: number) => `${min}:${sec.toString().padStart(2, '0')}`,
     BLOCK: 'Block',
     REPORT: 'Report',
+    ACCEPT: 'Accept',
+    DECLINE: 'Decline',
+    BLOCK_AND_REPORT: 'Block & Report',
+    LOADING_MESSAGES: 'Loading messages...',
+    TYPING_INDICATOR: 'typing...',
+    MICROPHONE_PERMISSION_TITLE: 'AIRA Would Like To Access The Microphone',
+    MICROPHONE_PERMISSION_DESCRIPTION:
+      'AIRA uses the microphone to record and send voice messages in chat. These can be managed in Settings.',
   },
 } as const;
 

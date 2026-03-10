@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,6 +19,10 @@ import { STRINGS } from '../../../constants/strings';
 import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { MARITAL_OPTIONS } from '../../../constants/profile';
+import { apiClient } from '../../../services/api/client';
+import { endpoints } from '../../../services/api/endpoints';
+import { getProfileApi } from '../../../modules/auth/api';
+import { useAuthStore } from '../../../store/auth.store';
 import { styles } from './styles';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
 
@@ -27,7 +31,7 @@ type NavigationProp = NativeStackNavigationProp<
   'BasicDetailsMaritalStatus'
 >;
 
-const CURRENT_STEP = 9;
+const CURRENT_STEP = 10;
 
 const maritalSchema = z.object({
   maritalStatus: z.string().min(1),
@@ -38,6 +42,19 @@ type MaritalFormData = z.infer<typeof maritalSchema>;
 export const BasicDetailsMaritalStatusScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { maritalStatus, setMaritalStatus, setCurrentStep } = useProfileStore();
+  const route = useRoute<any>();
+  const fromEditProfile = route.params?.fromEditProfile === true;
+  const authUser = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  const initialMaritalStatus = React.useMemo(() => {
+    if (fromEditProfile && authUser) {
+      const raw = (authUser as any)?.maritalStatus;
+      if (typeof raw === 'string') return raw;
+    }
+    return maritalStatus || '';
+  }, [fromEditProfile, authUser, maritalStatus]);
 
   const {
     control,
@@ -48,11 +65,37 @@ export const BasicDetailsMaritalStatusScreen: React.FC = () => {
     resolver: zodResolver(maritalSchema),
     mode: 'onChange',
     defaultValues: {
-      maritalStatus: maritalStatus || '',
+      maritalStatus: initialMaritalStatus,
     },
   });
 
-  const onSubmit = (data: MaritalFormData) => {
+  useEffect(() => {
+    setValue('maritalStatus', initialMaritalStatus);
+  }, [initialMaritalStatus, setValue]);
+
+  const onSubmit = async (data: MaritalFormData) => {
+    if (fromEditProfile) {
+      try {
+        setIsSaving(true);
+        await apiClient.patch(endpoints.user.editProfile, {
+          maritalStatus: data.maritalStatus,
+        });
+
+        const profile = await getProfileApi();
+        if ((profile as any)?.data) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setUser((profile as any).data);
+        }
+
+        navigation.goBack();
+      } catch (error: any) {
+        // Error handled silently
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
     setMaritalStatus(data.maritalStatus);
     setCurrentStep(CURRENT_STEP + 1);
     navigation.navigate('BasicDetailsChildren');
@@ -123,10 +166,11 @@ export const BasicDetailsMaritalStatusScreen: React.FC = () => {
 
         <View style={styles.buttonContainer}>
           <Button
-            title={STRINGS.PROFILE_SETUP.COMMON.CONTINUE}
+            title={fromEditProfile ? STRINGS.PREFERENCES.SAVE : STRINGS.PROFILE_SETUP.COMMON.CONTINUE}
             onPress={handleSubmit(onSubmit)}
             variant="primary"
-            disabled={!isValid}
+            disabled={!isValid || (fromEditProfile && isSaving)}
+            loading={fromEditProfile && isSaving}
             style={styles.button}
           />
         </View>

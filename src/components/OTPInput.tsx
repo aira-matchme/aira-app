@@ -22,7 +22,7 @@ export const OTPInput: React.FC<OTPInputProps> = ({
   onChangeText,
   error,
   success = false,
-  length = 4,
+  length = 6,
   ...rest
 }) => {
   const [isFocused, setIsFocused] = useState(false);

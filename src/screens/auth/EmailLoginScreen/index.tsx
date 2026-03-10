@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   Keyboard,
   Platform,
-  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -82,13 +81,7 @@ export const EmailLoginScreen: React.FC = () => {
         navigation.navigate('OTPVerification', { email });
       }
     } catch (error: any) {
-      console.error('Error sending OTP:', error);
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        'Failed to send OTP. Please try again.';
-      
-      Alert.alert('Error', errorMessage);
+      // Send OTP failed
     }
   };
 

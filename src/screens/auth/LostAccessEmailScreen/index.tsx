@@ -52,7 +52,7 @@ export const LostAccessEmailScreen: React.FC = () => {
   });
 
   const onSubmit = (data: LostAccessEmailFormData) => {
-    console.log('Form submitted:', data);
+    // Form submission
   };
 
   const handleClose = () => {

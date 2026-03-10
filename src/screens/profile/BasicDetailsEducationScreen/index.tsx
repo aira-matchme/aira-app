@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,6 +20,10 @@ import { STRINGS } from '../../../constants/strings';
 import { EDUCATION_OPTIONS } from '../../../constants/profile';
 import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
+import { apiClient } from '../../../services/api/client';
+import { endpoints } from '../../../services/api/endpoints';
+import { getProfileApi } from '../../../modules/auth/api';
+import { useAuthStore } from '../../../store/auth.store';
 import { styles } from './styles';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
 
@@ -29,7 +33,7 @@ type NavigationProp = NativeStackNavigationProp<
 >;
 
 const TOTAL_STEPS = 8;
-const CURRENT_STEP = 5;
+const CURRENT_STEP = 6;
 
 const educationSchema = z.object({
   education: z.string().min(1, 'Please select an option'),
@@ -40,6 +44,20 @@ type EducationFormData = z.infer<typeof educationSchema>;
 export const BasicDetailsEducationScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { education, setEducation, setCurrentStep } = useProfileStore();
+  const route = useRoute<any>();
+  const fromEditProfile = route.params?.fromEditProfile === true;
+  const authUser = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  const initialEducation = React.useMemo(() => {
+    if (fromEditProfile && authUser) {
+      const raw = (authUser as any)?.education;
+      if (typeof raw === 'string') return raw;
+      if (raw && typeof raw === 'object' && 'level' in raw) return (raw as { level: string }).level;
+    }
+    return education || '';
+  }, [fromEditProfile, authUser, education]);
 
   const {
     control,
@@ -50,11 +68,37 @@ export const BasicDetailsEducationScreen: React.FC = () => {
     resolver: zodResolver(educationSchema),
     mode: 'onChange',
     defaultValues: {
-      education: education || '',
+      education: initialEducation,
     },
   });
 
-  const onSubmit = (data: EducationFormData) => {
+  useEffect(() => {
+    setValue('education', initialEducation);
+  }, [initialEducation, setValue]);
+
+  const onSubmit = async (data: EducationFormData) => {
+    if (fromEditProfile) {
+      try {
+        setIsSaving(true);
+        await apiClient.patch(endpoints.user.editProfile, {
+          education: data.education,
+        });
+
+        const profile = await getProfileApi();
+        if ((profile as any)?.data) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setUser((profile as any).data);
+        }
+
+        navigation.goBack();
+      } catch (error: any) {
+        // Error handled silently
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
     setEducation(data.education);
     setCurrentStep(CURRENT_STEP + 1);
     navigation.navigate('BasicDetailsEmployment');
@@ -127,10 +171,11 @@ export const BasicDetailsEducationScreen: React.FC = () => {
 
         <View style={styles.buttonContainer}>
           <Button
-            title={STRINGS.PROFILE_SETUP.COMMON.CONTINUE}
+            title={fromEditProfile ? STRINGS.PREFERENCES.SAVE : STRINGS.PROFILE_SETUP.COMMON.CONTINUE}
             onPress={handleSubmit(onSubmit)}
             variant="primary"
-            disabled={!isValid}
+            disabled={!isValid || (fromEditProfile && isSaving)}
+            loading={fromEditProfile && isSaving}
             style={styles.button}
           />
         </View>

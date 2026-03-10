@@ -20,7 +20,6 @@ export const WelcomeScreen: React.FC = () => {
   const [showLoginOptions, setShowLoginOptions] = useState(false);
 
   const handleGetStarted = () => {
-    console.log('Firebase apps:', getApps());
     setShowLoginOptions(true);
   };
 

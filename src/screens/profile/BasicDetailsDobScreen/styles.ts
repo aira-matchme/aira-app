@@ -55,10 +55,13 @@ export const styles = StyleSheet.create({
   },
   dateColumn: {
     flex: 1,
-    height: 180, // 3 rows (52 + 8) so selected row is centered like Figma
+    height: 180, // approx. 3 rows visible
   },
   scrollContent: {
-    paddingVertical: 60, // centers the selected row in the 180px visible area
+    // Small vertical padding so full list (top & bottom) is reachable,
+    // especially on iOS where large symmetric padding can prevent
+    // scrolling to the very first / last items.
+    paddingVertical: spacing.sm,
   },
   dateOption: {
     height: 52,

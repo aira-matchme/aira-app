@@ -5,10 +5,10 @@ import {
   StatusBar,
   TouchableOpacity,
   Dimensions,
-  Alert,
   ActivityIndicator,
   Image,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -50,12 +50,10 @@ export const SelfieCameraScreen: React.FC = () => {
 
   const handleTakePhoto = async () => {
     if (!camera.current || !device) {
-      Alert.alert('Error', 'Camera not ready. Please try again.');
       return;
     }
 
     if (!hasPermission) {
-      Alert.alert('Permission Required', 'Camera permission is required to take a photo.');
       return;
     }
     setIsCapturing(true);
@@ -69,23 +67,11 @@ export const SelfieCameraScreen: React.FC = () => {
         await uploadSelfieApi(photo.path);
         navigation.navigate('VideoVerification');
       } catch (err: unknown) {
-        const message =
-          (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data
-            ?.message ||
-          (err as { message?: string })?.message ||
-          'Verification failed. Please try again.';
-        Alert.alert('Verification Failed', message, [
-          { text: 'OK', onPress: () => { setScreenState('camera'); setCapturedPhotoUri(null); } },
-        ]);
+        setScreenState('camera');
+        setCapturedPhotoUri(null);
       }
     } catch (error) {
       setIsCapturing(false);
-      console.error('Error capturing photo:', error);
-      Alert.alert(
-        'Error',
-        'Failed to capture photo. Please try again.',
-        [{ text: 'OK' }]
-      );
     }
   };
 
@@ -136,7 +122,10 @@ export const SelfieCameraScreen: React.FC = () => {
       <View style={styles.wrapper}>
         <Image
           source={{ uri: capturedPhotoUri }}
-          style={styles.verifyingBackgroundImage}
+          style={[
+            styles.verifyingBackgroundImage,
+            Platform.OS === 'ios' && styles.iosBackgroundRotate,
+          ]}
           resizeMode="cover"
         />
         <View style={styles.verifyingBackgroundOverlay} />
@@ -170,7 +159,10 @@ export const SelfieCameraScreen: React.FC = () => {
           <>
             <Image
               source={{ uri: capturedPhotoUri }}
-              style={styles.verifiedBackgroundImage}
+              style={[
+                styles.verifiedBackgroundImage,
+                Platform.OS === 'ios' && styles.iosBackgroundRotate,
+              ]}
               resizeMode="cover"
             />
             <View style={styles.verifiedBackgroundOverlay} />

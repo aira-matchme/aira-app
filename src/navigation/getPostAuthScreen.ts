@@ -16,17 +16,19 @@ export type PostAuthScreen = keyof Pick<
   AuthStackParamList,
   | 'EnableNotifications'
   | 'ProfileIntro'
+  | 'FaceVerification'
   | 'ProfilePhotos'
   | 'OnboardingIntro'
   | 'PreferencesMatch'
   | 'VideoVerification'
-  | 'FaceVerification'
   | 'Likes'
 >;
 
 /**
  * Central logic for post-login / post-auth navigation.
  * Used by AuthNavigator (initial route), LoginOptionsBottomSheet, OTPVerificationScreen, etc.
+ *
+ * Order: notifications → profile → face verification → gallery photos → questionnaire → main app.
  *
  * @param user - Current user from profile API or auth response
  * @param shouldShowEnableNotifications - Whether notification permission prompt is needed (caller checks permission)
@@ -37,17 +39,14 @@ export function getPostAuthScreen(
   shouldShowEnableNotifications: boolean
 ): PostAuthScreen {
   if (shouldShowEnableNotifications) return 'EnableNotifications';
-  if (!user) return 'EnableNotifications';
+  if (!user) return 'ProfileIntro';
 
-  // if (user.questionnaireCompleted) return 'PreferencesMatch';
-  // if (!user.isProfileComplete) return 'ProfileIntro';π
-  // if (user.livenessCheck)
-  //   return user.galleryPhotosUploaded ? 'OnboardingIntro' : 'ProfilePhotos';
-  // if (user.profilePhoto) return 'VideoVerification';
-  // return 'ProfileIntro';
+  if (!user.isProfileComplete) return 'ProfileIntro';
+  if (!user.livenessCheck) return 'FaceVerification';
+  if (!user.galleryPhotosUploaded) return 'ProfilePhotos';
+  if (!user.questionnaireCompleted) return 'OnboardingIntro';
+
+  // Show main app with bottom tabs; RootNavigator shows TabNavigator and initial tab is Home (Dashboard)
+  return 'Likes';
   // return 'FaceVerification';
-  // return 'OnboardingIntro';
-  // return 'Likes';
-  return 'PreferencesMatch';
-
 }

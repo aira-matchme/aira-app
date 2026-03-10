@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StatusBar, TouchableOpacity, ScrollView, Platform, Linking, Alert } from 'react-native';
+import { View, Text, StatusBar, TouchableOpacity, ScrollView, Platform, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LinearGradient from 'react-native-linear-gradient';
 
 import { Button } from '../../../components/Button';
-import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import FrameIcon from '../../../assets/icons/common/FrameIcon';
 import { ReusableBottomSheet } from '../../../components/BottomSheet';
 import { STRINGS } from '../../../constants/strings';
@@ -34,98 +33,28 @@ export const FaceVerificationScreen: React.FC = () => {
     setIsRequesting(true);
     try {
       const status = await requestCameraPermission();
-      console.log('status', status);
-      
+
       if (status === 'granted') {
         setShowPermissionSheet(false);
         navigation.navigate('SelfieCamera');
       } else if (status === 'denied') {
-        Alert.alert(
-          'Camera Permission Required',
-          'To verify your face, please enable camera access in Settings.',
-          [
-            { text: 'Cancel', style: 'cancel', onPress: () => setShowPermissionSheet(false) },
-            {
-              text: 'Open Settings',
-              onPress: () => {
-                if (Platform.OS === 'ios') {
-                  Linking.openURL('app-settings:');
-                } else {
-                  Linking.openSettings();
-                }
-              },
-            },
-          ]
-        );
+        setShowPermissionSheet(false);
       } else if (status === 'notDetermined') {
-        // On iOS, notDetermined usually means permission wasn't requested yet
-        // But if we're here, it means the permission library isn't available
-        Alert.alert(
-          'Camera Permission Required',
-          Platform.OS === 'ios' 
-            ? 'Camera permission is required. Please enable it in Settings to continue with face verification.'
-            : 'Camera permission is required. Please enable it in Settings to continue with face verification.',
-          [
-            { text: 'Cancel', style: 'cancel', onPress: () => setShowPermissionSheet(false) },
-            {
-              text: 'Open Settings',
-              onPress: () => {
-                if (Platform.OS === 'ios') {
-                  Linking.openURL('app-settings:');
-                } else {
-                  Linking.openSettings();
-                }
-              },
-            },
-          ]
-        );
+        setShowPermissionSheet(false);
       }
     } catch (error) {
-      console.error('Error requesting camera permission:', error);
-      Alert.alert(
-        'Error', 
-        'Failed to request camera permission. Please enable camera access in Settings.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Open Settings',
-            onPress: () => {
-              if (Platform.OS === 'ios') {
-                Linking.openURL('app-settings:');
-              } else {
-                Linking.openSettings();
-              }
-            },
-          },
-        ]
-      );
+      setShowPermissionSheet(false);
     } finally {
       setIsRequesting(false);
     }
   };
 
   const handleDontAllow = () => {
-    Alert.alert(
-      'Camera Permission Required',
-      'Face verification requires camera access. Please enable it to continue.',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Keep the sheet open - user must grant permission
-          },
-        },
-      ]
-    );
+    // Keep the sheet open - user must grant permission
   };
 
   const handleCloseSheet = () => {
     // Prevent closing without granting permission
-    Alert.alert(
-      'Permission Required',
-      'Camera permission is required for face verification. Please grant access to continue.',
-      [{ text: 'OK' }]
-    );
   };
 
   return (

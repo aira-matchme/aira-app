@@ -12,6 +12,7 @@ import { Thumb, Rail, RailSelected } from '../../../components/RangeSlider/Range
 import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { usePreferencesStore } from '../../../store/preferences.store';
+import { buildAddPreferencePayload, patchEditPreference } from '../../../modules/preferences/api';
 import { styles } from './styles';
 
 const DISTANCE_MIN_MILES = 1;
@@ -49,10 +50,16 @@ export const PreferencesDistanceScreen: React.FC = () => {
     navigation.goBack();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setDistanceMiles(low, high);
     if (returnToSummary) {
       setOpenedEditFromSummary(false);
+      try {
+        const payload = buildAddPreferencePayload(usePreferencesStore.getState());
+        await patchEditPreference(payload);
+      } catch {
+        // Ignore; global error UI handles failures.
+      }
       navigation.goBack();
     } else {
       navigation.navigate('PreferencesEducation', {});

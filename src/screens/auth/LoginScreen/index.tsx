@@ -10,7 +10,6 @@ export const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const setTokens = useAuthStore((state) => state.setTokens);
-  console.log('Firebase apps:', getApps());
   const handleLogin = async () => {
     if (!email || !password) {
       return;
@@ -22,7 +21,7 @@ export const LoginScreen = () => {
       const response = { accessToken: '123', refreshToken: '456' };
       setTokens(response.accessToken, response.refreshToken);
     } catch (error) {
-      console.error('Login failed:', error);
+      // Login failed
     } finally {
       setLoading(false);
     }

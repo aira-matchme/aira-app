@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,6 +24,7 @@ import { UK_POSTCODE_REGEX } from '../../../constants/profile';
 import { apiClient } from '../../../services/api/client';
 import { endpoints } from '../../../services/api/endpoints';
 import { useProfileStore } from '../../../store/profile.store';
+import { useApiErrorStore } from '../../../store/apiError.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './styles';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
@@ -34,8 +34,8 @@ type NavigationProp = NativeStackNavigationProp<
   'BasicDetailsPincode'
 >;
 
-const TOTAL_STEPS = 12;
-const CURRENT_STEP = 12;
+const TOTAL_STEPS = 13;
+const CURRENT_STEP = 13;
 
 const pincodeSchema = z.object({
   pincode: z
@@ -55,6 +55,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
     name,
     dateOfBirth,
     gender,
+    bodyType,
     height,
     education,
     employment,
@@ -95,6 +96,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
   );
 
   const onSubmit = async (data: PincodeFormData) => {
+    console.log('Submitted postcode:', data.pincode);
     setIsLoading(true);
     try {
       // Normalize postcode: uppercase, remove extra spaces
@@ -105,22 +107,18 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
         `https://api.postcodes.io/postcodes/${encodeURIComponent(normalizedPostcode)}`,
       );
       const json = await postcodeResponse.json();
-      console.log('📍 Postcode lookup result:', json.result);
 
       // Only proceed if postcode API is successful (status 200)
       if (json.status !== 200 || !json.result) {
         setIsLoading(false);
-        Alert.alert('Invalid postcode', 'Please enter a valid UK postcode.');
+        useApiErrorStore.getState().showError(
+          STRINGS.PROFILE_SETUP.PINCODE?.ERROR_NOT_FOUND ??
+            "We couldn't find this postcode. Please check it and try again.",
+        );
         return;
       }
 
       const { latitude, longitude, admin_district      } = json.result;
-      console.log('📍 Postcode lookup result:', {
-        postcode: rawPostcode,
-        latitude,
-        longitude,
-        admin_district
-      });
 
       // Build payload for /edit/profile
       const formatDob = (): string | undefined => {
@@ -133,8 +131,15 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
         nickName: name ?? '',
         dob: formatDob(),
         gender: gender ?? '',
-        height: height?.value != null ? String(height.value) : undefined,
-        heightUnit: height?.unit ?? undefined,
+        bodyType: bodyType ?? undefined,
+        heightFeet:
+          height?.feet != null
+            ? String(height.feet)
+            : undefined,
+        heightInches:
+          height?.inches != null
+            ? String(height.inches)
+            : undefined,
         education: education ?? '',
         career: employment ?? '',
         income: finalChoice ?? '',
@@ -144,40 +149,20 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
         religion: religion ?? '',
         maritalStatus: maritalStatus ?? undefined,
         children: children ?? undefined,
-        interests: interests?.length ? interests : undefined,
+        hobbies: interests?.length ? interests : undefined,
       };
 
-      console.log('📤 Submitting profile to /edit/profile with payload:', payload);
-      const profileResponse = await apiClient.patch(endpoints.user.editProfile, payload);
-
+      const profileResponse = await apiClient.post(endpoints.user.addprofile, payload);
       // Check if the API response is successful
-      if (profileResponse.data?.statusCode === 200) {
-        console.log('✅ Profile updated successfully:', profileResponse.data);
-        
-        // Check if profile is complete
-        const isProfileComplete = profileResponse.data?.data?.isProfileComplete;
-        console.log('📋 Profile completion status:', isProfileComplete);
-
+      if (profileResponse.data?.statusCode === 201) {
         setIsLoading(false);
         setCurrentStep(CURRENT_STEP + 1);
         navigation.navigate('FaceVerification');
       } else {
-        // Handle API error response
         setIsLoading(false);
-        const errorMessage = profileResponse.data?.message || 'Failed to update profile. Please try again.';
-        Alert.alert('Error', errorMessage);
       }
     } catch (error: any) {
-      console.error('❌ Error:', error);
       setIsLoading(false);
-      
-      // Handle different error types
-      const errorMessage = 
-        error.response?.data?.message || 
-        error.message || 
-        'Unable to verify postcode right now. Please check your connection and try again.';
-      
-      Alert.alert('Network error', errorMessage);
     }
   };
 
@@ -215,14 +200,12 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
         </View>
 
         <View style={styles.content}>
-          <View style={styles.header}>
-            <Text style={styles.title}>
-              {STRINGS.PROFILE_SETUP.PINCODE?.TITLE || "Let's find people around you"}
-            </Text>
-            <Text style={styles.subtitle}>
-              {STRINGS.PROFILE_SETUP.PINCODE?.SUBTITLE || "We use this to prioritize nearby matches."}
-            </Text>
-          </View>
+          <Text style={styles.title}>
+            {STRINGS.PROFILE_SETUP.PINCODE?.TITLE || "Let's find people around you"}
+          </Text>
+          <Text style={styles.subtitle}>
+            {STRINGS.PROFILE_SETUP.PINCODE?.SUBTITLE || "We use this to prioritize nearby matches."}
+          </Text>
 
           <View style={styles.inputWrapper}>
             <Controller
@@ -247,7 +230,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
           </View>
         </View>
 
-        <View style={styles.buttonContainer}>
+        <View style={Platform.OS === 'ios' ? styles.buttonContainer : styles.buttonContainerAndroid}>
           <Button
             title={STRINGS.PROFILE_SETUP.COMMON.CONTINUE || "Next"}
             onPress={handleSubmit(onSubmit)}

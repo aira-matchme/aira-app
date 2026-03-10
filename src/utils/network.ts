@@ -19,11 +19,8 @@ export const getAdjustedApiUrl = (baseUrl: string): string => {
   // No auto-adjustment - use exactly what's configured in .env
   // This gives you full control over the URL based on your device type
   if (!baseUrl) {
-    console.warn('⚠️ API_BASE_URL is not set in .env file');
     return baseUrl;
   }
-
-  console.log('🌐 Using API Base URL:', baseUrl);
   return baseUrl;
 };
 

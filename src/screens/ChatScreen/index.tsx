@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,7 +25,7 @@ import { STRINGS } from '../../constants/strings';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { ProfileScreenGradient } from '../../components/ProfileScreenGradient';
-import { getChatListApi, mapChatResponseToItem } from '../../modules/chat/api';
+import { getChatListApi, getPendingChatsApi, mapChatResponseToItem, pinChatApi, unpinChatApi, deleteChatApi } from '../../modules/chat/api';
 
 type ChatItem = {
   id: string;
@@ -36,6 +36,7 @@ type ChatItem = {
   time: string;
   unreadCount?: number;
   pinned?: boolean;
+  otherUserId?: string; // for request mode (block API)
 };
 
 /** Capitalized initials from name: e.g. "Kelsey Scott" → "KS", "kkbhalani98" → "K" */
@@ -59,6 +60,10 @@ export const ChatScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<ChatStackParamList, 'ChatList'>>();
   const listBottomPadding = TAB_BAR_VISIBLE_HEIGHT + insets.bottom;
 
+  type ActiveTab = 'chats' | 'requests';
+  const [activeTab, setActiveTab] = useState<ActiveTab>('chats');
+  const [requestsCount, setRequestsCount] = useState(0);
+
   const [data, setData] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -67,6 +72,12 @@ export const ChatScreen = () => {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
   const [menuChatId, setMenuChatId] = useState<string | null>(null);
+
+  const [requestsData, setRequestsData] = useState<ChatItem[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requestsLoadingMore, setRequestsLoadingMore] = useState(false);
+  const [requestsNextPage, setRequestsNextPage] = useState(1);
+  const [requestsHasMore, setRequestsHasMore] = useState(true);
 
   const fetchPage = useCallback((page: number) => {
     return getChatListApi({ page, limit: PAGE_SIZE }).then((res) => {
@@ -80,6 +91,22 @@ export const ChatScreen = () => {
         ? meta.currentPage < meta.totalPages
         : list.length >= PAGE_SIZE;
       return { list, hasMore: hasMorePages };
+    });
+  }, []);
+
+  const fetchPendingPage = useCallback((page: number) => {
+    return getPendingChatsApi({ page, limit: PAGE_SIZE }).then((res) => {
+      const inner = res.data;
+      const raw = inner?.list ?? [];
+      const list = Array.isArray(raw)
+        ? raw.map((item) => mapChatResponseToItem(item, 0))
+        : [];
+      const meta = inner?.meta;
+      const hasMorePages = meta
+        ? meta.currentPage < meta.totalPages
+        : list.length >= PAGE_SIZE;
+      const total = meta?.total ?? list.length;
+      return { list, hasMore: hasMorePages, total };
     });
   }, []);
 
@@ -106,6 +133,58 @@ export const ChatScreen = () => {
     };
   }, [fetchPage]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setRequestsLoading(true);
+    setRequestsNextPage(1);
+    setRequestsHasMore(true);
+    fetchPendingPage(1)
+      .then(({ list, hasMore: more, total }) => {
+        if (cancelled) return;
+        setRequestsData(list);
+        setRequestsHasMore(more);
+        setRequestsNextPage(2);
+        setRequestsCount(total);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRequestsData([]);
+          setRequestsCount(0);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setRequestsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchPendingPage]);
+
+  const isFirstFocus = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstFocus.current) {
+        isFirstFocus.current = false;
+        return;
+      }
+      let cancelled = false;
+      fetchPage(1).then(({ list, hasMore: more }) => {
+        if (cancelled) return;
+        setData(list);
+        setHasMore(more);
+        setNextPage(2);
+      }).catch(() => {});
+      fetchPendingPage(1).then(({ list, hasMore: more, total }) => {
+        if (cancelled) return;
+        setRequestsData(list);
+        setRequestsHasMore(more);
+        setRequestsNextPage(2);
+        setRequestsCount(total);
+      }).catch(() => {});
+      return () => { cancelled = true; };
+    }, [fetchPage, fetchPendingPage])
+  );
+
   const loadMore = useCallback(() => {
     if (loading || loadingMore || !hasMore) return;
     const page = nextPage;
@@ -120,23 +199,53 @@ export const ChatScreen = () => {
       .finally(() => setLoadingMore(false));
   }, [loading, loadingMore, hasMore, nextPage, fetchPage]);
 
+  const loadMoreRequests = useCallback(() => {
+    if (requestsLoading || requestsLoadingMore || !requestsHasMore) return;
+    const page = requestsNextPage;
+    setRequestsLoadingMore(true);
+    fetchPendingPage(page)
+      .then(({ list, hasMore: more }) => {
+        setRequestsData((prev) => [...prev, ...list]);
+        setRequestsHasMore(more);
+        setRequestsNextPage((p) => p + 1);
+      })
+      .catch(() => {})
+      .finally(() => setRequestsLoadingMore(false));
+  }, [requestsLoading, requestsLoadingMore, requestsHasMore, requestsNextPage, fetchPendingPage]);
+
   const handlePinChat = useCallback(() => {
     if (!menuChatId) return;
-    setData((prev) =>
-      prev.map((item) =>
-        item.id === menuChatId ? { ...item, pinned: !item.pinned } : item
-      )
-    );
+    const item = data.find((c) => c.id === menuChatId);
+    const currentlyPinned = item?.pinned ?? false;
+    const apiCall = currentlyPinned ? unpinChatApi(menuChatId) : pinChatApi(menuChatId);
     setMenuVisible(false);
     setMenuChatId(null);
-  }, [menuChatId]);
+    apiCall
+      .then(() => {
+        setData((prev) =>
+          prev.map((c) =>
+            c.id === menuChatId ? { ...c, pinned: !currentlyPinned } : c
+          )
+        );
+      })
+      .catch(() => {
+        // Pin update failed
+      });
+  }, [menuChatId, data]);
 
   const handleDelete = useCallback(() => {
     if (!menuChatId) return;
-    setData((prev) => prev.filter((item) => item.id !== menuChatId));
-    setSelectedChatId((id) => (id === menuChatId ? null : id));
+    const chatIdToDelete = menuChatId;
     setMenuVisible(false);
     setMenuChatId(null);
+    deleteChatApi(chatIdToDelete)
+      .then(() => {
+        setData((prev) => prev.filter((item) => item.id !== chatIdToDelete));
+        setSelectedChatId((id) => (id === chatIdToDelete ? null : id));
+      })
+      .catch(() => {
+        // Delete failed
+      });
   }, [menuChatId]);
 
   const openContextMenu = useCallback((item: ChatItem) => {
@@ -144,7 +253,20 @@ export const ChatScreen = () => {
     setMenuVisible(true);
   }, []);
 
-  const renderItem = ({ item }: { item: ChatItem }) => {
+  const openChatDetail = useCallback(
+    (item: ChatItem, fromRequests: boolean) => {
+      navigation.navigate('ChatDetail', {
+        chatId: item.id,
+        name: item.name,
+        avatar: item.avatar ?? undefined,
+        otherUserId: item.otherUserId,
+        ...(fromRequests && { isRequest: true }),
+      });
+    },
+    [navigation],
+  );
+
+  const renderItem = ({ item }: { item: ChatItem }, fromRequests = false) => {
     const isDraft = !!item.previewDraft;
     const rawPreview = isDraft
       ? `${STRINGS.CHAT.DRAFT_PREFIX} ${item.previewDraft}`
@@ -155,8 +277,8 @@ export const ChatScreen = () => {
       <TouchableOpacity
         style={styles.card}
         activeOpacity={0.7}
-        onPress={() => navigation.navigate('ChatDetail', { chatId: item.id, name: item.name, avatar: item.avatar ?? undefined })}
-        onLongPress={() => openContextMenu(item)}
+        onPress={() => openChatDetail(item, fromRequests)}
+        onLongPress={() => !fromRequests && openContextMenu(item)}
       >
         {item.avatar ? (
           <Image source={item.avatar} style={styles.avatar} resizeMode="cover" />
@@ -216,11 +338,68 @@ export const ChatScreen = () => {
             </TouchableOpacity>
           </View>
 
-        {loading ? (
+          <View style={styles.tabRow}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'chats' ? styles.tabActive : styles.tabInactive]}
+              onPress={() => setActiveTab('chats')}
+              activeOpacity={0.8}
+            >
+              <Text style={activeTab === 'chats' ? styles.tabLabelActive : styles.tabLabelInactive}>
+                {STRINGS.CHAT.TAB_CHATS}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'requests' ? styles.tabActive : styles.tabInactive]}
+              onPress={() => setActiveTab('requests')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.tabRequestsWrap}>
+                <Text style={activeTab === 'requests' ? styles.tabLabelActive : styles.tabLabelInactive}>
+                  {STRINGS.CHAT.TAB_REQUESTS}
+                </Text>
+                {requestsCount > 0 && <View style={styles.requestsDot} />}
+              </View>
+            </TouchableOpacity>
+          </View>
+
+        {activeTab === 'requests' ? (
+          requestsLoading ? (
+            <View style={[styles.emptyState, { paddingBottom: listBottomPadding }]}>
+              <ActivityIndicator size="large" color={colors.primary[500]} />
+            </View>
+          ) : requestsData.length === 0 ? (
+            <View style={[styles.emptyState, { paddingBottom: listBottomPadding }]}>
+              <View style={styles.emptyStateContent}>
+                <ChatEmptyIcon width={72} height={72} />
+                <Text style={styles.emptyStateText}>
+                  {STRINGS.CHAT.REQUESTS_EMPTY_MESSAGE}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <FlatList
+              style={styles.list}
+              data={requestsData}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => renderItem({ item }, true)}
+              showsVerticalScrollIndicator={true}
+              contentContainerStyle={{ paddingBottom: listBottomPadding }}
+              onEndReached={loadMoreRequests}
+              onEndReachedThreshold={0.4}
+              ListFooterComponent={
+                requestsLoadingMore ? (
+                  <View style={styles.loadMoreFooter}>
+                    <ActivityIndicator size="small" color={colors.primary[500]} />
+                  </View>
+                ) : null
+              }
+            />
+          )
+        ) : loading ? (
           <View style={[styles.emptyState, { paddingBottom: listBottomPadding }]}>
             <ActivityIndicator size="large" color={colors.primary[500]} />
           </View>
-        ) : data.length === 0 ? (
+        ) : !loading && data.length === 0 ? (
           <View style={[styles.emptyState, { paddingBottom: listBottomPadding }]}>
             <View style={styles.emptyStateContent}>
               <ChatEmptyIcon width={72} height={72} />
@@ -234,7 +413,7 @@ export const ChatScreen = () => {
             style={styles.list}
             data={data}
             keyExtractor={(item) => item.id}
-            renderItem={renderItem}
+            renderItem={({ item }) => renderItem({ item }, false)}
             showsVerticalScrollIndicator={true}
             contentContainerStyle={{ paddingBottom: listBottomPadding }}
             onEndReached={loadMore}

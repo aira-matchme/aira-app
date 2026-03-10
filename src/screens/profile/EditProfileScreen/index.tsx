@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
-  Alert,
   StyleSheet,
   Platform,
   Linking,
@@ -33,33 +32,65 @@ import {
   requestPhotoLibraryPermission,
 } from '../../../config/permissions';
 import { STRINGS } from '../../../constants/strings';
+import {
+  EMPLOYMENT_OPTIONS,
+  INCOME_OPTIONS,
+  INTEREST_KEY_TO_LABEL,
+} from '../../../constants/profile';
 import { colors, typography } from '../../../theme';
 import type { ProfileStackParamList } from '../../../navigation/types';
-import { uploadProfilePhotoApi } from '../../../modules/auth/api';
+import { getProfileApi, uploadProfilePhotoApi, deleteProfilePhotoApi } from '../../../modules/auth/api';
 import { useAuthStore } from '../../../store/auth.store';
 import { styles } from './styles';
 
+/** Extract display URL from API gallery image photo (object or string). */
+function getGalleryImageUrl(photo: unknown): string | null {
+  if (photo == null) return null;
+  if (typeof photo === 'string') return photo;
+  if (typeof photo === 'object' && photo !== null && 'url' in photo) {
+    const u = (photo as { url?: unknown }).url;
+    if (typeof u === 'string') return u;
+    if (u && typeof u === 'object' && 'S' in (u as object)) return (u as { S?: string }).S ?? null;
+  }
+  return null;
+}
+
 const PHOTO_SLOTS = 6;
-const PROFILE_PERCENT = 75;
+
+type PhotoSlot = { uri: string; id: string | null } | null;
 
 type NavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'EditProfile'>;
 
-const DETAIL_ROWS: Array<{ key: string; label: string; value: string }> = [
-  { key: 'name', label: 'Name', value: 'David Taylor' },
-  { key: 'gender', label: 'Gender', value: 'Male' },
-  { key: 'height', label: 'Height', value: '175cm' },
-  { key: 'education', label: 'Education', value: 'PhD/ Dr' },
-  { key: 'employment', label: 'Employment', value: 'Self Employed' },
-  { key: 'income', label: 'Income', value: '£20k-30k' },
-  { key: 'marital', label: 'Marital Status', value: 'Never Married' },
-  { key: 'children', label: 'Children', value: 'No' },
-  { key: 'interests', label: 'Interests', value: 'Music, Gaming, Art & Craft, Travel, Sports' },
+type DetailKey =
+  | 'name'
+  | 'gender'
+  | 'height'
+  | 'education'
+  | 'employment'
+  | 'income'
+  | 'religion'
+  | 'marital'
+  | 'children'
+  | 'interests';
+
+const DETAIL_ROWS: Array<{ key: DetailKey; label: string }> = [
+  { key: 'name', label: 'Name' },
+  { key: 'gender', label: 'Gender' },
+  { key: 'height', label: 'Height' },
+  { key: 'education', label: 'Education' },
+  { key: 'employment', label: 'Employment' },
+  { key: 'income', label: 'Income' },
+  { key: 'religion', label: 'Religion' },
+  { key: 'marital', label: 'Marital Status' },
+  { key: 'children', label: 'Children' },
+  { key: 'interests', label: 'Interests' },
 ];
 
 export const EditProfileScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const user = useAuthStore((s) => s.user);
-  const [photos, setPhotos] = useState<(string | null)[]>(Array(PHOTO_SLOTS).fill(null));
+  const setUser = useAuthStore((s) => s.setUser);
+  const [photoSlots, setPhotoSlots] = useState<PhotoSlot[]>(Array(PHOTO_SLOTS).fill(null));
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [showCameraPermissionSheet, setShowCameraPermissionSheet] = useState(false);
@@ -68,6 +99,22 @@ export const EditProfileScreen: React.FC = () => {
   const [pendingGalleryIndex, setPendingGalleryIndex] = useState<number | null>(null);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [uploadingSlot, setUploadingSlot] = useState<number | null>(null);
+  console.log('photoSlots', photoSlots, user);
+
+  // Sync gallery photos from user API (order-wise), with id for delete
+  useEffect(() => {
+    const gallery = (user as any)?.galleryImages;
+    if (!Array.isArray(gallery) || gallery.length === 0) return;
+    const sorted = [...gallery].sort(
+      (a: { order?: number }, b: { order?: number }) => (a.order ?? 0) - (b.order ?? 0)
+    );
+    const slots: PhotoSlot[] = Array(PHOTO_SLOTS).fill(null);
+    sorted.slice(0, PHOTO_SLOTS).forEach((item: { id?: string; photo?: unknown }, i: number) => {
+      const url = getGalleryImageUrl(item.photo);
+      if (url) slots[i] = { uri: url, id: item.id ?? null };
+    });
+    setPhotoSlots(slots);
+  }, [user]);
 
   const handlePickerResponse = async (
     response: {
@@ -80,15 +127,14 @@ export const EditProfileScreen: React.FC = () => {
   ) => {
     if (response.didCancel) return;
     if (response.errorCode) {
-      Alert.alert('Error', response.errorMessage ?? 'Failed to pick image');
       return;
     }
     const uri = response.assets?.[0]?.uri;
     if (!uri) return;
 
-    setPhotos((prev) => {
+    setPhotoSlots((prev) => {
       const next = [...prev];
-      next[index] = uri;
+      next[index] = { uri, id: null };
       return next;
     });
 
@@ -96,14 +142,10 @@ export const EditProfileScreen: React.FC = () => {
     setUploadingSlot(index);
     try {
       await uploadProfilePhotoApi(uri, order);
+      const res = await getProfileApi();
+      if ((res as any)?.galleryImages) setUser(res as any);
     } catch (err: unknown) {
-      const message =
-        (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data
-          ?.message ||
-        (err as { message?: string })?.message ||
-        'Failed to upload photo. Please try again.';
-      Alert.alert('Upload Failed', message);
-      setPhotos((prev) => {
+      setPhotoSlots((prev) => {
         const next = [...prev];
         next[index] = null;
         return next;
@@ -152,10 +194,7 @@ export const EditProfileScreen: React.FC = () => {
       setPendingCameraIndex(null);
       if (status === 'granted') openCameraForSlot(index);
       else
-        Alert.alert('Camera Permission Required', 'Please enable camera access in Settings.', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => (Platform.OS === 'ios' ? Linking.openURL('app-settings:') : Linking.openSettings()) },
-        ]);
+        setShowCameraPermissionSheet(false);
     } catch {
       setShowCameraPermissionSheet(false);
       setPendingCameraIndex(null);
@@ -195,10 +234,7 @@ export const EditProfileScreen: React.FC = () => {
       const hasAccess = status === 'granted' || status === 'limited';
       if (hasAccess) openGalleryForSlot(index);
       else
-        Alert.alert('Photo Permission Required', 'Please enable photo access in Settings.', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => (Platform.OS === 'ios' ? Linking.openURL('app-settings:') : Linking.openSettings()) },
-        ]);
+        setShowGalleryPermissionSheet(false);
     } catch {
       setShowGalleryPermissionSheet(false);
       setPendingGalleryIndex(null);
@@ -207,20 +243,156 @@ export const EditProfileScreen: React.FC = () => {
     }
   };
 
-  const handleRemovePhoto = () => {
+  // Ensure we have user data; if not, fetch profile once and hydrate auth store
+  useEffect(() => {
+    if (!user) {
+      (async () => {
+        try {
+          const res = await getProfileApi();
+          if (res?.data) setUser(res.data);
+        } catch (err) {
+          // Profile fetch failed
+        }
+      })();
+    }
+  }, [user, setUser]);
+
+  const handleRemovePhoto = async () => {
     if (selectedPhotoIndex === null) return;
-    setPhotos((prev) => {
+    // Enforce minimum of 2 photos: if only 2 are present, do not allow deletion
+    const currentFilledCount = photoSlots.filter(Boolean).length;
+    if (currentFilledCount <= 2) {
+      closeActionSheet();
+      return;
+    }
+    const slot = photoSlots[selectedPhotoIndex];
+    const photoId = slot?.id ?? null;
+    setPhotoSlots((prev) => {
       const next = [...prev];
       next[selectedPhotoIndex] = null;
       return next;
     });
     closeActionSheet();
+    if (photoId) {
+      try {
+        await deleteProfilePhotoApi(photoId);
+        const res = await getProfileApi();
+        if ((res as any)?.galleryImages != null) setUser(res as any);
+      } catch {
+        // Revert on failure: re-sync from user or leave slot empty
+        if (user) setUser({ ...user });
+      }
+    }
   };
 
   const displayName = user?.name ?? 'David Taylor';
-  const detailRowsWithName = DETAIL_ROWS.map((row) =>
-    row.key === 'name' ? { ...row, value: displayName } : row
+
+  /** Ensure value is a string for display; API may return objects e.g. { level, levelRank, id }. */
+  const toDisplayString = (v: unknown): string | undefined => {
+    if (v == null) return undefined;
+    if (typeof v === 'string') return v;
+    if (typeof v === 'number') return String(v);
+    if (Array.isArray(v)) {
+      const parts = v.map((item) =>
+        typeof item === 'object' && item !== null && 'level' in item
+          ? String((item as { level?: string }).level ?? (item as { id?: string }).id ?? '')
+          : String(item),
+      );
+      return parts.filter(Boolean).join(', ');
+    }
+    if (typeof v === 'object') {
+      const o = v as Record<string, unknown>;
+      return String(
+        o.level ??
+          o.incomeRange ??
+          o.religion ??
+          o.label ??
+          o.name ??
+          o.id ??
+          '',
+      );
+    }
+    return String(v);
+  };
+
+  const detailRows = useMemo(
+    () =>
+      DETAIL_ROWS.map((row) => {
+        const u: any = user ?? {};
+        let value: string | undefined;
+
+        switch (row.key) {
+          case 'name':
+            value = toDisplayString(u.name ?? displayName);
+            break;
+          case 'gender':
+            value = toDisplayString(u.gender);
+            break;
+          case 'height': {
+            const feet = u.heightFeet != null ? Number(u.heightFeet) : null;
+            const inches = u.heightInches != null ? Number(u.heightInches) : null;
+            if (feet != null && inches != null) {
+              value = `${feet} ft ${inches} in`;
+            } else {
+              value = toDisplayString((u.heightCm ?? u.height) as unknown);
+            }
+            break;
+          }
+          case 'education':
+            value = toDisplayString((u.education as any)?.level ?? u.education);
+            break;
+          case 'employment': {
+            const employmentStatus = (u.career as any)?.employmentStatus ?? u.employment;
+            const employmentOption = EMPLOYMENT_OPTIONS.find(
+              (o) => o.key === employmentStatus
+            );
+            value = employmentOption?.label ?? toDisplayString(employmentStatus);
+            break;
+          }
+          case 'income': {
+            const incomeRange = (u.income as any)?.incomeRange ?? u.income;
+            const incomeOption = INCOME_OPTIONS.find((o) => o.key === incomeRange);
+            value = incomeOption?.label ?? toDisplayString(incomeRange);
+            break;
+          }
+          case 'religion':
+            value = toDisplayString(u.religion);
+            break;
+          case 'marital':
+            value = toDisplayString(u.maritalStatus);
+            break;
+          case 'children':
+            value = toDisplayString(u.children);
+            break;
+          case 'interests': {
+            const rawList = Array.isArray(u.hobbies) ? u.hobbies : u.interests;
+            if (Array.isArray(rawList)) {
+              const labels = rawList
+                .map((item: unknown) => {
+                  const key = typeof item === 'string' ? item : (item as any)?.id ?? (item as any)?.key;
+                  return key ? (INTEREST_KEY_TO_LABEL[key] ?? key) : null;
+                })
+                .filter(Boolean);
+              value = labels.join(', ');
+            } else {
+              value = toDisplayString(rawList);
+            }
+            break;
+          }
+          default:
+            break;
+        }
+
+        return {
+          ...row,
+          value: (typeof value === 'string' ? value : undefined) ?? '-',
+        };
+      }),
+    [displayName, user],
   );
+
+  const filledPhotoCount = photoSlots.filter(Boolean).length;
+  const photoProgressPercent = Math.round((filledPhotoCount / PHOTO_SLOTS) * 100);
 
   return (
     <View style={styles.wrapper}>
@@ -228,16 +400,19 @@ export const EditProfileScreen: React.FC = () => {
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.8}>
-            <BackArrowIcon size={48} backgroundColor="rgba(255,255,255,0.5)" strokeColor={colors.black} />
+      <View style={styles.headerContainer}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <BackArrowIcon size={48} />
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.headerRow}>
           <View style={styles.headerTextBlock}>
             <Text style={styles.title}>Edit Profile</Text>
             <Text style={styles.subtitle}>Complete profile get matched better.</Text>
           </View>
           <View style={styles.progressBadge}>
-            <Text style={styles.progressBadgeText}>{PROFILE_PERCENT}%</Text>
+            <Text style={styles.progressBadgeText}>{photoProgressPercent}%</Text>
           </View>
         </View>
 
@@ -246,7 +421,16 @@ export const EditProfileScreen: React.FC = () => {
             colors={[colors.secondary.lavender, colors.primary.purple] as [string, string]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={[StyleSheet.absoluteFill, styles.progressFill]}
+            style={[
+                styles.progressFill,
+                {
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: `${photoProgressPercent}%`,
+                },
+              ]}
           />
         </View>
 
@@ -255,17 +439,17 @@ export const EditProfileScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.grid}>
-            {photos.map((uri, index) => (
+            {photoSlots.map((slot, index) => (
               <TouchableOpacity
                 key={index}
-                style={[styles.photoCard, uri ? styles.photoCardFilled : null]}
+                style={[styles.photoCard, slot ? styles.photoCardFilled : null]}
                 activeOpacity={0.8}
                 onPress={() => openActionSheet(index)}
                 disabled={uploadingSlot === index}
               >
-                {uri ? (
+                {slot?.uri ? (
                   <>
-                    <Image source={{ uri }} style={styles.photoImage} resizeMode="cover" />
+                    <Image source={{ uri: slot.uri }} style={styles.photoImage} resizeMode="cover" />
                     <View style={styles.photoOverlay} pointerEvents="none" />
                     <TouchableOpacity
                       style={styles.removeButton}
@@ -294,12 +478,44 @@ export const EditProfileScreen: React.FC = () => {
           </View>
 
           <View style={styles.detailsCard}>
-            {detailRowsWithName.map((row, i) => (
+            {detailRows.map((row, i) => (
               <React.Fragment key={row.key}>
                 <TouchableOpacity
                   style={styles.detailRow}
                   activeOpacity={0.7}
-                  onPress={() => {}}
+                  onPress={() => {
+                    switch (row.key) {
+                      // case 'name':
+                      //   navigation.navigate('BasicDetailsName', { fromEditProfile: true });
+                      //   break;
+                      case 'height':
+                        navigation.navigate('BasicDetailsHeight', { fromEditProfile: true });
+                        break;
+                      case 'education':
+                        navigation.navigate('BasicDetailsEducation', { fromEditProfile: true });
+                        break;
+                      case 'employment':
+                        navigation.navigate('BasicDetailsEmployment', { fromEditProfile: true });
+                        break;
+                      case 'income':
+                        navigation.navigate('BasicDetailsIncome', { fromEditProfile: true });
+                        break;
+                      case 'religion':
+                        navigation.navigate('BasicDetailsReligion', { fromEditProfile: true });
+                        break;
+                      case 'marital':
+                        navigation.navigate('BasicDetailsMaritalStatus', { fromEditProfile: true });
+                        break;
+                      case 'children':
+                        navigation.navigate('BasicDetailsChildren', { fromEditProfile: true });
+                        break;
+                      case 'interests':
+                        navigation.navigate('BasicDetailsInterests', { fromEditProfile: true });
+                        break;
+                      default:
+                        break;
+                    }
+                  }}
                 >
                   <View style={styles.detailLeft}>
                     <Text style={styles.detailLabel}>{row.label}</Text>
@@ -309,7 +525,7 @@ export const EditProfileScreen: React.FC = () => {
                   </View>
                   <ProfileChevronRightIcon width={24} height={24} color={colors.neutral[400]} />
                 </TouchableOpacity>
-                {i < detailRowsWithName.length - 1 ? <View style={styles.separator} /> : null}
+                {i < detailRows.length - 1 ? <View style={styles.separator} /> : null}
               </React.Fragment>
             ))}
           </View>
@@ -328,7 +544,9 @@ export const EditProfileScreen: React.FC = () => {
       >
         <View style={sheetStyles.content}>
           <Text style={sheetStyles.title}>
-            {selectedPhotoIndex !== null && photos[selectedPhotoIndex]
+            {selectedPhotoIndex !== null &&
+            photoSlots[selectedPhotoIndex] &&
+            photoSlots.filter(Boolean).length > 2
               ? 'Change or remove photo'
               : STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.CHOOSE_ACTION_TITLE}
           </Text>
@@ -350,7 +568,9 @@ export const EditProfileScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
           </View>
-          {selectedPhotoIndex !== null && photos[selectedPhotoIndex] ? (
+          {selectedPhotoIndex !== null &&
+          photoSlots[selectedPhotoIndex] &&
+          photoSlots.filter(Boolean).length > 2 ? (
             <TouchableOpacity style={sheetStyles.removeButton} onPress={handleRemovePhoto} activeOpacity={0.8}>
               <Text style={sheetStyles.removeButtonText}>Remove photo</Text>
             </TouchableOpacity>

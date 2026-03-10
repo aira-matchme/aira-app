@@ -16,12 +16,8 @@ export const getDeviceToken = async (): Promise<string | null> => {
 
     // Get FCM token
     const fcmToken = await messaging().getToken();
-
-    console.log('🔥 FCM Token:', fcmToken);
-
     return fcmToken;
   } catch (error) {
-    console.error('FCM Token Error:', error);
     return null;
   }
 };

@@ -18,11 +18,12 @@ import { RequestTimeoutModal } from '../components/RequestTimeoutModal';
 const RootStack = createNativeStackNavigator();
 
 export const RootNavigator = () => {
-  const { isAuthenticated, isLoading, user, shouldShowEnableNotifications } = useAuthStore();
+  const { isAuthenticated, isLoading, user, shouldShowEnableNotifications, preferenceFlowCompleted } =
+    useAuthStore();
   const { visible: apiErrorVisible, message: apiErrorMessage, hideError: hideApiError } = useApiErrorStore();
-  console.log('🚀 RootNavigator - isAuthenticated:', isAuthenticated, 'isLoading:', isLoading);
   const postAuthScreen = getPostAuthScreen(user ?? null, shouldShowEnableNotifications);
-  const shouldShowTabs = isAuthenticated && postAuthScreen === 'Likes';
+  const shouldShowTabs =
+    isAuthenticated && (postAuthScreen === 'Likes' || preferenceFlowCompleted);
 
   useEffect(() => {
     // Disable Android back button behavior

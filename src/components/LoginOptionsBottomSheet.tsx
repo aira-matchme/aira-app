@@ -19,7 +19,6 @@ import { checkNotificationPermission } from '../config/permissions';
 import { getPostAuthScreen } from '../navigation/getPostAuthScreen';
 import type { SocialLoginRequest } from '../modules/auth/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert } from 'react-native';
 import appleAuth from '@invertase/react-native-apple-authentication';
 import { apiClient } from '../services/api/client';
 import { endpoints } from '../services/api/endpoints';
@@ -100,13 +99,10 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
     await GoogleSignin.signOut().catch(() => {});
     await GoogleSignin.revokeAccess().catch(() => {});
     const userInfo = await GoogleSignin.signIn();
-    console.log('📱 Google Sign-In User Info:', userInfo);
 
     const { idToken } = userInfo;
-    console.log(idToken)
 
     if (!idToken) {
-      Alert.alert('Google Login Error', 'No ID token received.');
       return;
     }
 
@@ -117,9 +113,7 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
       deviceToken: await getDeviceToken(),
 
     };
-console.log('🔑 Google Login Payload:', payload);
     const response = await apiClient.post(endpoints.auth.googleLogin, payload);
-    console.log('🔑 Google Login Response:', response);
     const authData = response.data?.data ?? response.data;
     if (authData?.accessToken && authData?.refreshToken) {
       await setTokens(authData.accessToken, authData.refreshToken);
@@ -135,13 +129,7 @@ console.log('🔑 Google Login Payload:', payload);
     onClose();
     navigation.navigate('AuthStack', { screen: 'EnableNotifications' });
   } catch (error: any) {
-    console.error('Google login error:', error);
-    if (error?.message?.includes('RNGoogleSignin') || error?.message?.includes('TurboModuleRegistry')) {
-      Alert.alert(
-        'Google Sign-In Not Available',
-        'Please rebuild the app: run "cd android && ./gradlew clean" then "npx react-native run-android"',
-      );
-    }
+    // Google login error
   }
 };
 
@@ -150,7 +138,6 @@ console.log('🔑 Google Login Payload:', payload);
     try {
       const isSupported = appleAuth.isSupported;
       if (!isSupported) {
-        Alert.alert('Apple login not supported on this device');
         return;
       }
 
@@ -165,7 +152,6 @@ console.log('🔑 Google Login Payload:', payload);
       const { identityToken } = appleAuthRequestResponse;
 
       if (!identityToken) {
-        Alert.alert('Apple Login failed - No identity token');
         return;
       }
 
@@ -192,11 +178,8 @@ console.log('🔑 Google Login Payload:', payload);
       onClose();
       navigation.navigate('AuthStack', { screen: 'EnableNotifications' });
     } catch (error: any) {
-      if (error.code === appleAuth.Error.CANCELED) {
-        // User canceled - no need to alert
-      } else {
-        console.error('Apple login error:', error);
-        Alert.alert('Apple login failed');
+      if (error.code !== appleAuth.Error.CANCELED) {
+        // Apple login failed
       }
     }
   }

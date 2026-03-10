@@ -60,8 +60,6 @@ export const navigateToQuestion = (
       navigation.navigate('OnboardingPhotoQuestion', params);
       break;
     default:
-      console.warn(`Unknown question type: ${question.questionType}`);
-      // Default to radio for unknown types
       navigation.navigate('OnboardingRadioQuestion', params);
   }
 };
@@ -107,7 +105,7 @@ export const navigateToNextQuestion = (
           await submitOnboardingAnswers({ answers: payloadAnswers });
         }
       } catch (error) {
-        console.error('Failed to submit onboarding answers', error);
+        // Submit failed
       } finally {
         clearOnboarding();
         navigation.navigate('PreferencesStart');

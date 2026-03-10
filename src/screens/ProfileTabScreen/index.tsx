@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Image,
   ImageSourcePropType,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -15,7 +16,6 @@ import type { ProfileStackParamList } from '../../navigation/types';
 
 import { ProfileScreenGradient } from '../../components/ProfileScreenGradient';
 import { ProfileProgressRing } from '../../components/ProfileProgressRing';
-import { Button } from '../../components/Button';
 import { useAuthStore } from '../../store/auth.store';
 import { colors } from '../../theme';
 import {
@@ -29,8 +29,11 @@ import {
 } from '../../assets/icons/profile/ProfileMenuIcons';
 import { VerifiedIcon } from '../../assets/icons/common/VerifiedIcon';
 import { LogoWordmarkGradient } from '../../assets/icons/home/LogoWordmarkGradient';
+import { AiraPlusLogo } from '../../assets/icons/profile/AiraPlusLogo';
+import { getPreferencesAndHydrateStore } from '../../modules/preferences/api';
 
 import { styles } from './styles';
+import { HomeFilterIcon } from '../../assets/icons/home/HomeFilterIcon';
 
 const AIRA_PLUS_CARD_IMAGE = require('../../assets/images/AiraPlusCardBackground.png');
 
@@ -39,12 +42,13 @@ const MENU_ITEMS: Array<{
   label: string;
   Icon: React.FC<{ width?: number; height?: number; color?: string }>;
   screen?: string;
+  iconColor?: string;
 }> = [
-  { id: 'preferences', label: 'Preferences', Icon: ProfilePreferencesIcon, screen: 'PreferencesSummary' },
+  { id: 'preferences', label: 'Preferences', Icon: HomeFilterIcon, screen: 'PreferencesSummary', iconColor: colors.primary.purple },
   { id: 'referral', label: 'Referral Points', Icon: ProfileReferralIcon },
   { id: 'subscription', label: 'My Subscription', Icon: ProfileSubscriptionIcon },
   { id: 'help', label: 'Help Center', Icon: ProfileHelpIcon },
-  { id: 'privacy', label: 'Privacy & Terms', Icon: ProfilePrivacyIcon },
+  { id: 'privacy', label: 'Privacy & Terms', Icon: ProfileHelpIcon },
 ];
 
 function getProfileImageSource(): ImageSourcePropType | null {
@@ -57,19 +61,27 @@ function getProfileImageSource(): ImageSourcePropType | null {
 
 type ProfileMainNav = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
+const PHOTO_SLOTS = 6;
+
 export const ProfileTabScreen = () => {
   const navigation = useNavigation<ProfileMainNav>();
   const { user, logout } = useAuthStore();
   const displayName = user?.name ?? 'David Taylor';
   const profileImage = getProfileImageSource();
-  const profilePercent = 75;
+  const galleryCount = (user as { galleryImages?: unknown[] })?.galleryImages?.length ?? 0;
+  const profilePercent = Math.round((galleryCount / PHOTO_SLOTS) * 100);
 
   const onEditProfile = () => {
     navigation.navigate('EditProfile');
   };
 
-  const onMenuPress = (screen?: string) => {
+  const onMenuPress = async (screen?: string) => {
     if (screen === 'PreferencesSummary') {
+      try {
+        await getPreferencesAndHydrateStore();
+      } catch {
+        // If fetching fails, still allow navigation with existing store values.
+      }
       navigation.navigate('PreferencesSummary');
     }
   };
@@ -108,7 +120,7 @@ export const ProfileTabScreen = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Aira Plus card — image background with gradient overlay per Figma */}
+          {/* Aira Plus card — Figma 2101-28021 */}
           <TouchableOpacity style={styles.airaPlusCard} activeOpacity={0.95}>
             <Image
               source={AIRA_PLUS_CARD_IMAGE}
@@ -123,21 +135,29 @@ export const ProfileTabScreen = () => {
             />
             <View style={styles.airaPlusOverlayTint} />
             <View style={styles.airaPlusOverlay} pointerEvents="box-none">
-              <Text style={styles.airaPlusTitle}>aira plus</Text>
-              <View>
+              <View style={styles.airaPlusLogo}>
+                <AiraPlusLogo width={66} height={48} color={colors.white} />
+              </View>
+              <View style={styles.airaPlusTextBlock}>
                 <Text style={styles.airaPlusText}>
                   See more. Understand better.{'\n'}Connect smarter.
                 </Text>
-                <View style={styles.airaPlusButton}>
-                  <Button title="Upgrade Plan" onPress={() => {}} variant="primary" />
-                </View>
+                <Pressable style={styles.airaPlusButton} onPress={() => {}}>
+                  <LinearGradient
+                    colors={[colors.secondary.lavender, colors.primary.purple] as [string, string]}
+                    start={{ x: 0.15, y: 0 }}
+                    end={{ x: 0.85, y: 1 }}
+                    style={styles.airaPlusButtonGradient}
+                  />
+                  <Text style={styles.airaPlusButtonText}>Upgrade Plan</Text>
+                </Pressable>
               </View>
             </View>
           </TouchableOpacity>
 
           {/* Menu list */}
           <View style={styles.menuList}>
-            {MENU_ITEMS.map(({ id, label, Icon, screen }) => (
+            {MENU_ITEMS.map(({ id, label, Icon, screen, iconColor }) => (
               <TouchableOpacity
                 key={id}
                 style={styles.menuRow}
@@ -145,7 +165,7 @@ export const ProfileTabScreen = () => {
                 activeOpacity={0.7}
               >
                 <View style={styles.menuRowLeft}>
-                  <Icon width={20} height={20} />
+                  <Icon width={20} height={20} color={iconColor} />
                   <Text style={styles.menuRowLabel}>{label}</Text>
                 </View>
                 <ProfileChevronRightIcon width={24} height={24} />

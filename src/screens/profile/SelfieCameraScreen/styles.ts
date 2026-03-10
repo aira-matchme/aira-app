@@ -180,6 +180,10 @@ export const styles = StyleSheet.create({
   verifyingBackgroundImage: {
     ...StyleSheet.absoluteFillObject,
   },
+  // iOS-only helper to correct EXIF rotation for the blurred selfie background
+  iosBackgroundRotate: {
+    transform: [{ rotate: '90deg' }],
+  },
   verifyingBackgroundOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',

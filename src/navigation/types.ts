@@ -24,18 +24,19 @@ export type AuthStackParamList = {
   EnableNotifications: undefined;
   EnableLocation: undefined;
   ProfileIntro: undefined;
-  BasicDetailsName: undefined;
-  BasicDetailsDob: undefined;
-  BasicDetailsWeight: undefined;
-  BasicDetailsHeight: undefined;
-  BasicDetailsEducation: undefined;
-  BasicDetailsEmployment: undefined;
-  BasicDetailsIncome: undefined;
-  BasicDetailsReligion: undefined;
-  BasicDetailsMaritalStatus: undefined;
-  BasicDetailsChildren: undefined;
-  BasicDetailsInterests: undefined;
-  BasicDetailsPincode: undefined;
+  BasicDetailsName: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsDob: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsWeight: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsBodyType: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsHeight: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsEducation: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsEmployment: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsIncome: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsReligion: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsMaritalStatus: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsChildren: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsInterests: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsPincode: { fromEditProfile?: boolean } | undefined;
   FaceVerification: undefined;
   SelfieCamera: undefined;
   VideoVerification: undefined;
@@ -81,6 +82,7 @@ export type AuthStackParamList = {
   PreferencesEducation: { returnToSummary?: boolean };
   PreferencesEmployment: { returnToSummary?: boolean };
   PreferencesIncome: { returnToSummary?: boolean };
+  PreferencesReligion: { returnToSummary?: boolean };
   PreferencesMaritalStatus: { returnToSummary?: boolean };
   PreferencesBodyType: { returnToSummary?: boolean };
   PreferencesSummary: undefined;
@@ -98,6 +100,19 @@ export type TabStackParamList = {
 export type ProfileStackParamList = {
   ProfileMain: undefined;
   EditProfile: undefined;
+  BasicDetailsName: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsDob: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsWeight: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsBodyType: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsHeight: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsEducation: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsEmployment: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsIncome: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsReligion: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsMaritalStatus: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsChildren: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsInterests: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsPincode: { fromEditProfile?: boolean } | undefined;
   PreferencesSummary: undefined;
   PreferencesMatch: { returnToSummary?: boolean };
   PreferencesAge: { returnToSummary?: boolean };
@@ -106,6 +121,7 @@ export type ProfileStackParamList = {
   PreferencesEducation: { returnToSummary?: boolean };
   PreferencesEmployment: { returnToSummary?: boolean };
   PreferencesIncome: { returnToSummary?: boolean };
+  PreferencesReligion: { returnToSummary?: boolean };
   PreferencesMaritalStatus: { returnToSummary?: boolean };
   PreferencesBodyType: { returnToSummary?: boolean };
 };
@@ -116,6 +132,10 @@ export type ChatStackParamList = {
     chatId: string;
     name: string;
     avatar?: number | { uri: string };
+    /** When true, show Accept / Decline / Block & Report (request mode) */
+    isRequest?: boolean;
+    /** Other user's id (for block API); required when isRequest is true */
+    otherUserId?: string;
   };
 };
 

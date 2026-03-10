@@ -5,7 +5,6 @@ import {
   StatusBar,
   TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,30 +16,36 @@ import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { ShapeMatchesIcon } from '../../../assets/icons/common/ShapeMatchesIcon';
 import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
+import type { ProfileStackParamList } from '../../../navigation/types';
 import { colors } from '../../../theme';
 import { usePreferencesStore } from '../../../store/preferences.store';
+import { useAuthStore } from '../../../store/auth.store';
+import { RELIGION_OPTIONS } from '../../../constants/profile';
 import type { EducationOption, EmploymentOption } from '../../../store/preferences.store';
 import {
-  buildEditPreferencePayload,
+  buildAddPreferencePayload,
   patchEditPreference,
 } from '../../../modules/preferences/api';
 import { styles } from './styles';
 
 /** Param list that includes only screens we navigate to from summary (used in both Auth and Profile stacks) */
-type PreferencesSummaryNavList = Pick<
-  AuthStackParamList,
-  | 'PreferencesSummary'
-  | 'PreferencesMatch'
-  | 'PreferencesAge'
-  | 'PreferencesHeight'
-  | 'PreferencesDistance'
-  | 'PreferencesEducation'
-  | 'PreferencesEmployment'
-  | 'PreferencesIncome'
-  | 'PreferencesMaritalStatus'
-  | 'PreferencesBodyType'
-  | 'Likes'
->;
+type PreferencesSummaryNavList =
+  Pick<
+    AuthStackParamList,
+    | 'PreferencesSummary'
+    | 'PreferencesMatch'
+    | 'PreferencesAge'
+    | 'PreferencesHeight'
+    | 'PreferencesDistance'
+    | 'PreferencesEducation'
+    | 'PreferencesEmployment'
+    | 'PreferencesIncome'
+    | 'PreferencesReligion'
+    | 'PreferencesMaritalStatus'
+    | 'PreferencesBodyType'
+    | 'Likes'
+  > &
+  Pick<ProfileStackParamList, 'ProfileMain'>;
 
 type PreferencesSummaryNavigationProp = NativeStackNavigationProp<
   PreferencesSummaryNavList,
@@ -94,6 +99,17 @@ function getIncomeDisplay(
   return STRINGS.PREFERENCES_INCOME[map[value] ?? 'PREFER_NOT_TO_SAY'] ?? '—';
 }
 
+function getReligionDisplay(
+  values: ReturnType<typeof usePreferencesStore.getState>['preferredReligions']
+): string {
+  if (!values.length) return '—';
+  type ReligionKey = (typeof RELIGION_OPTIONS)[number]['key'];
+  const labelMap = new Map<ReligionKey, string>(
+    RELIGION_OPTIONS.map((opt) => [opt.key, opt.label])
+  );
+  return values.map((v) => labelMap.get(v as ReligionKey) ?? v).join(', ');
+}
+
 function getMaritalStatusDisplay(
   value: ReturnType<typeof usePreferencesStore.getState>['preferredMaritalStatus']
 ): string {
@@ -134,6 +150,7 @@ export const PreferencesSummaryScreen: React.FC = () => {
     preferredIncome,
     preferredMaritalStatus,
     preferredBodyTypes,
+    preferredReligions,
     setOpenedEditFromSummary,
   } = usePreferencesStore();
 
@@ -146,6 +163,7 @@ export const PreferencesSummaryScreen: React.FC = () => {
     | 'PreferencesEducation'
     | 'PreferencesEmployment'
     | 'PreferencesIncome'
+    | 'PreferencesReligion'
     | 'PreferencesMaritalStatus'
     | 'PreferencesBodyType'
   >;
@@ -206,6 +224,12 @@ export const PreferencesSummaryScreen: React.FC = () => {
         required: true,
       },
       {
+        label: STRINGS.PREFERENCES_SUMMARY.LABEL_RELIGION,
+        value: getReligionDisplay(preferredReligions),
+        screen: 'PreferencesReligion',
+        required: false,
+      },
+      {
         label: STRINGS.PREFERENCES_SUMMARY.LABEL_MARITAL_STATUS,
         value: getMaritalStatusDisplay(preferredMaritalStatus),
         screen: 'PreferencesMaritalStatus',
@@ -228,6 +252,7 @@ export const PreferencesSummaryScreen: React.FC = () => {
       preferredEducation,
       preferredEmployment,
       preferredIncome,
+      preferredReligions,
       preferredMaritalStatus,
       preferredBodyTypes,
     ]
@@ -237,14 +262,23 @@ export const PreferencesSummaryScreen: React.FC = () => {
     navigation.goBack();
   };
 
+  const setPreferenceFlowCompleted = useAuthStore((s) => s.setPreferenceFlowCompleted);
+
   const handleGetStarted = async () => {
     setLoading(true);
     try {
-      const payload = buildEditPreferencePayload(usePreferencesStore.getState());
+      const payload = buildAddPreferencePayload(usePreferencesStore.getState());
       await patchEditPreference(payload);
-      navigation.navigate('Likes');
+      const routeNames = navigation.getState().routeNames ?? [];
+      const isInProfileStack = routeNames.includes('ProfileMain');
+      if (isInProfileStack) {
+        navigation.navigate('ProfileMain');
+      } else {
+        // Switch to main app with bottom tabs (RootNavigator shows Tabs when this flag is true)
+        setPreferenceFlowCompleted(true);
+      }
     } catch (err) {
-     
+      // Save failed
     } finally {
       setLoading(false);
     }

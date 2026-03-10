@@ -320,3 +320,14 @@ export const INTEREST_CATEGORIES: InterestCategory[] = [
 
 // ─── Pincode / Postcode ───
 export const UK_POSTCODE_REGEX = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
+
+/** Map interest key -> label for display (e.g. in Edit Profile). */
+export const INTEREST_KEY_TO_LABEL: Record<string, string> = INTEREST_CATEGORIES.reduce(
+  (acc, cat) => {
+    cat.options.forEach((opt) => {
+      acc[opt.key] = opt.label;
+    });
+    return acc;
+  },
+  {} as Record<string, string>
+);

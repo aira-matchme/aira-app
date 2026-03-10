@@ -26,24 +26,20 @@ export const loginApi = async (
 export const sendOtpApi = async (
   payload: SendOtpRequest
 ): Promise<SendOtpResponse> => {
-  console.log('📤 sendOtpApi - Request Payload:', payload);
   const { data } = await apiClient.post<SendOtpResponse>(
     endpoints.auth.sendOtp,
     payload
   );
-  console.log('📥 sendOtpApi - Response Data:', data);
   return data;
 };
 
 export const resendOtpApi = async (
   payload: SendOtpRequest
 ): Promise<SendOtpResponse> => {
-  console.log('📤 resendOtpApi - Request Payload:', payload);
   const { data } = await apiClient.post<SendOtpResponse>(
     endpoints.auth.resendOtp,
     payload
   );
-  console.log('📥 resendOtpApi - Response Data:', data);
   return data;
 };
 
@@ -96,11 +92,8 @@ export const uploadSelfieApi = async (
         },
       },
     );
-
-    console.log('📥 uploadSelfieApi - Response Data:', data);
     return data;
   } catch (error) {
-    console.error('uploadSelfieApi error:', error);
     throw error;
   }
 };
@@ -145,4 +138,10 @@ export const uploadProfilePhotoApi = async (
     }
   );
   return data;
+};
+
+/** Delete a gallery photo by id (from galleryImages[].id) */
+export const deleteProfilePhotoApi = async (photoId: string): Promise<void> => {
+  const url = endpoints.user.deletePhoto.replace('{id}', photoId);
+  await apiClient.delete(url);
 };

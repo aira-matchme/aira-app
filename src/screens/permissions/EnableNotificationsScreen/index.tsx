@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StatusBar, Platform, TouchableOpacity, Linking, Alert, Pressable } from 'react-native';
+import { View, Text, StatusBar, Platform, TouchableOpacity, Linking, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -27,53 +27,30 @@ export const EnableNotificationsScreen = () => {
   };
 
   const handleAllow = async () => {
-    console.log('Allow button pressed');
     setShowPermissionSheet(false);
     setIsRequesting(true);
     try {
       const status = await requestNotificationPermission();
-      console.log('Notification permission status:', status);
-      
       if (status === 'granted') {
-        console.log('Navigating to ProfileIntro');
         setShouldShowEnableNotifications(false);
         navigation.navigate('ProfileIntro');
       } else if (status === 'denied') {
-        Alert.alert(
-          'Permission Denied',
-          'To enable notifications, please go to Settings and enable notifications for Aira.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Open Settings',
-              onPress: () => {
-                if (Platform.OS === 'ios') {
-                  Linking.openURL('app-settings:');
-                } else {
-                  Linking.openSettings();
-                }
-              },
-            },
-          ]
-        );
+        // User denied - no action
       }
     } catch (error) {
-      console.error('Error requesting notification permission:', error);
-      Alert.alert('Error', 'Failed to request notification permission. Please try again.');
+      // Request failed
     } finally {
       setIsRequesting(false);
     }
   };
 
   const handleDontAllow = () => {
-    console.log('Don\'t Allow button pressed');
     setShowPermissionSheet(false);
     setShouldShowEnableNotifications(false);
     navigation.navigate('ProfileIntro');
   };
 
   const handleMayBeLater = () => {
-    console.log('Maybe Later button pressed');
     setShouldShowEnableNotifications(false);
     navigation.navigate('ProfileIntro');
   };
@@ -102,27 +79,19 @@ export const EnableNotificationsScreen = () => {
               <View style={styles.actions}>
                 <Button
                   title={STRINGS.ENABLE_NOTIFICATIONS.PRIMARY_CTA}
-                  onPress={() => {
-                    console.log('Enable Notifications button pressed');
-                    handleEnableNotifications();
-                  }}
+                  onPress={handleEnableNotifications}
                   variant="primary"
                   disabled={isRequesting}
                   loading={isRequesting}
                   style={styles.primaryButton}
                 />
                 <Pressable
-                  onPress={() => {
-                    console.log('Maybe Later button onPress called');
-                    handleMayBeLater();
-                  }}
+                  onPress={handleMayBeLater}
                   hitSlop={{ top: 25, bottom: 25, left: 25, right: 25 }}
                   style={({ pressed }) => [
                     styles.maybeLaterButton,
                     pressed && { opacity: 0.7 }
                   ]}
-                  onPressIn={() => console.log('Maybe Later pressed in')}
-                  onPressOut={() => console.log('Maybe Later pressed out')}
                 >
                   <Text style={styles.secondaryText}>
                     {STRINGS.ENABLE_NOTIFICATIONS.SECONDARY_CTA}

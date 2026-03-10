@@ -12,6 +12,7 @@ import { Thumb, Rail, RailSelected } from '../../../components/RangeSlider/Range
 import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { usePreferencesStore } from '../../../store/preferences.store';
+import { buildAddPreferencePayload, patchEditPreference } from '../../../modules/preferences/api';
 import { styles } from './styles';
 
 const HEIGHT_MIN_CM = 120;
@@ -46,10 +47,16 @@ export const PreferencesHeightScreen: React.FC = () => {
     navigation.goBack();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setHeightRange(low, high);
     if (returnToSummary) {
       setOpenedEditFromSummary(false);
+      try {
+        const payload = buildAddPreferencePayload(usePreferencesStore.getState());
+        await patchEditPreference(payload);
+      } catch {
+        // Ignore; global error UI handles failures.
+      }
       navigation.goBack();
     } else {
       navigation.navigate('PreferencesDistance', {});

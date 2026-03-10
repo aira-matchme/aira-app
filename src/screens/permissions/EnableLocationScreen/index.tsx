@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StatusBar, Platform, TouchableOpacity, Linking, Alert } from 'react-native';
+import { View, Text, StatusBar, Platform, TouchableOpacity, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -34,27 +34,10 @@ export const EnableLocationScreen = () => {
       if (status === 'granted') {
         navigation.navigate('ProfileIntro');
       } else if (status === 'denied') {
-        Alert.alert(
-          'Permission Denied',
-          'To enable location services, please go to Settings and enable location for Aira.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Open Settings',
-              onPress: () => {
-                if (Platform.OS === 'ios') {
-                  Linking.openURL('app-settings:');
-                } else {
-                  Linking.openSettings();
-                }
-              },
-            },
-          ]
-        );
+        // User denied
       }
     } catch (error) {
-      console.error('Error requesting location permission:', error);
-      Alert.alert('Error', 'Failed to request location permission. Please try again.');
+      // Request failed
     } finally {
       setIsRequesting(false);
     }

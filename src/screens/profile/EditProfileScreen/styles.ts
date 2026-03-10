@@ -14,12 +14,18 @@ export const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+    
+  },
+  headerContainer: {
+    paddingTop: spacing.md,
+    paddingHorizontal: HORIZONTAL_PADDING,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     paddingHorizontal: HORIZONTAL_PADDING,
+
     paddingTop: 16,
     marginBottom: 14,
   },

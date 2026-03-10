@@ -25,11 +25,14 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   shouldShowEnableNotifications: boolean;
+  /** Set true when user completes preferences flow (Get Started); RootNavigator uses this to show Tabs */
+  preferenceFlowCompleted: boolean;
   initialize: () => Promise<void>;
   setTokens: (access: string, refresh: string) => Promise<void>;
   setUser: (user: User) => void;
   setLoading: (loading: boolean) => void;
   setShouldShowEnableNotifications: (show: boolean) => void;
+  setPreferenceFlowCompleted: (value: boolean) => void;
   logout: () => Promise<void>;
 }
 
@@ -40,6 +43,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   isLoading: true,
   shouldShowEnableNotifications: false,
+  preferenceFlowCompleted: false,
 
   initialize: async () => {
     try {
@@ -51,7 +55,6 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ isLoading: false });
       }
     } catch (e) {
-      console.error('AuthStore: Error loading tokens:', e);
       set({ isLoading: false });
     }
   },
@@ -63,7 +66,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         JSON.stringify({ accessToken: access, refreshToken: refresh }),
       );
     } catch (e) {
-      console.error('AuthStore: Error saving tokens:', e);
+      // Save failed
     }
     set({ accessToken: access, refreshToken: refresh, isAuthenticated: true });
   },
@@ -81,11 +84,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   setShouldShowEnableNotifications: (show) =>
     set({ shouldShowEnableNotifications: show }),
 
+  setPreferenceFlowCompleted: (value) => set({ preferenceFlowCompleted: value }),
+
   logout: async () => {
     try {
       await AsyncStorage.clear();
     } catch (e) {
-      console.error('Error clearing AsyncStorage on logout:', e);
+      // Clear failed
     }
     set({
       accessToken: null,
@@ -94,6 +99,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       isAuthenticated: false,
       isLoading: false,
       shouldShowEnableNotifications: false,
+      preferenceFlowCompleted: false,
     });
   },
 }));

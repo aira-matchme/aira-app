@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Platform } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -150,13 +150,7 @@ export const OTPVerificationScreen: React.FC = () => {
         setCanResend(false);
       }
     } catch (error: any) {
-      console.error('Error resending OTP:', error);
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        'Failed to resend OTP. Please try again.';
-      
-      Alert.alert('Error', errorMessage);
+      // Resend failed
     }
   };
 
@@ -172,7 +166,6 @@ export const OTPVerificationScreen: React.FC = () => {
         deviceId: await getDeviceId() ?? '',
         deviceType: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web',
       });
-console.log('OTP Verification Response:', response, await getDeviceToken(), await getDeviceId());
       if (response.data?.accessToken && response.data?.refreshToken) {
         await setTokens(response.data.accessToken, response.data.refreshToken);
         let userData = response.data?.user;
@@ -186,7 +179,6 @@ console.log('OTP Verification Response:', response, await getDeviceToken(), awai
         //     setUser(userData);
         //   }
         // } catch (profileError) {
-        //   console.warn('Profile fetch after verify failed, using verify response user', profileError);
         //   if (response.data?.user) {
         //     userData = response.data.user;
         //     setUser(userData);
@@ -217,7 +209,6 @@ console.log('OTP Verification Response:', response, await getDeviceToken(), awai
         }, 1000);
       }
     } catch (error: any) {
-      console.error('Error verifying OTP:', error);
       const errorMessage =
         error?.response?.data?.message ||
         error?.message ||

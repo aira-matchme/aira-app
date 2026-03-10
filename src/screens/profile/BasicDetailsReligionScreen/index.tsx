@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,6 +19,11 @@ import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { RELIGION_OPTIONS } from '../../../constants/profile';
+import { STRINGS } from '../../../constants/strings';
+import { apiClient } from '../../../services/api/client';
+import { endpoints } from '../../../services/api/endpoints';
+import { getProfileApi } from '../../../modules/auth/api';
+import { useAuthStore } from '../../../store/auth.store';
 import { styles } from './styles';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
 
@@ -28,7 +33,7 @@ type NavigationProp = NativeStackNavigationProp<
 >;
 
 const TOTAL_STEPS = 9;
-const CURRENT_STEP = 8;
+const CURRENT_STEP = 9;
 
 const religionSchema = z.object({
   religion: z.string().min(1),
@@ -39,6 +44,19 @@ type ReligionFormData = z.infer<typeof religionSchema>;
 export const BasicDetailsReligionScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { religion, setReligion, setCurrentStep } = useProfileStore();
+  const route = useRoute<any>();
+  const fromEditProfile = route.params?.fromEditProfile === true;
+  const authUser = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  const initialReligion = React.useMemo(() => {
+    if (fromEditProfile && authUser) {
+      const raw = (authUser as any)?.religion;
+      if (typeof raw === 'string') return raw;
+    }
+    return religion || '';
+  }, [fromEditProfile, authUser, religion]);
 
   const {
     control,
@@ -49,11 +67,37 @@ export const BasicDetailsReligionScreen: React.FC = () => {
     resolver: zodResolver(religionSchema),
     mode: 'onChange',
     defaultValues: {
-      religion: religion || '',
+      religion: initialReligion,
     },
   });
 
-  const onSubmit = (data: ReligionFormData) => {
+  useEffect(() => {
+    setValue('religion', initialReligion);
+  }, [initialReligion, setValue]);
+
+  const onSubmit = async (data: ReligionFormData) => {
+    if (fromEditProfile) {
+      try {
+        setIsSaving(true);
+        await apiClient.patch(endpoints.user.editProfile, {
+          religion: data.religion,
+        });
+
+        const profile = await getProfileApi();
+        if ((profile as any)?.data) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setUser((profile as any).data);
+        }
+
+        navigation.goBack();
+      } catch (error: any) {
+        // Error handled silently
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
     setReligion(data.religion);
     setCurrentStep(CURRENT_STEP + 1);
     navigation.navigate('BasicDetailsMaritalStatus');
@@ -126,10 +170,11 @@ export const BasicDetailsReligionScreen: React.FC = () => {
 
         <View style={styles.buttonContainer}>
           <Button
-            title="Next"
+            title={fromEditProfile ? STRINGS.PREFERENCES.SAVE : STRINGS.PROFILE_SETUP.COMMON.CONTINUE}
             onPress={handleSubmit(onSubmit)}
             variant="primary"
-            disabled={!isValid}
+            disabled={!isValid || (fromEditProfile && isSaving)}
+            loading={fromEditProfile && isSaving}
             style={styles.button}
           />
         </View>

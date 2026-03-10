@@ -251,6 +251,18 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.neutral[600],
   },
+  messagesLoadingWrap: {
+    flex: 1,
+    minHeight: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  messagesLoadingText: {
+    ...typography.bodyMedium,
+    fontSize: 14,
+    color: colors.neutral[600],
+  },
   messageRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -363,6 +375,18 @@ export const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 12,
     backgroundColor: colors.white,
+  },
+  inputBarContent: {
+    flex: 1,
+    flexDirection: 'column',
+  },
+  typingIndicatorWrap: {
+    paddingBottom: 6,
+    paddingLeft: 4,
+  },
+  typingIndicatorText: {
+    fontSize: 13,
+    color: colors.neutral[500],
   },
   inputWrap: {
     flex: 1,
@@ -804,5 +828,59 @@ borderRadius: 16,
   },
   fileBubbleNameReceived: {
     color: colors.black,
+  },
+  // Request mode: Decline / Accept / Block & Report (Figma 2259-18847)
+  requestActionBar: {
+    paddingHorizontal: H_PADDING,
+    paddingTop: 16,
+    paddingBottom: 24,
+    backgroundColor: colors.white,
+    gap: 8,
+  },
+  requestActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  requestDeclineButton: {
+    flex: 1,
+    height: 54,
+    borderRadius: 100,
+    backgroundColor: colors.neutral[50],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  requestAcceptButton: {
+    flex: 1,
+    height: 54,
+    borderRadius: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  requestDeclineLabel: {
+    ...typography.bodyMedium,
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.black,
+  },
+  requestAcceptLabel: {
+    ...typography.bodyMedium,
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.white,
+  },
+  requestBlockReportWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  requestBlockReportText: {
+    ...typography.label,
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
+    letterSpacing: 0.28,
+    color: colors.neutral[700],
   },
 });

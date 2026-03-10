@@ -48,6 +48,8 @@
 	<string></string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>AIRA uses your photos to let you upload images to your profile. These can be managed in Settings.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Aira needs microphone access to record and send voice messages in chat.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIBackgroundModes</key>

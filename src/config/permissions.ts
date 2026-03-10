@@ -114,7 +114,6 @@ export const requestCameraPermission = async (): Promise<CameraPermissionStatus>
   if (Platform.OS === 'ios') {
     try {
       const status = await Camera.getCameraPermissionStatus();
-      console.log('VisionCamera current status:', status);
 
       if (status === 'granted') {
         return 'granted';
@@ -126,14 +125,12 @@ export const requestCameraPermission = async (): Promise<CameraPermissionStatus>
 
       if (status === 'not-determined') {
         const newStatus = await Camera.requestCameraPermission();
-        console.log('VisionCamera request result:', newStatus);
 
         return newStatus === 'granted' ? 'granted' : 'denied';
       }
 
       return 'denied';
     } catch (error) {
-      console.warn('Error requesting camera permission:', error);
       return 'notDetermined';
     }
   }
@@ -154,7 +151,6 @@ export const requestCameraPermission = async (): Promise<CameraPermissionStatus>
       ? 'granted'
       : 'denied';
   } catch (error) {
-    console.error('Error requesting camera permission:', error);
     return 'denied';
   }
 };
@@ -207,6 +203,40 @@ export const requestPhotoLibraryPermission =
       }
       if (status === RESULTS.BLOCKED) return 'blocked';
       return 'denied';
+    } catch {
+      return 'denied';
+    }
+  };
+
+export type MicrophonePermissionStatus = 'granted' | 'denied' | 'notDetermined';
+
+/** Check microphone permission (for voice recording) */
+export const checkMicrophonePermission =
+  async (): Promise<MicrophonePermissionStatus> => {
+    try {
+      const permission =
+        Platform.OS === 'ios'
+          ? PERMISSIONS.IOS.MICROPHONE
+          : PERMISSIONS.ANDROID.RECORD_AUDIO;
+      const status = await checkPermission(permission);
+      if (status === RESULTS.GRANTED) return 'granted';
+      if (status === RESULTS.DENIED || status === RESULTS.BLOCKED) return 'denied';
+      return 'notDetermined';
+    } catch {
+      return 'denied';
+    }
+  };
+
+/** Request microphone permission */
+export const requestMicrophonePermission =
+  async (): Promise<MicrophonePermissionStatus> => {
+    try {
+      const permission =
+        Platform.OS === 'ios'
+          ? PERMISSIONS.IOS.MICROPHONE
+          : PERMISSIONS.ANDROID.RECORD_AUDIO;
+      const status = await requestPermission(permission);
+      return status === RESULTS.GRANTED ? 'granted' : 'denied';
     } catch {
       return 'denied';
     }

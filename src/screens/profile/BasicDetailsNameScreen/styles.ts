@@ -27,8 +27,7 @@ export const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: spacing.lg,
-    // Align title vertically with other profile screens
-    // paddingTop: spacing.sm 
+    paddingBottom: spacing.lg
   },
   title: {
     fontSize: 34,
@@ -70,8 +69,12 @@ export const styles = StyleSheet.create({
   },
   buttonContainer: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    // paddingVertical: spacing.md,
     // paddingBottom: spacing.sm * 1.5,
+  },
+  buttonContainerAndroid: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm * 1.5,
   },
   button: {
     height: 56,

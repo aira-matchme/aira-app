@@ -13,11 +13,14 @@ export interface ProfileSetupData {
   
   // Step 3: Gender
   gender: string | null;
+
+  // Step 4: Body type (single: e.g. endomorph)
+  bodyType: string | null;
   
-  // Step 4: Height
+  // Step 5: Height
   height: {
-    value: number | null;
-    unit: 'cm' | 'ft';
+    feet: number | null;
+    inches: number | null;
   } | null;
   
   // Step 5: Education
@@ -50,7 +53,8 @@ interface ProfileState extends ProfileSetupData {
   setName: (name: string) => void;
   setDateOfBirth: (day: number, month: number, year: number) => void;
   setGender: (gender: string) => void;
-  setHeight: (value: number, unit: 'cm' | 'ft') => void;
+  setBodyType: (bodyType: string) => void;
+  setHeight: (feet: number, inches: number) => void;
   setEducation: (education: string) => void;
   setEmployment: (employment: string) => void;
   setFinalChoice: (finalChoice: string) => void;
@@ -67,6 +71,7 @@ const initialState: ProfileSetupData = {
   name: null,
   dateOfBirth: null,
   gender: null,
+  bodyType: null,
   height: null,
   education: null,
   employment: null,
@@ -80,7 +85,7 @@ const initialState: ProfileSetupData = {
 export const useProfileStore = create<ProfileState>((set, get) => ({
   ...initialState,
   currentStep: 1,
-  totalSteps: 12,
+  totalSteps: 13,
 
   setName: (name) => set({ name }),
   
@@ -88,9 +93,9 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     set({ dateOfBirth: { day, month, year } }),
   
   setGender: (gender) => set({ gender }),
-  
-  setHeight: (value, unit) =>
-    set({ height: { value, unit } }),
+  setBodyType: (bodyType) => set({ bodyType }),
+  setHeight: (feet, inches) =>
+    set({ height: { feet, inches } }),
   
   setEducation: (education) => set({ education }),
   
@@ -121,20 +126,22 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       case 3:
         return !!state.gender && state.gender.trim().length > 0;
       case 4:
-        return !!state.height?.value && state.height.value > 0;
+        return !!state.bodyType && state.bodyType.trim().length > 0;
       case 5:
-        return !!state.education;
+        return !!(state.height?.feet != null && state.height?.inches != null);
       case 6:
-        return !!state.employment;
+        return !!state.education;
       case 7:
-        return !!state.finalChoice;
+        return !!state.employment;
       case 8:
-        return !!state.religion;
+        return !!state.finalChoice;
       case 9:
-        return !!state.maritalStatus;
+        return !!state.religion;
       case 10:
-        return !!state.children;
+        return !!state.maritalStatus;
       case 11:
+        return !!state.children;
+      case 12:
         return !!state.interests && state.interests.length > 0;
       default:
         return false;

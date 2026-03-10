@@ -18,6 +18,7 @@ import { InterestChipCheckIcon } from '../../../assets/icons/common/InterestChip
 import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { usePreferencesStore } from '../../../store/preferences.store';
+import { buildAddPreferencePayload, patchEditPreference } from '../../../modules/preferences/api';
 import { styles } from './styles';
 
 export type EmploymentOption =
@@ -73,11 +74,17 @@ export const PreferencesEmploymentScreen: React.FC = () => {
     navigation.goBack();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (selected.length === 0) return;
     setPreferredEmployment(selected);
     if (returnToSummary) {
       setOpenedEditFromSummary(false);
+      try {
+        const payload = buildAddPreferencePayload(usePreferencesStore.getState());
+        await patchEditPreference(payload);
+      } catch {
+        // Ignore; global error UI handles failures.
+      }
       navigation.goBack();
     } else {
       navigation.navigate('PreferencesIncome', {});
