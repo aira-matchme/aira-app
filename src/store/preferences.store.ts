@@ -26,6 +26,8 @@ export type MaritalStatusOption =
   | 'widowed'
   | 'separated';
 
+export type RelationshipIntentOption = 'serious' | 'flexible' | 'casual';
+
 export interface PreferencesState {
   lookingForGender: GenderOption[];
   preferredMinAge: number;
@@ -38,6 +40,7 @@ export interface PreferencesState {
   preferredEmployment: EmploymentOption[];
   preferredIncome: IncomeOption | null;
   preferredMaritalStatus: MaritalStatusOption | null;
+  relationshipIntentLabel: RelationshipIntentOption | null;
   preferredReligions: string[];
   preferredBodyTypes: string[];
   setLookingForGender: (value: GenderOption[]) => void;
@@ -48,6 +51,7 @@ export interface PreferencesState {
   setPreferredEmployment: (value: EmploymentOption[]) => void;
   setPreferredIncome: (value: IncomeOption | null) => void;
   setPreferredMaritalStatus: (value: MaritalStatusOption | null) => void;
+  setRelationshipIntentLabel: (value: RelationshipIntentOption | null) => void;
   setPreferredReligions: (value: string[]) => void;
   setPreferredBodyTypes: (value: string[]) => void;
   reset: () => void;
@@ -68,6 +72,7 @@ const defaultState = {
   preferredEmployment: [] as EmploymentOption[],
   preferredIncome: null as IncomeOption | null,
   preferredMaritalStatus: null as MaritalStatusOption | null,
+  relationshipIntentLabel: null as RelationshipIntentOption | null,
   preferredReligions: [] as string[],
   preferredBodyTypes: [] as string[],
   openedEditFromSummary: false,
@@ -87,6 +92,8 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
   setPreferredIncome: (preferredIncome) => set({ preferredIncome }),
   setPreferredMaritalStatus: (preferredMaritalStatus) =>
     set({ preferredMaritalStatus }),
+  setRelationshipIntentLabel: (relationshipIntentLabel) =>
+    set({ relationshipIntentLabel }),
   setPreferredReligions: (preferredReligions) => set({ preferredReligions }),
   setPreferredBodyTypes: (preferredBodyTypes) => set({ preferredBodyTypes }),
   reset: () => set(defaultState),

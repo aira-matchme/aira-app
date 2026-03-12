@@ -84,15 +84,16 @@ export const BasicDetailsInterestsScreen: React.FC = () => {
     setExpandedId((prev) => (prev === id ? null : id));
   };
 
-  const MIN_PER_CATEGORY = 2;
+  const MIN_TOTAL = 2;
   const categoryCounts = React.useMemo(() => {
     return INTEREST_CATEGORIES.map((category) => {
       const count = category.options.filter((opt) => selectedKeys.has(opt.key)).length;
-      return { id: category.id, count, required: MIN_PER_CATEGORY, isValid: count >= MIN_PER_CATEGORY };
+      return { id: category.id, count };
     });
   }, [selectedKeys]);
 
-  const isValid = categoryCounts.every((c) => c.isValid);
+  const totalSelected = selectedKeys.size;
+  const isValid = totalSelected >= MIN_TOTAL;
 
   const onSubmit = async () => {
     const selected = Array.from(selectedKeys);
@@ -147,7 +148,7 @@ export const BasicDetailsInterestsScreen: React.FC = () => {
               {STRINGS.PROFILE_SETUP.INTERESTS.TITLE}
             </Text>
             <Text style={styles.subtitle}>
-              {STRINGS.PROFILE_SETUP.INTERESTS.SUBTITLE}
+              Choose at least {MIN_TOTAL}.
             </Text>
           </View>
 
@@ -159,7 +160,6 @@ export const BasicDetailsInterestsScreen: React.FC = () => {
             {INTEREST_CATEGORIES.map((category, index) => {
               const isExpanded = expandedId === category.id;
               const categoryState = categoryCounts[index];
-              const countValid = categoryState?.isValid ?? false;
               return (
                 <View key={category.id} style={styles.categoryCard}>
                   <TouchableOpacity
@@ -181,17 +181,14 @@ export const BasicDetailsInterestsScreen: React.FC = () => {
                       )}
                     </View>
                     <Text style={styles.categoryLabel}>{category.label}</Text>
-                    <Text
+                    {/* <Text
                       style={[
                         styles.categoryCountText,
-                        { color: countValid ? colors.primary.purple : colors.neutral[500] },
+                        { color: totalSelected >= MIN_TOTAL ? colors.primary.purple : colors.neutral[500] },
                       ]}
                     >
-                      {STRINGS.PROFILE_SETUP.INTERESTS.SELECTED_COUNT(
-                        categoryState?.count ?? 0,
-                        MIN_PER_CATEGORY,
-                      )}
-                    </Text>
+                      {categoryState?.count ?? 0} selected
+                    </Text> */}
                   </TouchableOpacity>
                   {isExpanded && (
                     <View style={styles.categoryTags}>

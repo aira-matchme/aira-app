@@ -41,7 +41,10 @@ export interface ProfileSetupData {
   // Step 10: Children
   children: string | null;
 
-  // Step 11: Interests
+  // Step 11: Ethnicity (optional)
+  ethnicity: string | null;
+
+  // Step 12: Interests
   interests: string[] | null;
 }
 
@@ -61,6 +64,7 @@ interface ProfileState extends ProfileSetupData {
   setReligion: (religion: string) => void;
   setMaritalStatus: (maritalStatus: string) => void;
   setChildren: (children: string) => void;
+  setEthnicity: (ethnicity: string | null) => void;
   setInterests: (interests: string[]) => void;
   setCurrentStep: (step: number) => void;
   resetProfile: () => void;
@@ -76,16 +80,17 @@ const initialState: ProfileSetupData = {
   education: null,
   employment: null,
   finalChoice: null,
-   religion: null,
+  religion: null,
   maritalStatus: null,
   children: null,
+  ethnicity: null,
   interests: null,
 };
 
 export const useProfileStore = create<ProfileState>((set, get) => ({
   ...initialState,
   currentStep: 1,
-  totalSteps: 13,
+  totalSteps: 14,
 
   setName: (name) => set({ name }),
   
@@ -106,6 +111,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   setReligion: (religion) => set({ religion }),
   setMaritalStatus: (maritalStatus) => set({ maritalStatus }),
   setChildren: (children) => set({ children }),
+  setEthnicity: (ethnicity) => set({ ethnicity }),
   setInterests: (interests) => set({ interests }),
 
   setCurrentStep: (step) => set({ currentStep: step }),
@@ -142,6 +148,9 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       case 11:
         return !!state.children;
       case 12:
+        // Ethnicity is optional – always considered complete
+        return true;
+      case 13:
         return !!state.interests && state.interests.length > 0;
       default:
         return false;

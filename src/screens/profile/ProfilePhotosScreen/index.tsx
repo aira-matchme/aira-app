@@ -53,7 +53,7 @@ export const ProfilePhotosScreen: React.FC = () => {
   const [showGalleryPermissionSheet, setShowGalleryPermissionSheet] = useState(false);
   const [pendingGalleryIndex, setPendingGalleryIndex] = useState<number | null>(null);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
-  const [uploadingSlot, setUploadingSlot] = useState<number | null>(null);
+  const [uploadingSlots, setUploadingSlots] = useState<Set<number>>(new Set());
   const [uploadedSlots, setUploadedSlots] = useState<Set<number>>(new Set());
 
   const handlePickerResponse = async (
@@ -79,7 +79,7 @@ export const ProfilePhotosScreen: React.FC = () => {
     });
 
     const order = index + 1; // 1-based: 1st slot = 1, 6th slot = 6
-    setUploadingSlot(index);
+    setUploadingSlots((prev) => new Set(prev).add(index));
     try {
       await uploadProfilePhotoApi(uri, order);
       setUploadedSlots((prev) => new Set(prev).add(index));
@@ -95,7 +95,11 @@ export const ProfilePhotosScreen: React.FC = () => {
         return next;
       });
     } finally {
-      setUploadingSlot(null);
+      setUploadingSlots((prev) => {
+        const next = new Set(prev);
+        next.delete(index);
+        return next;
+      });
     }
   };
 
@@ -224,12 +228,15 @@ export const ProfilePhotosScreen: React.FC = () => {
 
           <View style={styles.grid}>
             {photos.map((uri, index) => (
+              (() => {
+                const isUploading = uploadingSlots.has(index);
+                return (
               <TouchableOpacity
                 key={index}
                 style={styles.photoCard}
                 activeOpacity={0.8}
                 onPress={() => openActionSheet(index)}
-                disabled={uploadingSlot === index}
+                disabled={isUploading}
               >
                 {uri ? (
                   <Image
@@ -242,12 +249,14 @@ export const ProfilePhotosScreen: React.FC = () => {
                     <AddPhotoIcon stroke={colors.neutral[300]} />
                   </View>
                 )}
-                {uploadingSlot === index && (
+                {isUploading && (
                   <View style={sheetStyles.uploadingOverlay}>
                     <ActivityIndicator size="large" color={colors.white} />
                   </View>
                 )}
               </TouchableOpacity>
+                );
+              })()
             ))}
           </View>
 

@@ -13,5 +13,6 @@ export interface AddPreferencePayload {
   preferredMaxHeightIn: number;
   preferredBodyTypes: string[];
   preferredMaritalStatus: string[];
+  relationshipIntentLabel?: string;
   preferredChildren: string;
 }

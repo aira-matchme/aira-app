@@ -168,22 +168,22 @@ export const OTPVerificationScreen: React.FC = () => {
       });
       if (response.data?.accessToken && response.data?.refreshToken) {
         await setTokens(response.data.accessToken, response.data.refreshToken);
-        let userData = response.data?.user;
-        // try {
-        //   const profileResponse = await getProfileApi();
-        //   if (profileResponse?.data) {
-        //     userData = profileResponse.data;
-        //     setUser(userData);
-        //   } else if (response.data?.user) {
-        //     userData = response.data.user;
-        //     setUser(userData);
-        //   }
-        // } catch (profileError) {
-        //   if (response.data?.user) {
-        //     userData = response.data.user;
-        //     setUser(userData);
-        //   }
-        // }
+        let userData: PostAuthUser | null = (response.data?.user ?? null) as PostAuthUser | null;
+
+        try {
+          const profileResponse = await getProfileApi();
+          if (profileResponse?.data) {
+            userData = profileResponse.data as unknown as PostAuthUser;
+            setUser(profileResponse.data as any);
+          } else if (response.data?.user) {
+            setUser(response.data.user as any);
+          }
+        } catch {
+          if (response.data?.user) {
+            userData = (response.data.user as PostAuthUser) ?? null;
+            setUser(response.data.user as any);
+          }
+        }
 
         let shouldShowNotifications = false;
         try {
@@ -194,7 +194,7 @@ export const OTPVerificationScreen: React.FC = () => {
           shouldShowNotifications = true;
           setShouldShowEnableNotifications(true);
         }
-        const screen = getPostAuthScreen((userData ?? null) as PostAuthUser | null, shouldShowNotifications);
+        const screen = getPostAuthScreen(userData, shouldShowNotifications);
 
         setIsVerified(true);
 

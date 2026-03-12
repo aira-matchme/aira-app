@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthNavigator } from './AuthNavigator';
 import { TabNavigator } from './TabNavigator';
 import { SplashScreen } from '../screens/SplashScreen';
+import { MatchDetailsScreen } from '../screens/MatchDetailsScreen';
 import { EmailLoginScreen } from '../screens/auth/EmailLoginScreen';
 import { LostAccessEmailScreen } from '../screens/auth/LostAccessEmailScreen';
 import { OTPVerificationScreen } from '../screens/auth/OTPVerificationScreen';
@@ -73,6 +74,10 @@ export const RootNavigator = () => {
               name="OTPVerification"
               component={OTPVerificationScreen}
               options={{ presentation: 'transparentModal' }}
+            />
+            <RootStack.Screen
+              name="MatchDetails"
+              component={MatchDetailsScreen}
             />
           </>
         )}

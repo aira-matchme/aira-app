@@ -10,6 +10,12 @@ export interface PostAuthUser {
   livenessCheck?: boolean;
   galleryPhotosUploaded?: boolean;
   questionnaireCompleted?: boolean;
+  visualAttributesCompleted?: boolean;
+  onboardingVisualAttributesCompleted?: boolean;
+  /** API returns camelCase */
+  preferenceIsCompleted?: boolean;
+  /** @deprecated use preferenceIsCompleted */
+  PreferenceIsCompleted?: boolean;
 }
 
 export type PostAuthScreen = keyof Pick<
@@ -21,6 +27,9 @@ export type PostAuthScreen = keyof Pick<
   | 'OnboardingIntro'
   | 'PreferencesMatch'
   | 'VideoVerification'
+  | 'ReferenceImageIntro'
+  | 'ReferenceImagePreference'
+  | 'PreferencesStart'
   | 'Likes'
 >;
 
@@ -40,13 +49,18 @@ export function getPostAuthScreen(
 ): PostAuthScreen {
   if (shouldShowEnableNotifications) return 'EnableNotifications';
   if (!user) return 'ProfileIntro';
-
   if (!user.isProfileComplete) return 'ProfileIntro';
   if (!user.livenessCheck) return 'FaceVerification';
   if (!user.galleryPhotosUploaded) return 'ProfilePhotos';
   if (!user.questionnaireCompleted) return 'OnboardingIntro';
+  if (!user.preferenceIsCompleted && !user.PreferenceIsCompleted) return 'PreferencesStart';
+  if (!user.onboardingVisualAttributesCompleted) return 'ReferenceImageIntro';
+
 
   // Show main app with bottom tabs; RootNavigator shows TabNavigator and initial tab is Home (Dashboard)
   return 'Likes';
+  // return 'ReferenceImageIntro';
   // return 'FaceVerification';
+  // return 'OnboardingIntro'
+
 }

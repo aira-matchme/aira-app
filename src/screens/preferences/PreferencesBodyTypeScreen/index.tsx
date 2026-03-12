@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Image,
   Pressable,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -115,45 +114,40 @@ export const PreferencesBodyTypeScreen: React.FC = () => {
             </Text>
           </View>
 
-          <ScrollView
-            style={styles.optionsContainer}
-            contentContainerStyle={styles.optionsContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {BODY_TYPE_OPTIONS.map((item) => (
-              <Pressable
-                key={item.id}
-                onPress={() => handleSelect(item.id)}
-                style={[
-                  styles.optionRow,
-                  selected.includes(item.id) ? styles.optionRowSelected : styles.optionRowUnselected,
-                ]}
-              >
-                <View style={styles.rowImageWrap}>
-                  <Image source={item.image} style={styles.rowImageImg} resizeMode="contain" />
-                </View>
-                <Text
+          <View style={[styles.optionsContainer, styles.optionsContent]}>
+            {BODY_TYPE_OPTIONS.map((item) => {
+              const isSelected = selected.includes(item.id);
+              const rank = selected.indexOf(item.id) + 1;
+
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => handleSelect(item.id)}
                   style={[
-                    styles.optionText,
-                    selected.includes(item.id) && styles.optionTextSelected,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {item.label}
-                </Text>
-                <View
-                  style={[
-                    styles.checkbox,
-                    selected.includes(item.id) && styles.checkboxSelected,
+                    styles.optionRow,
+                    isSelected ? styles.optionRowSelected : styles.optionRowUnselected,
                   ]}
                 >
-                  {selected.includes(item.id) && (
-                    <InterestChipCheckIcon size={14} color="#FFFFFF" />
-                  )}
-                </View>
-              </Pressable>
-            ))}
-          </ScrollView>
+                  <View style={styles.rowImageWrap}>
+                    <Image source={item.image} style={styles.rowImageImg} resizeMode="contain" />
+                  </View>
+                  <Text
+                    style={[styles.optionText, isSelected && styles.optionTextSelected]}
+                    numberOfLines={1}
+                  >
+                    {item.label}
+                  </Text>
+                  <View
+                    style={[styles.checkbox, isSelected && styles.checkboxSelected]}
+                  >
+                    {isSelected && (
+                      <Text style={styles.checkboxRankText}>{rank}</Text>
+                    )}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
 
         <View style={styles.actions}>

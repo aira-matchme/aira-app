@@ -116,6 +116,41 @@ export const CHILDREN_OPTIONS: { key: ChildrenApiValue; label: string }[] = [
   { key: '3_or_more', label: '3 or more' },
 ];
 
+// ─── Ethnicity (after children – optional) ───
+export type EthnicityGroup = 'White' | 'Black' | 'Brown' | 'Asian';
+
+export type EthnicityOption = {
+  key: string;
+  label: string;
+  groups: EthnicityGroup[];
+};
+
+export const ETHNICITY_OPTIONS: EthnicityOption[] = [
+  // Asian / Brown
+  { key: 'indian_subcontinent', label: 'Indian Subcontinent', groups: ['Brown'] },
+  { key: 'chinese', label: 'Chinese', groups: ['Asian'] },
+  { key: 'arab', label: 'Arab', groups: ['Brown'] },
+  { key: 'any_other_asian', label: 'Any other Asian background', groups: ['Asian'] },
+
+  // Black, Black British, Caribbean or African
+  { key: 'caribbean', label: 'Caribbean', groups: ['Black'] },
+  { key: 'african', label: 'African', groups: ['Black'] },
+  { key: 'other_black', label: 'Any other Black, Black British, or Caribbean background', groups: ['Black'] },
+
+  // Mixed or multiple ethnic groups
+  { key: 'white_black_caribbean', label: 'White and Black Caribbean', groups: ['White', 'Black'] },
+  { key: 'white_black_african', label: 'White and Black African', groups: ['White', 'Black'] },
+  { key: 'white_asian', label: 'White and Asian', groups: ['White', 'Brown', 'Asian'] },
+  { key: 'other_mixed', label: 'Any other Mixed or multiple ethnic background', groups: ['White', 'Black', 'Brown', 'Asian'] },
+
+  // White
+  { key: 'white_british', label: 'English, Welsh, Scottish, Northern Irish or British', groups: ['White'] },
+  { key: 'white_irish', label: 'Irish', groups: ['White'] },
+  { key: 'gypsy_traveller', label: 'Gypsy or Irish Traveller', groups: ['White'] },
+  { key: 'roma', label: 'Roma', groups: ['White'] },
+  { key: 'other_white', label: 'Any other White background', groups: ['White'] },
+];
+
 // ─── Interests / Hobbies (after children, before pincode) ───
 export type InterestOption = { key: string; label: string };
 

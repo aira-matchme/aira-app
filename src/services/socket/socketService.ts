@@ -22,12 +22,23 @@ export interface MessageSendPayload {
 export interface MessageReceivePayload {
   sender: string;
   receiver: string;
-  message: string;
+  /** For incoming events we attach the full backend message object here. */
+  message: unknown;
   /** Optional server-generated id; used to avoid duplicates and for delete. */
   messageId?: string;
   /** Optional server timestamp (ISO string or ms); used for display. */
   timestamp?: string | number;
   createdAt?: string;
+  /** For image/file messages: URL of the uploaded file. */
+  url?: string;
+  /** For image/file messages: 'image' | 'audio' | 'video'. */
+  messageType?: string;
+  /** For file messages: display name. */
+  name?: string;
+  /** Optional file key (S3 etc). */
+  key?: string;
+  /** Optional files array from server. */
+  files?: Array<{ url?: string; key?: string; name?: string }>;
 }
 
 /** Payload for message delete (send and receive). */
@@ -41,10 +52,14 @@ export type SocketEventType = 'join' | 'join_success' | 'typing' | 'message_send
 
 export type SocketEventListener<T = unknown> = (data: T) => void;
 
+/** Callback for connection state changes (true = connected, false = disconnected). */
+export type ConnectionStateListener = (connected: boolean) => void;
+
 class SocketService {
   private socket: Socket | null = null;
   private token: string | null = null;
   private userId: string | null = null;
+  private connectionListeners = new Set<ConnectionStateListener>();
   private listeners: Partial<Record<SocketEventType, Set<SocketEventListener>>> = {
     join: new Set(),
     join_success: new Set(),
@@ -53,6 +68,10 @@ class SocketService {
     message_delete: new Set(),
   };
 
+  /** Backend contract (verify against your server):
+   * - Client emit: join({ chatId } | { userId }) | typing({ sender, receiver, isTyping }) | message_send({ sender, receiver, message }) | message_delete({ sender, receiver, messageId })
+   * - Server emit: join_success (presence/online), typing({ sender, receiver, isTyping }), message_send/message_receive({ sender, receiver, message?, messageId?, timestamp? }), message_delete
+   */
   private static readonly SOCKET_URL = 'http://13.42.70.111:12345';
 
   private getBearerToken() {
@@ -111,14 +130,15 @@ class SocketService {
 
     this.socket.on('connect', () => {
       console.log('[Socket] connected', { id: this.socket?.id });
-      if (this.userId) {
-        console.log('[Socket] sending join for presence on connect', { userId: this.userId });
-        this.send('join');
-      }
+      this.notifyConnectionState(true);
+      const payload = this.userId ? { userId: this.userId } : {};
+      if (this.userId) console.log('[Socket] sending join for presence on connect', { userId: this.userId });
+      this.send('join', payload);
     });
 
     this.socket.on('disconnect', (reason) => {
       console.log('[Socket] disconnected', { reason });
+      this.notifyConnectionState(false);
     });
 
     this.socket.on('connect_error', (err) => {
@@ -141,11 +161,11 @@ class SocketService {
     });
 
     this.socket.on('typing', (data: unknown) => {
-      const { sender = '', receiver = '', isTyping = true } = (data ?? {}) as {
-        sender?: string;
-        receiver?: string;
-        isTyping?: boolean;
-      };
+      const d = (data ?? {}) as Record<string, unknown>;
+      const sender = String(d.sender ?? d.userId ?? d.senderId ?? '');
+      let receiver = String(d.receiver ?? d.targetUserId ?? d.receiverId ?? '');
+      if (!receiver && this.userId) receiver = this.userId;
+      const isTyping = d.isTyping !== false && d.typing !== false;
       console.log('[Socket] handled: typing', { sender, receiver, isTyping });
       this.emit('typing', { sender, receiver, isTyping });
     });
@@ -153,32 +173,60 @@ class SocketService {
     // Some backends emit `message_receive`, others emit `message_send` for incoming messages.
     const handleIncomingMessage = (data: unknown) => {
       const raw = (data ?? {}) as Record<string, unknown>;
-      const sender = String(raw.sender ?? '');
-      const receiver = String(raw.receiver ?? '');
-      const message = String(raw.message ?? '');
-      const messageId = raw.messageId != null ? String(raw.messageId) : undefined;
-      const timestamp = raw.timestamp ?? raw.createdAt;
-      console.log('[Socket] handled: message', { sender, receiver, messagePreview: message.slice(0, 50), messageId });
-      // Keep app API stable: notify listeners using `message_send`; pass through messageId/timestamp for UI
-      this.emit('message_send', { sender, receiver, message, messageId, timestamp, createdAt: raw.createdAt });
+      console.log('[Socket] message_receive raw payload', raw);
+      const msg = (raw.message ?? {}) as Record<string, unknown>;
+      let sender = String(msg.sender ?? raw.sender ?? raw.senderId ?? '');
+      let receiver = String(msg.receiver ?? raw.receiver ?? raw.receiverId ?? '');
+      if (!receiver && this.userId) receiver = this.userId;
+      const messageId = msg._id != null ? String(msg._id) : (raw.messageId != null ? String(raw.messageId) : undefined);
+      const timestamp = raw.timestamp ?? msg.createdAt ?? raw.createdAt;
+      this.emit('message_send', {
+        sender,
+        receiver,
+        message: msg,
+        messageId,
+        timestamp,
+        createdAt: msg.createdAt ?? (typeof raw.createdAt === 'string' ? raw.createdAt : undefined),
+      });
     };
 
     this.socket.on('message_receive', handleIncomingMessage);
     this.socket.on('message_send', handleIncomingMessage);
+    this.socket.on('message', handleIncomingMessage);
+    this.socket.on('new_message', handleIncomingMessage);
+    this.socket.on('chat_message', handleIncomingMessage);
 
-    this.socket.on('message_delete', (data: unknown) => {
-      const { sender = '', receiver = '', messageId = '' } = (data ?? {}) as {
-        sender?: string;
-        receiver?: string;
-        messageId?: string;
-      };
+    const handleMessageDelete = (data: unknown) => {
+      const d = (data ?? {}) as Record<string, unknown>;
+      const sender = String(d.sender ?? d.senderId ?? '');
+      let receiver = String(d.receiver ?? d.receiverId ?? '');
+      if (!receiver && this.userId) receiver = this.userId;
+      const messageId = String(d.messageId ?? d.message_id ?? d.id ?? d._id ?? '');
       console.log('[Socket] handled: message_delete', { sender, receiver, messageId });
       this.emit('message_delete', { sender, receiver, messageId });
-    });
+    };
+    this.socket.on('message_delete', handleMessageDelete);
+    this.socket.on('message_deleted', handleMessageDelete);
+    this.socket.on('delete_message', handleMessageDelete);
+  }
+
+  private notifyConnectionState(connected: boolean) {
+    this.connectionListeners.forEach((fn) => fn(connected));
   }
 
   private emit<T>(type: SocketEventType, data: T) {
     this.listeners[type]?.forEach((fn) => fn(data as T));
+  }
+
+  /** Whether the socket is currently connected. */
+  isConnected(): boolean {
+    return this.socket?.connected === true;
+  }
+
+  /** Subscribe to connection state changes. Returns unsubscribe. */
+  onConnectionChange(listener: ConnectionStateListener): () => void {
+    this.connectionListeners.add(listener);
+    return () => this.connectionListeners.delete(listener);
   }
 
   /** Send socket.io event. Always attaches bearer token to payload. */
@@ -189,7 +237,7 @@ class SocketService {
     }
 
     const body = this.withAuthorization(payload);
-    console.log('[Socket] emit', { event, payload: body });
+    console.log('[Socket] emit', { event, message: body, sender: body.sender, receiver: body.receiver });
     this.socket.emit(event, body);
   }
 
@@ -205,16 +253,29 @@ class SocketService {
     this.send('typing', { sender, receiver, isTyping });
   }
 
-  /** Send message: sender, receiver, message. Server may echo as message_receive. */
+  /** Send text message: sender, receiver, message. */
   messageSend(sender: string, receiver: string, message: string) {
-    console.log('[Socket] messageSend', { sender, receiver, messagePreview: String(message).slice(0, 50) });
     this.send('message_send', { sender, receiver, message });
   }
 
-  /** Send message delete: sender, receiver, messageId. */
+  /**
+   * Send a message payload that comes directly from sendMessageApi (backend response).
+   * Backend expects: { sender, receiver, message: <messageObject> }.
+   */
+  messageSendFromApi(sender: string, receiver: string, message: Record<string, unknown>) {
+    this.send('message_send', { sender, receiver, message });
+  }
+
+  /** Send message delete: sender, receiver, messageId. Sends both snake and camel keys for backend compatibility. */
   messageDelete(sender: string, receiver: string, messageId: string) {
     console.log('[Socket] messageDelete', { sender, receiver, messageId });
-    this.send('message_delete', { sender, receiver, messageId });
+    this.send('message_delete', {
+      sender,
+      receiver,
+      messageId,
+      senderId: sender,
+      receiverId: receiver,
+    });
   }
 
   /** Set current user for presence; will emit join when possible, server replies with join_success. */

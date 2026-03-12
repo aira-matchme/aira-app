@@ -81,7 +81,7 @@ export const PreferencesMaritalStatusScreen: React.FC = () => {
       }
       navigation.goBack();
     } else {
-      navigation.navigate('PreferencesBodyType', {});
+      navigation.navigate('PreferencesRelationshipIntent', {});
     }
   };
 

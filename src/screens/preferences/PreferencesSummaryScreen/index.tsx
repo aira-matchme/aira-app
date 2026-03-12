@@ -23,6 +23,7 @@ import { useAuthStore } from '../../../store/auth.store';
 import { RELIGION_OPTIONS } from '../../../constants/profile';
 import type { EducationOption, EmploymentOption } from '../../../store/preferences.store';
 import {
+  addPreference,
   buildAddPreferencePayload,
   patchEditPreference,
 } from '../../../modules/preferences/api';
@@ -42,7 +43,10 @@ type PreferencesSummaryNavList =
     | 'PreferencesIncome'
     | 'PreferencesReligion'
     | 'PreferencesMaritalStatus'
+    | 'PreferencesRelationshipIntent'
     | 'PreferencesBodyType'
+    | 'ReferenceImageIntro'
+    | 'ReferenceImagePreference'
     | 'Likes'
   > &
   Pick<ProfileStackParamList, 'ProfileMain'>;
@@ -149,6 +153,7 @@ export const PreferencesSummaryScreen: React.FC = () => {
     preferredEmployment,
     preferredIncome,
     preferredMaritalStatus,
+    relationshipIntentLabel,
     preferredBodyTypes,
     preferredReligions,
     setOpenedEditFromSummary,
@@ -165,6 +170,7 @@ export const PreferencesSummaryScreen: React.FC = () => {
     | 'PreferencesIncome'
     | 'PreferencesReligion'
     | 'PreferencesMaritalStatus'
+    | 'PreferencesRelationshipIntent'
     | 'PreferencesBodyType'
   >;
 
@@ -172,7 +178,8 @@ export const PreferencesSummaryScreen: React.FC = () => {
     preferredEducation != null &&
     preferredEmployment.length > 0 &&
     preferredIncome != null &&
-    preferredMaritalStatus != null;
+    preferredMaritalStatus != null &&
+    relationshipIntentLabel != null;
 
   const rows = useMemo(
     (): {
@@ -236,6 +243,12 @@ export const PreferencesSummaryScreen: React.FC = () => {
         required: true,
       },
       {
+        label: 'Relationship intent',
+        value: relationshipIntentLabel ? relationshipIntentLabel : '—',
+        screen: 'PreferencesRelationshipIntent',
+        required: true,
+      },
+      {
         label: STRINGS.PREFERENCES_SUMMARY.LABEL_BODY_TYPE,
         value: getBodyTypeDisplay(preferredBodyTypes),
         screen: 'PreferencesBodyType',
@@ -254,6 +267,7 @@ export const PreferencesSummaryScreen: React.FC = () => {
       preferredIncome,
       preferredReligions,
       preferredMaritalStatus,
+      relationshipIntentLabel,
       preferredBodyTypes,
     ]
   );
@@ -268,18 +282,22 @@ export const PreferencesSummaryScreen: React.FC = () => {
     setLoading(true);
     try {
       const payload = buildAddPreferencePayload(usePreferencesStore.getState());
-      await patchEditPreference(payload);
+
       const routeNames = navigation.getState().routeNames ?? [];
+
       const isInProfileStack = routeNames.includes('ProfileMain');
       if (isInProfileStack) {
-        navigation.navigate('ProfileMain');
-      } else {
-        // Switch to main app with bottom tabs (RootNavigator shows Tabs when this flag is true)
-        setPreferenceFlowCompleted(true);
+        await patchEditPreference(payload);
+        setLoading(false);
+        return;
       }
+
+      await addPreference(payload);
+      navigation.navigate('ReferenceImageIntro', {
+        returnToProfileMain: false,
+      });
     } catch (err) {
       // Save failed
-    } finally {
       setLoading(false);
     }
   };

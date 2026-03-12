@@ -211,9 +211,58 @@ export async function deleteChatApi(chatId: string): Promise<{ statusCode?: numb
   return data;
 }
 
+/** Delete a single message. Requires chatId and messageId. */
+export async function deleteMessageApi(params: { chatId: string; messageId: string }): Promise<{ statusCode?: number; message?: string; data?: unknown }> {
+  const { data } = await apiClient.post(endpoints.chat.deleteMessage, {
+    // chatId: params.chatId,
+    messageId: params.messageId,
+  });
+  return data;
+}
+
 /** Mark chat as seen (e.g. when user opens the conversation). Payload: { "chatId": "<id>" } */
 export async function markChatSeenApi(chatId: string): Promise<{ statusCode?: number; message?: string; data?: unknown }> {
   const { data } = await apiClient.post(endpoints.chat.markSeen, { chatId });
+  return data;
+}
+
+export type PostAIMessagesParams = {
+  /** Receiver user id (sent as receiverId to API). */
+  receiverId?: string;
+  /** Chat / match user id; used as receiverId when receiverId is not provided. */
+  chatId?: string;
+};
+
+/** Chat suggestions response (e.g. from getAiSuggestions) */
+export type ChatSuggestionsResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: { success?: boolean; suggestions?: string[]; limitUsed?: number; limitLeft?: number; totalMessageLimit?: number };
+  suggestions?: string[];
+};
+
+/** Get AI chat suggestions for a chat. Endpoint: /chat/chat-suggestions */
+export async function getAiSuggestionsApi(chatId: string): Promise<ChatSuggestionsResponse> {
+  console.log('chatId', chatId);
+  const { data } = await apiClient.post<ChatSuggestionsResponse>(
+    endpoints.chat.getAiSuggestions,
+    { chatId }
+    // { params: { chatId } }
+  );
+  return data ?? {};
+}
+
+/** Call Aira to introduce / break the ice. Endpoint: /chat/aira-introduce */
+export async function postAIMessagesApi(
+  params: PostAIMessagesParams
+): Promise<{ statusCode?: number; message?: string; data?: unknown }> {
+  const receiverId = params.receiverId ?? params.chatId;
+  if (!receiverId) {
+    throw new Error('postAIMessagesApi: receiverId or chatId is required');
+  }
+  const { data } = await apiClient.post(endpoints.chat.postAIMessages, {
+    receiverId,
+  });
   return data;
 }
 
@@ -291,7 +340,7 @@ export type ChatMessageApiItem = {
   uri?: string;
   name?: string;
   senderId?: string;
-  replyTo?: { senderName?: string; preview?: string };
+  replyTo?: { senderName?: string; preview?: string; snippet?: string };
   [key: string]: unknown;
 };
 
@@ -318,7 +367,7 @@ export async function getChatMessagesApi(
   const { data } = await apiClient.post<GetChatMessagesResponse>(endpoints.chat.getChatMessages, {
     chatId: params.chatId,
     page: params.page ?? 1,
-    limit: params.limit ?? 20,
+    limit: params.limit ?? 50,
   });
   return data;
 }
@@ -326,7 +375,7 @@ export async function getChatMessagesApi(
 /** UI chat message (matches ChatDetailScreen ChatMessage union). messageId from API _id for replyTo. */
 export type ChatMessageUi =
   | { type: 'text'; text: string; timestamp: string; sent: boolean; replyTo?: { senderName: string; preview: string }; messageId?: string }
-  | { type: 'voice'; timestamp: string; sent: boolean; messageId?: string }
+  | { type: 'voice'; uri: string; timestamp: string; sent: boolean; messageId?: string }
   | { type: 'image'; uri: string; timestamp: string; sent: boolean; messageId?: string }
   | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean; messageId?: string };
 
@@ -367,13 +416,18 @@ export function mapApiMessageToChatMessage(
       timestamp,
       sent,
       replyTo: item.replyTo?.senderName != null
-        ? { senderName: item.replyTo.senderName, preview: item.replyTo.preview ?? '' }
+        ? {
+            senderName: item.replyTo.senderName,
+            preview: item.replyTo.preview ?? item.replyTo.snippet ?? '',
+          }
         : undefined,
       messageId,
     };
   }
   if (type === 'voice') {
-    return { type: 'voice', timestamp, sent, messageId };
+    const file = item.files?.[0];
+    const uri = item.uri ?? item.url ?? file?.url ?? file?.uri ?? '';
+    return uri ? { type: 'voice', uri, timestamp, sent, messageId } : null;
   }
   if (type === 'image') {
     const file = item.files?.[0];

@@ -121,6 +121,12 @@ export const styles = StyleSheet.create({
     borderColor: colors.primary.purple,
     backgroundColor: colors.primary.purple,
   },
+  checkboxRankText: {
+    ...typography.small,
+    fontSize: 12,
+    lineHeight: 14,
+    color: colors.white,
+  },
   actions: {
     position: 'absolute',
     bottom: 0,

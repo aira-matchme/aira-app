@@ -8,7 +8,7 @@ export const H_PADDING = 16;
 export const GRID_GAP = 16;
 export const CARD_HEIGHT = 200;
 export const CARD_RADIUS = 20;
-export const OVERLAY_HEIGHT = 70;
+export const OVERLAY_HEIGHT = 72;
 
 export const CARD_WIDTH = (SCREEN_WIDTH - H_PADDING * 2 - GRID_GAP) / 2;
 
@@ -110,8 +110,11 @@ export const styles = StyleSheet.create({
     bottom: 0,
     height: OVERLAY_HEIGHT,
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    justifyContent: 'center',
+    paddingTop: 10,
+    paddingBottom: 12,
+    justifyContent: 'flex-end',
+    zIndex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   name: {
     fontSize: 14,

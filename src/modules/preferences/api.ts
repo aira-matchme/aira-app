@@ -9,6 +9,7 @@ import type {
   PreferencesState,
 } from '../../store/preferences.store';
 import type { MaritalStatusOption } from '../../store/preferences.store';
+import type { RelationshipIntentOption } from '../../store/preferences.store';
 import { usePreferencesStore } from '../../store/preferences.store';
 
 const MILES_TO_KM = 1.60934;
@@ -64,6 +65,7 @@ type GetPreferencesResponse = Partial<{
   preferredMaxHeightIn: number;
   preferredBodyTypes: string[];
   preferredMaritalStatus: string[] | string;
+  relationshipIntentLabel: string;
 }>;
 
 function educationFromRank(rank: number): EducationOption {
@@ -148,6 +150,18 @@ function hydratePreferencesStoreFromApi(raw: unknown): void {
   if (typeof marital === 'string' && marital.length > 0) {
     usePreferencesStore.getState().setPreferredMaritalStatus(marital as MaritalStatusOption);
   }
+
+  const relIntentRaw =
+    (data as any)?.relationshipIntentLabel ??
+    (data as any)?.relationshipintentlabel ??
+    (data as any)?.relationship_intent_label ??
+    (data as any)?.relationshipIntent;
+
+  if (typeof relIntentRaw === 'string' && relIntentRaw.length > 0) {
+    usePreferencesStore
+      .getState()
+      .setRelationshipIntentLabel(relIntentRaw as RelationshipIntentOption);
+  }
 }
 
 export function buildAddPreferencePayload(
@@ -194,6 +208,7 @@ export function buildAddPreferencePayload(
     preferredMaxHeightIn: maxFtIn.inches,
     preferredBodyTypes: state.preferredBodyTypes,
     preferredMaritalStatus,
+    relationshipIntentLabel: state.relationshipIntentLabel ?? undefined,
     preferredChildren: 'no',
   };
 }

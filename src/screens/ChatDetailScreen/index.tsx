@@ -33,15 +33,18 @@ import { BackArrowIcon } from '../../assets/icons/common/BackArrowIcon';
 import { MoreVertIcon } from '../../assets/icons/common/MoreVertIcon';
 import { BlockIcon } from '../../assets/icons/common/BlockIcon';
 import { ReportIcon } from '../../assets/icons/common/ReportIcon';
+import { InterestChipCheckIcon } from '../../assets/icons/common/InterestChipCheckIcon';
 import { PlusIcon } from '../../assets/icons/common/PlusIcon';
 import { ForwardArrowIcon } from '../../assets/icons/common/ForwardArrowIcon';
-import { MicIcon } from '../../assets/icons/common/MicIcon';
-import { PlayIcon } from '../../assets/icons/common/PlayIcon';
-import { PauseIcon } from '../../assets/icons/common/PauseIcon';
+// import { MicIcon } from '../../assets/icons/common/MicIcon';
+// import { PlayIcon } from '../../assets/icons/common/PlayIcon';
+// import { PauseIcon } from '../../assets/icons/common/PauseIcon';
 import { DeleteIcon } from '../../assets/icons/common/DeleteIcon';
 import { ReplyIcon } from '../../assets/icons/common/ReplyIcon';
 import { AskAiraIcon } from '../../assets/icons/common/AskAiraIcon';
+import { AskAiraSendIcon } from '../../assets/icons/common/AskAiraSendIcon';
 import { GeneratingCloseIcon } from '../../assets/icons/common/GeneratingCloseIcon';
+import { InformativeIcon } from '../../assets/icons/common/InformativeIcon';
 import { ActionSheetFileIcon } from '../../assets/icons/common/ActionSheetFileIcon';
 import { AttachmentOptionsBottomSheet, type AttachmentOption } from '../../components/AttachmentOptionsBottomSheet';
 import { GradientText } from '../../components/GradientText';
@@ -49,25 +52,58 @@ import LinearGradient from 'react-native-linear-gradient';
 import { STRINGS } from '../../constants/strings';
 import { colors, typography } from '../../theme';
 import type { ChatStackParamList } from '../../navigation/types';
-import { setChatRequestActionApi, blockUserApi, reportUserApi, getChatMessagesApi, mapApiMessageToChatMessage, markChatSeenApi, sendMessageApi, uploadChatFileApi } from '../../modules/chat/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+import { setChatRequestActionApi, blockUserApi, reportUserApi, getChatMessagesApi, mapApiMessageToChatMessage, markChatSeenApi, sendMessageApi, uploadChatFileApi, postAIMessagesApi, getAiSuggestionsApi, deleteMessageApi, type ChatMessageApiItem } from '../../modules/chat/api';
 import { useAuthStore } from '../../store/auth.store';
 import socketService, { type MessageReceivePayload, type MessageDeletePayload, type TypingPayload } from '../../services/socket/socketService';
 import { styles, H_PADDING } from './styles';
+import { TabAICenterIcon } from '../../assets/icons/tabs/TabAICenterIcon';
 
 type Props = NativeStackScreenProps<ChatStackParamList, 'ChatDetail'>;
 
 type ChatMessage =
   | { type: 'text'; text: string; timestamp: string; sent: boolean; replyTo?: { senderName: string; preview: string }; messageId?: string }
-  | { type: 'voice'; timestamp: string; sent: boolean; messageId?: string }
+  // | { type: 'voice'; uri: string; timestamp: string; sent: boolean; messageId?: string }
   | { type: 'image'; uri: string; timestamp: string; sent: boolean; messageId?: string }
   | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean; messageId?: string };
 
-const VOICE_WAVEFORM = [8, 12, 6, 14, 10, 16, 8, 14, 12, 10];
+// const VOICE_WAVEFORM = [8, 12, 6, 14, 10, 16, 8, 14, 12, 10];
+
+const DONT_SHOW_ASK_AIRA_CONFIRM_KEY = 'dont_show_ask_aira_confirm';
+
+const REPORT_REASONS: { value: string; label: string }[] = [
+  { value: 'inappropriate_messages', label: 'Inappropriate messages' },
+  { value: 'fake_or_spam', label: 'Fake or spam account' },
+  { value: 'harassment_or_bullying', label: 'Harassment or bullying' },
+  { value: 'offensive_profile', label: 'Offensive profile content' },
+  { value: 'underage_user', label: 'Underage user' },
+  { value: 'something_else', label: "It's something else" },
+];
 
 const now = () => {
   const d = new Date();
   return `${d.getHours() > 12 ? d.getHours() - 12 : d.getHours()}:${d.getMinutes().toString().padStart(2, '0')} ${d.getHours() >= 12 ? 'pm' : 'am'}`;
 };
+
+function isAiraLimitError(err: unknown): boolean {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  const data = (err as { response?: { data?: { message?: string; error?: string } } })?.response?.data;
+  const msg = ((data?.message ?? data?.error) ?? '').toString().toLowerCase();
+  return status === 429 || msg.includes('limit') || msg.includes('suggestion') || msg.includes('quota');
+}
+
+/** Time until next midnight (local) for "come back in" countdown */
+function getTimeUntilMidnight(): { hours: number; minutes: number; seconds: number } {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  const diff = Math.max(0, midnight.getTime() - now.getTime());
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+  return { hours, minutes, seconds };
+}
 
 /** Format timestamp from socket (ISO string or ms number) for display; fallback to now(). */
 function formatMessageTimestamp(value: string | number | undefined): string {
@@ -96,23 +132,39 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<Array<{ type: 'image'; uri: string } | { type: 'file'; uri: string; name: string }>>([]);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
+  const [blockConfirmVisible, setBlockConfirmVisible] = useState(false);
+  const [blockConfirmLoading, setBlockConfirmLoading] = useState(false);
   const [showReportSheet, setShowReportSheet] = useState(false);
+  const [selectedReportReason, setSelectedReportReason] = useState<string | null>(null);
   const [reportMessageInput, setReportMessageInput] = useState('');
   const [reportSubmitting, setReportSubmitting] = useState(false);
-  const [voiceBarVisible, setVoiceBarVisible] = useState(false);
-  const [voiceSeconds, setVoiceSeconds] = useState(0);
-  const [voicePaused, setVoicePaused] = useState(false);
-  const [voiceSendLoading, setVoiceSendLoading] = useState(false);
-  const voiceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isRecordingRef = useRef(false);
+  // Voice chat state (disabled)
+  // const [voiceBarVisible, setVoiceBarVisible] = useState(false);
+  // const [voiceSeconds, setVoiceSeconds] = useState(0);
+  // const [voicePaused, setVoicePaused] = useState(false);
+  // const [voiceSendLoading, setVoiceSendLoading] = useState(false);
+  // const voiceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // const isRecordingRef = useRef(false);
+  // const audioRecorderPlayerRef = useRef(new AudioRecorderPlayer());
+  // const [recordFilePath, setRecordFilePath] = useState<string | null>(null);
   const [askAiraGenerating, setAskAiraGenerating] = useState(false);
   const [generatedReplies, setGeneratedReplies] = useState<string[] | null>(null);
+  const [askAiraConfirmVisible, setAskAiraConfirmVisible] = useState(false);
+  const [dontShowAskAiraAgain, setDontShowAskAiraAgain] = useState(false);
+  const [dontShowAskAiraPersisted, setDontShowAskAiraPersisted] = useState(false);
+  const [askAiraConfirmLoading, setAskAiraConfirmLoading] = useState(false);
+  const [airaLimitReachedVisible, setAiraLimitReachedVisible] = useState(false);
+  const [airaLimitCountdown, setAiraLimitCountdown] = useState({ hours: 23, minutes: 47, seconds: 12 });
+  const [airaSuggestionsLimitLeft, setAiraSuggestionsLimitLeft] = useState<number | null>(null);
+  const [airaSuggestionsTotalLimit, setAiraSuggestionsTotalLimit] = useState<number | null>(null);
   const [selectedReplyIndex, setSelectedReplyIndex] = useState(0);
   const [messageContextIndex, setMessageContextIndex] = useState<number | null>(null);
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
   const [replyingTo, setReplyingTo] = useState<{ index: number; message: ChatMessage; senderName: string; messageId?: string } | null>(null);
   const [sendLoading, setSendLoading] = useState(false);
   const [otherUserTyping, setOtherUserTyping] = useState(false);
+  const [otherUserOnline, setOtherUserOnline] = useState(false);
+  const [socketConnected, setSocketConnected] = useState(false);
   const generatedRepliesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -141,44 +193,36 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     return 'application/octet-stream';
   };
 
-  const getSoundRecorder = (): { start: (path: string) => Promise<void>; stop: () => Promise<{ path: string; duration: number }>; pause: () => Promise<void>; resume: () => Promise<void>; PATH_CACHE: string } | null => {
-    try {
-      const SR = require('react-native-sound-recorder');
-      return SR?.start && SR?.PATH_CACHE ? SR : null;
-    } catch {
-      return null;
-    }
-  };
-
   const getFileTypeLabel = (name: string) => {
     const ext = name.split('.').pop()?.toUpperCase() ?? 'FILE';
     return ext.length <= 4 ? ext : 'FILE';
   };
 
-  const formatVoiceTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
-
-  useEffect(() => {
-    if (!voiceBarVisible || voicePaused) {
-      if (voiceTimerRef.current) {
-        clearInterval(voiceTimerRef.current);
-        voiceTimerRef.current = null;
-      }
-      return;
-    }
-    voiceTimerRef.current = setInterval(() => {
-      setVoiceSeconds((prev) => prev + 1);
-    }, 1000);
-    return () => {
-      if (voiceTimerRef.current) {
-        clearInterval(voiceTimerRef.current);
-        voiceTimerRef.current = null;
-      }
-    };
-  }, [voiceBarVisible, voicePaused]);
+  // Voice bar timer helpers (voice chat disabled)
+  // const formatVoiceTime = (seconds: number) => {
+  //   const m = Math.floor(seconds / 60);
+  //   const s = seconds % 60;
+  //   return `${m}:${s.toString().padStart(2, '0')}`;
+  // };
+  //
+  // useEffect(() => {
+  //   if (!voiceBarVisible || voicePaused) {
+  //     if (voiceTimerRef.current) {
+  //       clearInterval(voiceTimerRef.current);
+  //       voiceTimerRef.current = null;
+  //     }
+  //     return;
+  //   }
+  //   voiceTimerRef.current = setInterval(() => {
+  //     setVoiceSeconds((prev) => prev + 1);
+  //   }, 1000);
+  //   return () => {
+  //     if (voiceTimerRef.current) {
+  //       clearInterval(voiceTimerRef.current);
+  //       voiceTimerRef.current = null;
+  //     }
+  //   };
+  // }, [voiceBarVisible, voicePaused]);
 
   // Simulate "replies generated" after a short delay when Ask AIRA is active
   useEffect(() => {
@@ -233,37 +277,76 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
   useEffect(() => {
     if (!chatId || !currentUserId || !otherUserId) return;
+    setSocketConnected(socketService.isConnected());
     console.log('[Socket] ChatDetailScreen: join + subscribe', { chatId, currentUserId, otherUserId });
     socketService.join(chatId);
     const unsubMessage = socketService.on<MessageReceivePayload>('message_send', (data) => {
-      const isForMe = data.receiver === currentUserId;
-      const isFromMe = data.sender === currentUserId;
-      console.log('[Socket] ChatDetailScreen: message_send received', { sender: data.sender, receiver: data.receiver, isForMe, isFromMe });
-      if (!isForMe) return;
-      // Own message echoed back: we already added it optimistically on send; skip to avoid duplicate.
-      if (isFromMe) return;
-      const timestamp = formatMessageTimestamp(data.timestamp ?? data.createdAt);
-      setMessages((prev) => [
-        ...prev,
-        { type: 'text', text: data.message, timestamp, sent: false, messageId: data.messageId },
-      ]);
+      const apiMessage = (data.message ?? {}) as ChatMessageApiItem;
+      const senderId = (apiMessage.sender as string | undefined) ?? data.sender;
+      const receiverId = (apiMessage.receiver as string | undefined) ?? data.receiver;
+      const isForMe = receiverId === currentUserId;
+      const isFromMe = senderId === currentUserId;
+      const isFromOtherInThisChat = senderId === otherUserId;
+      if (!isForMe || isFromMe) return;
+      if (!isFromOtherInThisChat) return;
+
+      // For socket messages, backend may set isSentByMe from the sender's perspective.
+      // Override it here so the UI uses the current device's user id.
+      const adjusted: ChatMessageApiItem = {
+        ...apiMessage,
+        isSentByMe: senderId === currentUserId,
+      };
+
+      const ui = mapApiMessageToChatMessage(adjusted, currentUserId);
+      if (!ui) return;
+      setMessages((prev) => [...prev, ui]);
+      // Mark this chat as seen so unread counts are cleared on other screens.
+      if (chatId) {
+        markChatSeenApi(chatId).catch(() => {});
+      }
     });
     const unsubDelete = socketService.on<MessageDeletePayload>('message_delete', (data) => {
-      console.log('[Socket] ChatDetailScreen: message_delete received', { messageId: data.messageId });
-      setMessages((prev) => prev.filter((m) => (m as { messageId?: string }).messageId !== data.messageId));
+      if (!data?.messageId) return;
+      setMessages((prev) =>
+        prev.filter((m) => (m as { messageId?: string }).messageId !== data.messageId)
+      );
     });
     const unsubTyping = socketService.on<TypingPayload>('typing', (data) => {
-      const applies = data.sender === otherUserId && data.receiver === currentUserId;
-      console.log('[Socket] ChatDetailScreen: typing received', { sender: data.sender, receiver: data.receiver, isTyping: data.isTyping, applies });
-      if (applies) {
-        setOtherUserTyping(data.isTyping);
+      const applies =
+        data.sender === otherUserId &&
+        (data.receiver === currentUserId || !data.receiver);
+      if (applies) setOtherUserTyping(data.isTyping);
+    });
+    const unsubJoinSuccess = socketService.on<{ users?: string[]; onlineUserIds?: string[]; userId?: string; online?: boolean }>('join_success', (data) => {
+      const onlineIds = data?.users ?? data?.onlineUserIds;
+      if (Array.isArray(onlineIds)) {
+        setOtherUserOnline(onlineIds.includes(otherUserId));
+      } else if (data?.userId === otherUserId && data?.online != null) {
+        setOtherUserOnline(data.online);
+      }
+    });
+    const unsubConnection = socketService.onConnectionChange((connected) => {
+      setSocketConnected(connected);
+      if (connected) {
+        getChatMessagesApi({ chatId })
+          .then((res) => {
+            const raw = res.data?.list ?? res.data?.messages ?? [];
+            const list = Array.isArray(raw)
+              ? raw
+                  .map((item) => mapApiMessageToChatMessage(item, currentUserId ?? undefined))
+                  .filter((m): m is ChatMessage => m != null)
+              : [];
+            setMessages(list);
+          })
+          .catch(() => {});
       }
     });
     return () => {
-      console.log('[Socket] ChatDetailScreen: unsubscribe (leave chat or params changed)');
       unsubMessage();
       unsubDelete();
       unsubTyping();
+      unsubJoinSuccess();
+      unsubConnection();
     };
   }, [chatId, currentUserId, otherUserId]);
 
@@ -299,6 +382,21 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     return () => clearTimeout(id);
   }, [messagesLoading, messages.length]);
 
+  useEffect(() => {
+    AsyncStorage.getItem(DONT_SHOW_ASK_AIRA_CONFIRM_KEY).then((value) => {
+      setDontShowAskAiraPersisted(value === 'true');
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!airaLimitReachedVisible) return;
+    setAiraLimitCountdown(getTimeUntilMidnight());
+    const id = setInterval(() => {
+      setAiraLimitCountdown(getTimeUntilMidnight());
+    }, 1000);
+    return () => clearInterval(id);
+  }, [airaLimitReachedVisible]);
+
   const handleInsertReply = () => {
     if (!generatedReplies?.length || selectedReplyIndex >= generatedReplies.length) return;
     setInputText(generatedReplies[selectedReplyIndex]);
@@ -314,126 +412,158 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     return '';
   };
 
-  const startVoiceRecording = useCallback(async () => {
-    const SoundRecorder = getSoundRecorder();
-    if (!SoundRecorder) {
-      return;
-    }
-    try {
-      const path = `${SoundRecorder.PATH_CACHE}/voice_${Date.now()}.mp4`;
-      await SoundRecorder.start(path);
-      isRecordingRef.current = true;
-    } catch (err) {
-      setVoiceBarVisible(false);
-    }
-  }, []);
-
-  const handleMicPress = async () => {
-    if (inputText.trim() || pendingAttachments.length) return;
-    const status = await checkMicrophonePermission();
-    if (status !== 'granted') {
-      setShowMicrophonePermissionSheet(true);
-      return;
-    }
-    setVoiceBarVisible(true);
-    setVoiceSeconds(0);
-    setVoicePaused(false);
-    await startVoiceRecording();
-  };
-
-  const handleAllowMicrophonePermission = async () => {
-    setIsRequestingPermission(true);
-    try {
-      const requested = await requestMicrophonePermission();
-      setShowMicrophonePermissionSheet(false);
-      if (requested === 'granted') {
-        setVoiceBarVisible(true);
-        setVoiceSeconds(0);
-        setVoicePaused(false);
-        await startVoiceRecording();
-      } else {
-        setShowMicrophonePermissionSheet(false);
-      }
-    } catch {
-      setShowMicrophonePermissionSheet(false);
-    } finally {
-      setIsRequestingPermission(false);
-    }
-  };
-
-  const handleVoiceTrash = () => {
-    if (isRecordingRef.current) {
-      const SoundRecorder = getSoundRecorder();
-      SoundRecorder?.stop?.().catch(() => {});
-      isRecordingRef.current = false;
-    }
-    setVoiceBarVisible(false);
-    setVoiceSeconds(0);
-    setVoicePaused(false);
-  };
-
-  const handleVoicePlayPause = () => {
-    if (!isRecordingRef.current) return;
-    const SoundRecorder = getSoundRecorder();
-    if (!SoundRecorder) return;
-    if (voicePaused) {
-      SoundRecorder.resume().catch(() => {});
-    } else {
-      SoundRecorder.pause().catch(() => {});
-    }
-    setVoicePaused((p) => !p);
-  };
-
-  const handleVoiceSend = async () => {
-    if (!chatId) return;
-    if (isRecordingRef.current) {
-      const SoundRecorder = getSoundRecorder();
-      if (!SoundRecorder?.stop) {
-        isRecordingRef.current = false;
-        setVoiceBarVisible(false);
-        setVoiceSeconds(0);
-        setVoicePaused(false);
-        return;
-      }
-      try {
-        const result = await SoundRecorder.stop();
-        isRecordingRef.current = false;
-        const path = result?.path;
-        if (!path) {
-          setVoiceBarVisible(false);
-          setVoiceSeconds(0);
-          setVoicePaused(false);
-          return;
-        }
-        setVoiceSendLoading(true);
-        try {
-          const { url, key } = await uploadChatFileApi(path, {
-            mimeType: 'audio/mp4',
-            fileName: `voice_${Date.now()}.mp4`,
-          });
-          await sendMessageApi({
-            chatId,
-            content: '',
-            messageType: 'audio',
-            files: [{ url, key }],
-            replyTo: replyingTo?.messageId ?? null,
-          });
-          setMessages((prev) => [...prev, { type: 'voice', timestamp: now(), sent: true }]);
-        } catch (err: unknown) {
-          // Send failed
-        } finally {
-          setVoiceSendLoading(false);
-        }
-      } catch (err) {
-        isRecordingRef.current = false;
-      }
-    } else {
-      setMessages((prev) => [...prev, { type: 'voice', timestamp: now(), sent: true }]);
-    }
-    setVoiceBarVisible(false);
-    setVoiceSeconds(0);
-    setVoicePaused(false);
-  };
+  // Voice recording and mic handlers (voice chat disabled)
+  // const startVoiceRecording = useCallback(async () => {
+  //   try {
+  //     const audioRecorderPlayer = audioRecorderPlayerRef.current;
+  //
+  //     const path =
+  //       Platform.OS === 'ios'
+  //         ? 'voice_record.m4a'
+  //         : `${Date.now()}.m4a`;
+  //
+  //     const result = await audioRecorderPlayer.startRecorder(path);
+  //
+  //     audioRecorderPlayer.addRecordBackListener(() => {
+  //       return;
+  //     });
+  //
+  //     isRecordingRef.current = true;
+  //
+  //     setRecordFilePath(result);
+  //   } catch (err) {
+  //     console.log('startVoiceRecording error', err);
+  //     setVoiceBarVisible(false);
+  //   }
+  // }, []);
+  //
+  // const handleMicPress = async () => {
+  //   if (inputText.trim() || pendingAttachments.length) return;
+  //   const status = await checkMicrophonePermission();
+  //   if (status !== 'granted') {
+  //     setShowMicrophonePermissionSheet(true);
+  //     return;
+  //   }
+  //   console.log('handleMicPress');
+  //   setVoiceBarVisible(true);
+  //   setVoiceSeconds(0);
+  //   setVoicePaused(false);
+  //   await startVoiceRecording();
+  // };
+  //
+  // const handleAllowMicrophonePermission = async () => {
+  //   setIsRequestingPermission(true);
+  //   try {
+  //     const requested = await requestMicrophonePermission();
+  //     setShowMicrophonePermissionSheet(false);
+  //     if (requested === 'granted') {
+  //       setVoiceBarVisible(true);
+  //       setVoiceSeconds(0);
+  //       setVoicePaused(false);
+  //       await startVoiceRecording();
+  //     } else {
+  //       setShowMicrophonePermissionSheet(false);
+  //     }
+  //   } catch {
+  //     setShowMicrophonePermissionSheet(false);
+  //   } finally {
+  //     setIsRequestingPermission(false);
+  //   }
+  // };
+  //
+  // const handleVoiceTrash = () => {
+  //   if (isRecordingRef.current) {
+  //     const audioRecorderPlayer = audioRecorderPlayerRef.current;
+  //     audioRecorderPlayer.stopRecorder().catch(() => {});
+  //     isRecordingRef.current = false;
+  //   }
+  //   setRecordFilePath(null);
+  //   setVoiceBarVisible(false);
+  //   setVoiceSeconds(0);
+  //   setVoicePaused(false);
+  // };
+  //
+  // const handleVoicePlayPause = () => {
+  //   if (!isRecordingRef.current) return;
+  //   const audioRecorderPlayer = audioRecorderPlayerRef.current;
+  //   if (voicePaused) {
+  //     audioRecorderPlayer.resumeRecorder().catch(() => {});
+  //   } else {
+  //     audioRecorderPlayer.pauseRecorder().catch(() => {});
+  //   }
+  //   setVoicePaused((p) => !p);
+  // };
+  //
+  // const stopRecording = async () => {
+  //   try {
+  //     const audioRecorderPlayer = audioRecorderPlayerRef.current;
+  //
+  //     const result = await audioRecorderPlayer.stopRecorder();
+  //     audioRecorderPlayer.removeRecordBackListener();
+  //
+  //     isRecordingRef.current = false;
+  //
+  //     return result;
+  //   } catch (e) {
+  //     console.log('stop recording error', e);
+  //     return null;
+  //   }
+  // };
+  //
+  // const handleVoiceSend = async () => {
+  //   if (!chatId || !currentUserId || !otherUserId) return;
+  //
+  //   try {
+  //     setVoiceSendLoading(true);
+  //
+  //     const path = await stopRecording();
+  //
+  //     if (!path) {
+  //       setVoiceBarVisible(false);
+  //       return;
+  //     }
+  //
+  //     const fileName = `voice_${Date.now()}.m4a`;
+  //
+  //     const { url, key } = await uploadChatFileApi(path, {
+  //       mimeType: 'audio/m4a',
+  //       fileName,
+  //     });
+  //
+  //     const res = await sendMessageApi({
+  //       chatId,
+  //       content: '',
+  //       messageType: 'audio',
+  //       files: [{ url, key }],
+  //       replyTo: replyingTo?.messageId ?? null,
+  //     });
+  //
+  //     const apiMessage = res?.data as ChatMessageApiItem;
+  //
+  //     if (apiMessage) {
+  //       const ui = mapApiMessageToChatMessage(apiMessage, currentUserId);
+  //
+  //       if (ui) {
+  //         setMessages(prev => [...prev, ui]);
+  //       }
+  //
+  //       socketService.messageSendFromApi(
+  //         currentUserId,
+  //         otherUserId,
+  //         apiMessage as unknown as Record<string, unknown>,
+  //       );
+  //     }
+  //
+  //     setVoiceBarVisible(false);
+  //     setVoiceSeconds(0);
+  //     setVoicePaused(false);
+  //     setRecordFilePath(null);
+  //   } catch (err) {
+  //     console.log('voice send error', err);
+  //   } finally {
+  //     setVoiceSendLoading(false);
+  //   }
+  // };
 
   const openCamera = () => {
     launchCamera(
@@ -532,47 +662,61 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     if (!chatId || !currentUserId || !otherUserId) return;
     setSendLoading(true);
     const replyToPayload = replyingTo?.messageId ?? null;
-    const newMessages: ChatMessage[] = [];
     try {
       if (trimmed) {
-        // Notify other user in real time via socket; we show message optimistically (no refetch).
         socketService.typing(currentUserId, otherUserId, false);
-        socketService.messageSend(currentUserId, otherUserId, trimmed);
-        const replyToUi = replyingTo
-          ? { senderName: replyingTo.senderName, preview: getMessagePreview(replyingTo.message) }
-          : undefined;
-        newMessages.push({ type: 'text', text: trimmed, timestamp: now(), sent: true, replyTo: replyToUi });
-        setInputText('');
-        setReplyingTo(null);
-        // Persist to backend; do not refetch — list is updated via socket + optimistic add.
-        sendMessageApi({
+        const res = await sendMessageApi({
           chatId,
           content: trimmed,
           messageType: 'text',
           files: [],
           replyTo: replyToPayload,
-        }).catch(() => {});
+        });
+        const apiMessage = (res?.data as unknown) as ChatMessageApiItem | undefined;
+        if (apiMessage) {
+          const ui = mapApiMessageToChatMessage(apiMessage, currentUserId);
+          if (ui) {
+            setMessages((prev) => [...prev, ui]);
+          }
+          if (currentUserId && otherUserId) {
+            socketService.messageSendFromApi(
+              currentUserId,
+              otherUserId,
+              apiMessage as unknown as Record<string, unknown>
+            );
+          }
+        }
+        setInputText('');
+        setReplyingTo(null);
       }
       for (const att of pendingAttachments) {
         const messageType = getMessageTypeFromAttachment(att);
         const mimeType = getMimeTypeFromAttachment(att);
         const fileName = att.type === 'image' ? `image_${Date.now()}.jpg` : att.name;
         const { url, key } = await uploadChatFileApi(att.uri, { mimeType, fileName });
-        await sendMessageApi({
+        const res = await sendMessageApi({
           chatId,
           content: '',
           messageType,
           files: [{ url, key }],
           replyTo: replyToPayload,
         });
-        if (att.type === 'image') {
-          newMessages.push({ type: 'image', uri: att.uri, timestamp: now(), sent: true });
-        } else {
-          newMessages.push({ type: 'file', uri: att.uri, name: att.name, timestamp: now(), sent: true });
+        const apiMessage = (res?.data as unknown) as ChatMessageApiItem | undefined;
+        if (apiMessage) {
+          const ui = mapApiMessageToChatMessage(apiMessage, currentUserId);
+          if (ui) {
+            setMessages((prev) => [...prev, ui]);
+          }
+          if (currentUserId && otherUserId) {
+            socketService.messageSendFromApi(
+              currentUserId,
+              otherUserId,
+              apiMessage as unknown as Record<string, unknown>
+            );
+          }
         }
       }
-      if (newMessages.length > 0) {
-        setMessages((prev) => [...prev, ...newMessages]);
+      if (pendingAttachments.length > 0) {
         setPendingAttachments([]);
       }
     } catch (err: unknown) {
@@ -639,6 +783,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   };
 
   const handleMessageLongPress = (index: number) => {
+    console.log('handleMessageLongPress', index);
     setMessageContextIndex(index);
   };
 
@@ -671,31 +816,32 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         </React.Fragment>
       );
     }
-    if (msg.type === 'voice') {
-      return (
-        <React.Fragment key={index}>
-          <View style={styles.messageRow}>
-            <TouchableOpacity
-              style={styles.voiceBubbleSent}
-              activeOpacity={1}
-              onLongPress={() => handleMessageLongPress(index)}
-            >
-              <TouchableOpacity style={styles.voiceBubblePlay} activeOpacity={0.8} onPress={() => {}}>
-                <PlayIcon size={40} color={colors.white} variant="voiceBubble" />
-              </TouchableOpacity>
-              <View style={styles.voiceBubbleWaveform}>
-                {VOICE_WAVEFORM.map((h, i) => (
-                  <View key={i} style={[styles.voiceBubbleWaveformBar, { height: Math.max(6, h) }]} />
-                ))}
-              </View>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.timeRow}>
-            <Text style={styles.timeText}>{msg.timestamp}</Text>
-          </View>
-        </React.Fragment>
-      );
-    }
+    // Voice message bubble (voice chat disabled)
+    // if (msg.type === 'voice') {
+    //   return (
+    //     <React.Fragment key={index}>
+    //       <View style={styles.messageRow}>
+    //         <TouchableOpacity
+    //           style={styles.voiceBubbleSent}
+    //           activeOpacity={1}
+    //           onLongPress={() => handleMessageLongPress(index)}
+    //         >
+    //           <TouchableOpacity style={styles.voiceBubblePlay} activeOpacity={0.8} onPress={() => {}}>
+    //             <PlayIcon size={40} color={colors.white} variant="voiceBubble" />
+    //           </TouchableOpacity>
+    //           <View style={styles.voiceBubbleWaveform}>
+    //             {VOICE_WAVEFORM.map((h, i) => (
+    //               <View key={i} style={[styles.voiceBubbleWaveformBar, { height: Math.max(6, h) }]} />
+    //             ))}
+    //           </View>
+    //         </TouchableOpacity>
+    //       </View>
+    //       <View style={styles.timeRow}>
+    //         <Text style={styles.timeText}>{msg.timestamp}</Text>
+    //       </View>
+    //     </React.Fragment>
+    //   );
+    // }
     if (msg.type === 'image') {
       return (
         <React.Fragment key={index}>
@@ -757,7 +903,45 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         ) : (
           <View style={styles.headerAvatar} />
         )}
-        <Text style={styles.headerName} numberOfLines={1}>{name}</Text>
+        <View style={styles.headerNameWrap}>
+          <Text style={styles.headerName} numberOfLines={1}>{name}</Text>
+          {otherUserOnline && <Text style={styles.headerOnline}>Online</Text>}
+        </View>
+        {!askAiraGenerating && generatedReplies == null && (
+          <TouchableOpacity
+            style={styles.headerAskAiraButton}
+            onPress={() => {
+              console.log('chatId', chatId, 'dontShowAskAiraPersisted', dontShowAskAiraPersisted);
+              if (dontShowAskAiraPersisted && chatId) {
+                setAskAiraConfirmLoading(true);
+                getAiSuggestionsApi(chatId)
+                  .then((res) => {
+                    const list =
+                      res?.data?.suggestions ??
+                      (res?.data as { data?: { suggestions?: string[] } } | undefined)?.data?.suggestions ??
+                      res?.suggestions;
+                    const meta = res?.data as { limitLeft?: number | null; totalMessageLimit?: number | null } | undefined;
+                    setAiraSuggestionsLimitLeft(meta?.limitLeft ?? null);
+                    setAiraSuggestionsTotalLimit(meta?.totalMessageLimit ?? null);
+                    if (Array.isArray(list) && list.length > 0) {
+                      setGeneratedReplies(list);
+                      setSelectedReplyIndex(0);
+                    }
+                  })
+                  .catch((err) => {
+                    if (isAiraLimitError(err)) setAiraLimitReachedVisible(true);
+                  })
+                  .finally(() => setAskAiraConfirmLoading(false));
+              } else {
+                setAskAiraConfirmVisible(true);
+              }
+            }}
+            activeOpacity={0.8}
+            disabled={askAiraConfirmLoading}
+          >
+            <AskAiraSendIcon width={52} height={52} />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity style={styles.moreButton} onPress={() => setMoreMenuVisible(true)}>
           <MoreVertIcon size={24} color={colors.black} />
         </TouchableOpacity>
@@ -777,14 +961,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   style={styles.moreMenuItem}
                   onPress={() => {
                     setMoreMenuVisible(false);
-                    if (!otherUserId) {
-                      return;
-                    }
-                    blockUserApi({ blockUserId: otherUserId, type: 'block' })
-                      .then(() => navigation.goBack())
-                      .catch(() => {
-                        // Block failed
-                      });
+                    if (otherUserId) 
+                      setBlockConfirmVisible(true);
                   }}
                   activeOpacity={0.7}
                 >
@@ -809,6 +987,333 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                     <ReportIcon size={20} color={colors.semantic.error} />
                   </View>
                   <Text style={styles.moreMenuLabelReport}>Report</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      <Modal
+        visible={blockConfirmVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setBlockConfirmVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setBlockConfirmVisible(false)}>
+          <View style={styles.blockConfirmBackdrop}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.blockConfirmSheet}>
+                <View style={styles.blockConfirmHandle} />
+                <View style={styles.blockConfirmIconWrap}>
+                  <BlockIcon size={40} color={colors.primary.purple} />
+                </View>
+                <Text style={styles.blockConfirmTitle}>Block {name}?</Text>
+                <Text style={styles.blockConfirmDescription}>
+                  They won't be able to message you, see your profile, or send requests. You can unblock them anytime from Settings.
+                </Text>
+                <TouchableOpacity
+                  style={styles.blockConfirmButtonBlock}
+                  onPress={() => {
+                    if (!otherUserId) {
+                      setBlockConfirmVisible(false);
+                      return;
+                    }
+                    setBlockConfirmLoading(true);
+                    blockUserApi({ blockUserId: otherUserId, type: 'block' })
+                      .then(() => {
+                        setBlockConfirmVisible(false);
+                        navigation.goBack();
+                      })
+                      .catch(() => {
+                        // Block failed
+                      })
+                      .finally(() => setBlockConfirmLoading(false));
+                  }}
+                  activeOpacity={0.8}
+                  disabled={blockConfirmLoading}
+                >
+                  <LinearGradient
+                    colors={[...colors.gradients.primary.colors]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.blockConfirmButtonGradient}
+                  >
+                    {blockConfirmLoading ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <Text style={styles.blockConfirmButtonLabelBlock}>Block</Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.blockConfirmButtonCancel}
+                  onPress={() => setBlockConfirmVisible(false)}
+                  activeOpacity={0.8}
+                  disabled={blockConfirmLoading}
+                >
+                  <Text style={styles.blockConfirmButtonLabelCancel}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      <Modal
+        visible={askAiraConfirmVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAskAiraConfirmVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setAskAiraConfirmVisible(false)}>
+          <View style={styles.askAiraConfirmBackdrop}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.askAiraConfirmSheet}>
+                <View style={styles.askAiraConfirmHandle} />
+                <View style={styles.askAiraConfirmContent}>
+                  <View style={styles.askAiraConfirmIconWrap}>
+                    <TabAICenterIcon width={52} height={52} />
+
+                    {/* <AskAiraSendIcon width={40} height={40} /> */}
+                  </View>
+                  <GradientText style={{ fontSize: 24, fontWeight: '600' }}>
+                    Your Reply Assistant
+                  </GradientText>
+                  <Text style={styles.askAiraConfirmDescription}>
+                    Aira reads your recent conversation and suggests replies, that you can send - or tweak - in one tap.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.askAiraConfirmGenerateButton}
+                  onPress={() => {
+                    if (!chatId) return;
+                    setAskAiraConfirmLoading(true);
+                    if (dontShowAskAiraAgain) {
+                      AsyncStorage.setItem(DONT_SHOW_ASK_AIRA_CONFIRM_KEY, 'true').then(() => {
+                        setDontShowAskAiraPersisted(true);
+                      });
+                    }
+                    postAIMessagesApi({ chatId })
+                      .then(() => {
+                        setAskAiraConfirmVisible(false);
+                        setAskAiraGenerating(true);
+                      })
+                      .catch((err) => {
+                        if (isAiraLimitError(err)) {
+                          setAskAiraConfirmVisible(false);
+                          setAiraLimitReachedVisible(true);
+                        }
+                      })
+                      .finally(() => setAskAiraConfirmLoading(false));
+                  }}
+                  activeOpacity={0.8}
+                  disabled={askAiraConfirmLoading || !chatId}
+                >
+                  <LinearGradient
+                    colors={[...colors.gradients.primary.colors]}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.askAiraConfirmGenerateGradient}
+                  >
+                    {askAiraConfirmLoading ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <Text style={styles.askAiraConfirmGenerateLabel}>Generate</Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.askAiraConfirmCheckRow}
+                  onPress={() => setDontShowAskAiraAgain((v) => !v)}
+                  activeOpacity={0.8}
+                  disabled={askAiraConfirmLoading}
+                >
+                  <View style={[styles.askAiraConfirmCheck, dontShowAskAiraAgain && styles.askAiraConfirmCheckSelected]}>
+                    {dontShowAskAiraAgain && <InterestChipCheckIcon size={12} color={colors.white} />}
+                  </View>
+                  <Text style={styles.askAiraConfirmCheckLabel}>Don't show this again</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Aira is thinking - API in progress (Figma 2636-13127, no cancel) */}
+      <Modal
+        visible={askAiraGenerating}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.airaThinkingBackdrop}>
+          <View style={styles.airaThinkingSheet}>
+            <View style={styles.airaThinkingHeader}>
+              <View style={styles.airaThinkingHeaderLeft}>
+                <View style={styles.airaThinkingIconWrap}>
+                  <AskAiraSendIcon width={20} height={20} />
+                </View>
+                <Text style={styles.airaThinkingTitle}>Aira is thinking...</Text>
+              </View>
+              <View style={styles.airaThinkingHeaderRight}>
+                <Text style={styles.airaThinkingLeftCount}>2/3 left</Text>
+                <InformativeIcon width={14} height={14} color={colors.neutral[700]} />
+              </View>
+            </View>
+            <View style={styles.airaThinkingSkeletons}>
+              <View style={styles.airaThinkingSkeletonRow}>
+                <View style={[styles.airaThinkingSkeleton, { width: '100%' }]} />
+                <View style={[styles.airaThinkingSkeleton, { width: 130 }]} />
+              </View>
+              <View style={styles.airaThinkingSkeletonRow}>
+                <View style={[styles.airaThinkingSkeleton, { width: '100%' }]} />
+              </View>
+              <View style={styles.airaThinkingSkeletonRow}>
+                <View style={[styles.airaThinkingSkeleton, { width: '100%' }]} />
+                <View style={[styles.airaThinkingSkeleton, { width: 268 }]} />
+              </View>
+              <View style={styles.airaThinkingSkeletonRow}>
+                <View style={[styles.airaThinkingSkeleton, { width: '100%' }]} />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Suggestions from Aira - API response (Figma 2636-13524) */}
+      <Modal
+        visible={generatedReplies != null && generatedReplies.length > 0}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setGeneratedReplies(null);
+          setSelectedReplyIndex(0);
+        }}
+      >
+        <TouchableWithoutFeedback
+          onPress={() => {
+            setGeneratedReplies(null);
+            setSelectedReplyIndex(0);
+          }}
+        >
+          <View style={styles.airaSuggestionsBackdrop}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.airaSuggestionsSheet}>
+                <View style={styles.airaSuggestionsHandle} />
+                <View style={styles.airaSuggestionsHeader}>
+                  <View style={styles.airaSuggestionsHeaderLeft}>
+                    <View style={styles.airaThinkingIconWrap}>
+                      <AskAiraSendIcon width={20} height={20} />
+                    </View>
+                    <Text style={styles.airaSuggestionsTitle}>Suggestions from Aira</Text>
+                  </View>
+                  <View style={styles.airaThinkingHeaderRight}>
+                    <Text style={styles.airaThinkingLeftCount}>
+                      {airaSuggestionsLimitLeft != null && airaSuggestionsTotalLimit != null
+                        ? `${airaSuggestionsLimitLeft}/${airaSuggestionsTotalLimit} left`
+                        : `${generatedReplies?.length ?? 0} suggestion${
+                            (generatedReplies?.length ?? 0) !== 1 ? 's' : ''
+                          }`}
+                    </Text>
+                    <InformativeIcon width={14} height={14} color={colors.neutral[700]} />
+                  </View>
+                </View>
+                <Text style={styles.airaSuggestionsListLabel}>Suggestions</Text>
+                <ScrollView
+                  style={styles.airaSuggestionsList}
+                  contentContainerStyle={styles.airaSuggestionsListContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {generatedReplies?.map((text, index) => {
+                    const selected = index === selectedReplyIndex;
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={[styles.airaSuggestionCard, selected && styles.airaSuggestionCardSelected]}
+                        onPress={() => setSelectedReplyIndex(index)}
+                        activeOpacity={0.8}
+                      >
+                        <Text
+                          style={[styles.airaSuggestionCardText, selected && styles.airaSuggestionCardTextSelected]}
+                          numberOfLines={4}
+                        >
+                          {text}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+                <TouchableOpacity
+                  style={styles.airaSuggestionsInsertButton}
+                  onPress={handleInsertReply}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={[...colors.gradients.primary.colors]}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.airaSuggestionsInsertGradient}
+                  >
+                    <Text style={styles.airaSuggestionsInsertLabel}>Insert</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Aira suggestion limit reached (Figma 2596-13414) */}
+      <Modal
+        visible={airaLimitReachedVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAiraLimitReachedVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setAiraLimitReachedVisible(false)}>
+          <View style={styles.airaLimitBackdrop}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.airaLimitSheet}>
+                <View style={styles.airaLimitHandle} />
+                <View style={styles.airaLimitContent}>
+                  <Text style={styles.airaLimitTitle}>You're out of Aira suggestions</Text>
+                  <Text style={styles.airaLimitDescription}>
+                    You've used all 3 for today. Come back in
+                  </Text>
+                </View>
+                <View style={styles.airaLimitCountdownRow}>
+                  <View style={styles.airaLimitCountdownPill}>
+                    <Text style={styles.airaLimitCountdownText}>
+                      {String(airaLimitCountdown.hours).padStart(2, '0')}h
+                    </Text>
+                  </View>
+                  <Text style={styles.airaLimitCountdownColon}>:</Text>
+                  <View style={styles.airaLimitCountdownPill}>
+                    <Text style={styles.airaLimitCountdownText}>
+                      {String(airaLimitCountdown.minutes).padStart(2, '0')}m
+                    </Text>
+                  </View>
+                  <Text style={styles.airaLimitCountdownColon}>:</Text>
+                  <View style={styles.airaLimitCountdownPill}>
+                    <Text style={styles.airaLimitCountdownText}>
+                      {String(airaLimitCountdown.seconds).padStart(2, '0')}s
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.airaLimitOkayButton}
+                  onPress={() => setAiraLimitReachedVisible(false)}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={[...colors.gradients.primary.colors]}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.airaLimitOkayGradient}
+                  >
+                    <Text style={styles.airaLimitOkayLabel}>Okay</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>
@@ -848,19 +1353,19 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   <ReplyIcon size={20} color={colors.black} />
                   <Text style={styles.messageContextLabel}>{STRINGS.CHAT.REPLY}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.messageContextItemDelete}
-                  onPress={() => {
-                    if (messageContextIndex !== null) {
+                {messageContextIndex !== null && messages[messageContextIndex]?.sent === true && (
+                  <TouchableOpacity
+                    style={styles.messageContextItemDelete}
+                    onPress={() => {
                       setDeleteConfirmIndex(messageContextIndex);
                       setMessageContextIndex(null);
-                    }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <DeleteIcon size={20} color={colors.semantic.error} />
-                  <Text style={styles.messageContextLabelDelete}>{STRINGS.CHAT.DELETE}</Text>
-                </TouchableOpacity>
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <DeleteIcon size={20} color={colors.semantic.error} />
+                    <Text style={styles.messageContextLabelDelete}>{STRINGS.CHAT.DELETE}</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -883,9 +1388,16 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 <TouchableOpacity
                   style={styles.deleteConfirmButtonDelete}
                   onPress={() => {
-                    if (deleteConfirmIndex !== null) {
-                      setMessages((prev) => prev.filter((_, i) => i !== deleteConfirmIndex));
-                      setDeleteConfirmIndex(null);
+                    if (deleteConfirmIndex === null || !chatId) return;
+                    const msg = messages[deleteConfirmIndex];
+                    const messageId = msg && 'messageId' in msg ? msg.messageId : undefined;
+                    setDeleteConfirmIndex(null);
+                    setMessages((prev) => prev.filter((_, i) => i !== deleteConfirmIndex));
+                    if (messageId) {
+                      deleteMessageApi({ chatId, messageId }).catch(() => {});
+                      if (currentUserId && otherUserId) {
+                        socketService.messageDelete(currentUserId, otherUserId, messageId);
+                      }
                     }
                   }}
                   activeOpacity={0.8}
@@ -927,40 +1439,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         )}
       </ScrollView>
 
-      {voiceBarVisible ? (
+      {/* Voice bar UI (voice chat disabled) */}
+      {/* {voiceBarVisible ? (
         <View style={[styles.voiceBar, { paddingBottom: 12 + insets.bottom }]}>
-          <TouchableOpacity style={styles.voiceBarTrash} onPress={handleVoiceTrash} activeOpacity={0.8}>
-            <DeleteIcon size={22} color={colors.white} />
-          </TouchableOpacity>
-          <View style={styles.voiceBarPill}>
-            <TouchableOpacity style={styles.voiceBarPlayPause} onPress={handleVoicePlayPause} activeOpacity={0.8}>
-              {voicePaused ? (
-                <PlayIcon size={24} color={colors.black} />
-              ) : (
-                <PauseIcon size={24} color={colors.black} />
-              )}
-            </TouchableOpacity>
-            <View style={styles.voiceBarWaveform}>
-              {VOICE_WAVEFORM.map((h, i) => (
-                <View key={i} style={[styles.voiceBarWaveformBar, { height: Math.max(6, h) }]} />
-              ))}
-            </View>
-            <Text style={styles.voiceBarTimer}>{formatVoiceTime(voiceSeconds)}</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.voiceBarSend}
-            onPress={handleVoiceSend}
-            activeOpacity={0.8}
-            disabled={voiceSendLoading}
-          >
-            {voiceSendLoading ? (
-              <ActivityIndicator size="small" color={colors.white} />
-            ) : (
-              <ForwardArrowIcon size={22} color={colors.white} />
-            )}
-          </TouchableOpacity>
+          ...
         </View>
-      ) : isRequest ? (
+      ) :  */}{isRequest ? (
         <View style={[styles.requestActionBar, { paddingBottom: 24 + insets.bottom }]}>
           <View style={styles.requestActionRow}>
             <TouchableOpacity
@@ -997,83 +1481,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         </View>
       ) : (
         <View style={styles.inputArea}>
-          {askAiraGenerating && (
-            <View style={[styles.generatingBar, { paddingHorizontal: H_PADDING }]}>
-              <LinearGradient
-                colors={[...colors.gradients.primary.colors]}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.generatingBubbleGradientWrap}
-              >
-                <View style={styles.generatingBubbleInner}>
-                  <AskAiraIcon size={18} useGradient />
-                  <GradientText
-                    style={{ fontSize: 15, fontWeight: '500' }}
-                    colors={['#CB7BF5', '#7742F0']}
-                    start={{ x: 0, y: 0.5 }}
-                    end={{ x: 1, y: 0.5 }}
-                  >
-                    {STRINGS.CHAT.GENERATING_REPLIES}
-                  </GradientText>
-                </View>
-              </LinearGradient>
-              <TouchableOpacity
-                style={styles.generatingCancel}
-                onPress={() => {
-                  if (generatedRepliesTimeoutRef.current) {
-                    clearTimeout(generatedRepliesTimeoutRef.current);
-                    generatedRepliesTimeoutRef.current = null;
-                  }
-                  setAskAiraGenerating(false);
-                }}
-                activeOpacity={0.8}
-              >
-                <GeneratingCloseIcon size={18} color={colors.black} />
-              </TouchableOpacity>
-            </View>
-          )}
-          {generatedReplies != null && generatedReplies.length > 0 && (
-            <ScrollView
-              style={styles.generatedRepliesStrip}
-              contentContainerStyle={[styles.generatedRepliesStripContent, { paddingHorizontal: H_PADDING }]}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-            >
-              {generatedReplies.map((text, index) => {
-                const selected = index === selectedReplyIndex;
-                const chip = (
-                  <TouchableOpacity
-                    key={index}
-                    activeOpacity={0.8}
-                    onPress={() => setSelectedReplyIndex(index)}
-                    style={styles.generatedReplyChipTouchable}
-                  >
-                    {selected ? (
-                      <LinearGradient
-                        colors={[...colors.gradients.primary.colors]}
-                        start={{ x: 0, y: 0.5 }}
-                        end={{ x: 1, y: 0.5 }}
-                        style={styles.generatedReplyChipGradientWrap}
-                      >
-                        <View style={styles.generatedReplyChipInner}>
-                          <Text style={styles.generatedReplyChipTextSelected} numberOfLines={3}>
-                            {text}
-                          </Text>
-                        </View>
-                      </LinearGradient>
-                    ) : (
-                      <View style={styles.generatedReplyChipUnselected}>
-                        <Text style={styles.generatedReplyChipTextUnselected} numberOfLines={3}>
-                          {text}
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-                return chip;
-              })}
-            </ScrollView>
-          )}
           {replyingTo != null && (
             <View style={[styles.replyToBar, { paddingHorizontal: H_PADDING }]}>
               <LinearGradient
@@ -1162,74 +1569,24 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   }
                 }}
                 multiline
+                scrollEnabled={false}
                 returnKeyType="default"
                 cursorColor={colors.primary.purple}
                 selectionColor={colors.primary[50]}
               />
-              {!inputText.trim() && askAiraGenerating && (
-                <View style={styles.insertButton}>
-                  <Text style={styles.insertButtonText}>{STRINGS.CHAT.INSERT}</Text>
-                </View>
-              )}
-              {!inputText.trim() && generatedReplies != null && generatedReplies.length > 0 && (
-                <TouchableOpacity
-                  style={styles.insertButtonGradientWrap}
-                  activeOpacity={0.8}
-                  onPress={handleInsertReply}
-                >
-                  <LinearGradient
-                    colors={[...colors.gradients.primary.colors]}
-                    start={{ x: 0, y: 0.5 }}
-                    end={{ x: 1, y: 0.5 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                  <Text style={styles.insertButtonGradientText}>{STRINGS.CHAT.INSERT}</Text>
-                </TouchableOpacity>
-              )}
-              {!inputText.trim() && !askAiraGenerating && generatedReplies == null && (
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => setAskAiraGenerating(true)}
-                >
-                  <LinearGradient
-                    colors={[...colors.gradients.primary.colors]}
-                    start={{ x: 0, y: 0.5 }}
-                    end={{ x: 1, y: 0.5 }}
-                    style={styles.askAiraChipGradientWrap}
-                  >
-                    <View style={styles.askAiraChipInner}>
-                      <AskAiraIcon size={14} useGradient />
-                      <GradientText
-                        style={{ fontSize: 14, fontWeight: '600' }}
-                        colors={['#CB7BF5', '#7742F0']}
-                        start={{ x: 0, y: 0.5 }}
-                        end={{ x: 1, y: 0.5 }}
-                      >
-                        {STRINGS.CHAT.ASK_AIRA}
-                      </GradientText>
-                    </View>
-                  </LinearGradient>
-                </TouchableOpacity>
-              )}
             </View>
             </View>
             </View>
           <TouchableOpacity
-            style={[styles.sendButton, !inputText.trim() && !pendingAttachments.length && styles.sendButtonMic]}
+            style={styles.sendButton}
             activeOpacity={0.8}
-            onPress={
-              inputText.trim() || pendingAttachments.length
-                ? handleSend
-                : handleMicPress
-            }
+            onPress={handleSend}
             disabled={sendLoading}
           >
             {sendLoading ? (
               <ActivityIndicator size="small" color={colors.white} />
-            ) : inputText.trim() || pendingAttachments.length ? (
-              <ForwardArrowIcon size={22} color={colors.white} />
             ) : (
-              <MicIcon size={24} color={colors.black} />
+              <ForwardArrowIcon size={22} color={colors.white} />
             )}
           </TouchableOpacity>
           </View>
@@ -1317,7 +1674,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           </Text>
           <TouchableOpacity
             style={permissionSheetStyles.allowButton}
-            onPress={handleAllowMicrophonePermission}
+            // Voice recording disabled – just close the sheet
+            onPress={() => setShowMicrophonePermissionSheet(false)}
             disabled={isRequestingPermission}
             activeOpacity={0.8}
           >
@@ -1354,19 +1712,44 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         onClose={() => {
           setShowReportSheet(false);
           setReportMessageInput('');
+          setSelectedReportReason(null);
         }}
-        snapPoints={['40%']}
+        snapPoints={['90%']}
         showDragHandle
         showCloseButton={false}
         enablePanDownToClose
         backgroundStyle={permissionSheetStyles.sheet}
         scrollEnabled={false}
       >
-        <View style={permissionSheetStyles.content}>
-          <Text style={permissionSheetStyles.title}>Report user</Text>
+        <View style={reportSheetStyles.content}>
+          <View style={reportSheetStyles.iconWrap}>
+            <ReportIcon size={40} color={colors.primary.purple} />
+          </View>
+          <Text style={reportSheetStyles.title}>Why Report {name}?</Text>
+          <View style={reportSheetStyles.reasonsWrap}>
+            {REPORT_REASONS.map((reason) => {
+              const selected = selectedReportReason === reason.value;
+              return (
+                <TouchableOpacity
+                  key={reason.value}
+                  style={[reportSheetStyles.reasonRow, selected && reportSheetStyles.reasonRowSelected]}
+                  onPress={() => setSelectedReportReason(reason.value)}
+                  activeOpacity={0.7}
+                  disabled={reportSubmitting}
+                >
+                  <View style={[reportSheetStyles.reasonCheck, selected && reportSheetStyles.reasonCheckSelected]}>
+                    {selected && <InterestChipCheckIcon size={12} color={colors.white} />}
+                  </View>
+                  <Text style={[reportSheetStyles.reasonLabel, selected && reportSheetStyles.reasonLabelSelected]}>
+                    {reason.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
           <TextInput
-            style={reportSheetStyles.input}
-            placeholder="Describe the issue..."
+            style={reportSheetStyles.optionalInput}
+            placeholder="Tell us the reason.. (optional)"
             placeholderTextColor={colors.neutral[500]}
             value={reportMessageInput}
             onChangeText={setReportMessageInput}
@@ -1375,52 +1758,56 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             textAlignVertical="top"
             editable={!reportSubmitting}
           />
-          <TouchableOpacity
-            style={permissionSheetStyles.allowButton}
-            onPress={() => {
-              const msg = reportMessageInput.trim();
-              if (!msg) {
-                return;
-              }
-              if (!otherUserId) return;
-              setReportSubmitting(true);
-              reportUserApi({ reportedAgainst: otherUserId, reportMessage: msg })
-                .then(() => {
-                  setShowReportSheet(false);
-                  setReportMessageInput('');
-                })
-                .catch(() => {
-                  // Report failed
-                })
-                .finally(() => setReportSubmitting(false));
-            }}
-            disabled={reportSubmitting}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={[...colors.gradients.primary.colors]}
-              start={{ x: 0, y: 0.5 }}
-              end={{ x: 1, y: 0.5 }}
-              style={permissionSheetStyles.allowButtonGradient}
+          <View style={reportSheetStyles.buttonRow}>
+            <TouchableOpacity
+              style={reportSheetStyles.cancelButton}
+              onPress={() => {
+                setShowReportSheet(false);
+                setReportMessageInput('');
+                setSelectedReportReason(null);
+              }}
+              disabled={reportSubmitting}
+              activeOpacity={0.8}
             >
-              {reportSubmitting ? (
-                <ActivityIndicator size="small" color={colors.white} />
-              ) : (
-                <Text style={permissionSheetStyles.allowButtonLabel}>Submit report</Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={permissionSheetStyles.dontAllowButton}
-            onPress={() => {
-              setShowReportSheet(false);
-              setReportMessageInput('');
-            }}
-            disabled={reportSubmitting}
-            activeOpacity={0.8}
-          >
-            <Text style={permissionSheetStyles.dontAllowButtonLabel}>Cancel</Text>
-          </TouchableOpacity>
+              <Text style={reportSheetStyles.cancelButtonLabel}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={reportSheetStyles.submitButton}
+              onPress={() => {
+                if (!selectedReportReason || !otherUserId) return;
+                const reasonLabel = REPORT_REASONS.find((r) => r.value === selectedReportReason)?.label ?? selectedReportReason;
+                const reportMessage = reportMessageInput.trim()
+                  ? `${reasonLabel}\n${reportMessageInput.trim()}`
+                  : reasonLabel;
+                setReportSubmitting(true);
+                reportUserApi({ reportedAgainst: otherUserId, reportMessage })
+                  .then(() => {
+                    setShowReportSheet(false);
+                    setReportMessageInput('');
+                    setSelectedReportReason(null);
+                  })
+                  .catch(() => {
+                    // Report failed
+                  })
+                  .finally(() => setReportSubmitting(false));
+              }}
+              disabled={reportSubmitting || !selectedReportReason}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={[...colors.gradients.primary.colors]}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={reportSheetStyles.submitButtonGradient}
+              >
+                {reportSubmitting ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <Text style={reportSheetStyles.submitButtonLabel}>Submit</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
       </ReusableBottomSheet>
       </KeyboardAvoidingView>
@@ -1491,16 +1878,117 @@ const permissionSheetStyles = StyleSheet.create({
 });
 
 const reportSheetStyles = StyleSheet.create({
-  input: {
+  content: {
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 32,
+    flex: 1,
+  },
+  iconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.primary[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.black,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  reasonsWrap: {
+    marginBottom: 16,
+  },
+  reasonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: colors.neutral[200],
-    borderRadius: 12,
+    borderColor: colors.neutral[100],
+    marginBottom: 8,
+    gap: 8,
+  },
+  reasonRowSelected: {
+    backgroundColor: colors.primary[50],
+    borderColor: colors.primary[50],
+  },
+  reasonCheck: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.neutral[300],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reasonCheckSelected: {
+    backgroundColor: colors.primary.purple,
+    borderColor: colors.primary.purple,
+  },
+  reasonLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.neutral[800],
+    flex: 1,
+  },
+  reasonLabelSelected: {
+    color: colors.primary.purple,
+  },
+  optionalInput: {
+    borderWidth: 1,
+    borderColor: colors.neutral[100],
+    borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 16,
+    paddingBottom: 16,
     fontSize: 16,
     fontFamily: typography.fontFamily.regular,
     color: colors.neutral[900],
     minHeight: 88,
-    marginBottom: 20,
+    marginBottom: 24,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  cancelButton: {
+    flex: 1,
+    height: 54,
+    borderRadius: 100,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.black,
+  },
+  submitButton: {
+    flex: 1,
+    height: 54,
+    borderRadius: 100,
+    overflow: 'hidden',
+  },
+  submitButtonGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitButtonLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.white,
   },
 });

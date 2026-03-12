@@ -98,7 +98,7 @@ export const BasicDetailsChildrenScreen: React.FC = () => {
 
     setChildren(data.children);
     setCurrentStep(CURRENT_STEP + 1);
-    navigation.navigate('BasicDetailsInterests');
+    navigation.navigate('BasicDetailsEthnicity');
   };
 
   return (

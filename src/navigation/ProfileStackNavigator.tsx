@@ -14,6 +14,7 @@ import { BasicDetailsIncomeScreen } from '../screens/profile/BasicDetailsIncomeS
 import { BasicDetailsReligionScreen } from '../screens/profile/BasicDetailsReligionScreen';
 import { BasicDetailsMaritalStatusScreen } from '../screens/profile/BasicDetailsMaritalStatusScreen';
 import { BasicDetailsChildrenScreen } from '../screens/profile/BasicDetailsChildrenScreen';
+import { BasicDetailsEthnicityScreen } from '../screens/profile/BasicDetailsEthnicityScreen';
 import { BasicDetailsInterestsScreen } from '../screens/profile/BasicDetailsInterestsScreen';
 import { BasicDetailsPincodeScreen } from '../screens/profile/BasicDetailsPincodeScreen';
 import { PreferencesSummaryScreen } from '../screens/preferences/PreferencesSummaryScreen';
@@ -26,6 +27,9 @@ import { PreferencesEmploymentScreen } from '../screens/preferences/PreferencesE
 import { PreferencesIncomeScreen } from '../screens/preferences/PreferencesIncomeScreen';
 import { PreferencesReligionScreen } from '../screens/preferences/PreferencesReligionScreen';
 import { PreferencesMaritalStatusScreen } from '../screens/preferences/PreferencesMaritalStatusScreen';
+import { PreferencesRelationshipIntentScreen } from '../screens/preferences/PreferencesRelationshipIntentScreen';
+import { ReferenceImageIntroScreen } from '../screens/preferences/ReferenceImageIntroScreen';
+import { ReferenceImagePreferenceScreen } from '../screens/preferences/ReferenceImagePreferenceScreen';
 import type { ProfileStackParamList } from './types';
 
 const PreferencesBodyTypeScreenLazy = React.lazy(() =>
@@ -119,6 +123,11 @@ export const ProfileStackNavigator = () => (
       options={profileScreenOptions}
     />
     <Stack.Screen
+      name="BasicDetailsEthnicity"
+      component={BasicDetailsEthnicityScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
       name="BasicDetailsInterests"
       component={BasicDetailsInterestsScreen}
       options={profileScreenOptions}
@@ -179,8 +188,23 @@ export const ProfileStackNavigator = () => (
       options={profileScreenOptions}
     />
     <Stack.Screen
+      name="PreferencesRelationshipIntent"
+      component={PreferencesRelationshipIntentScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
       name="PreferencesBodyType"
       component={PreferencesBodyTypeScreenWithSuspense}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="ReferenceImageIntro"
+      component={ReferenceImageIntroScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="ReferenceImagePreference"
+      component={ReferenceImagePreferenceScreen}
       options={profileScreenOptions}
     />
   </Stack.Navigator>

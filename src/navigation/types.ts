@@ -11,6 +11,7 @@ export type RootStackParamList = {
   Auth: undefined;
   Login: undefined;
   Dashboard: undefined;
+  MatchDetails: { userId: string };
 };
 
 export type AuthStackParamList = {
@@ -35,6 +36,7 @@ export type AuthStackParamList = {
   BasicDetailsReligion: { fromEditProfile?: boolean } | undefined;
   BasicDetailsMaritalStatus: { fromEditProfile?: boolean } | undefined;
   BasicDetailsChildren: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsEthnicity: { fromEditProfile?: boolean } | undefined;
   BasicDetailsInterests: { fromEditProfile?: boolean } | undefined;
   BasicDetailsPincode: { fromEditProfile?: boolean } | undefined;
   FaceVerification: undefined;
@@ -84,8 +86,11 @@ export type AuthStackParamList = {
   PreferencesIncome: { returnToSummary?: boolean };
   PreferencesReligion: { returnToSummary?: boolean };
   PreferencesMaritalStatus: { returnToSummary?: boolean };
+  PreferencesRelationshipIntent: { returnToSummary?: boolean };
   PreferencesBodyType: { returnToSummary?: boolean };
   PreferencesSummary: undefined;
+  ReferenceImageIntro: { returnToProfileMain?: boolean } | undefined;
+  ReferenceImagePreference: { returnToProfileMain?: boolean } | undefined;
   Likes: undefined;
 };
 
@@ -111,6 +116,7 @@ export type ProfileStackParamList = {
   BasicDetailsReligion: { fromEditProfile?: boolean } | undefined;
   BasicDetailsMaritalStatus: { fromEditProfile?: boolean } | undefined;
   BasicDetailsChildren: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsEthnicity: { fromEditProfile?: boolean } | undefined;
   BasicDetailsInterests: { fromEditProfile?: boolean } | undefined;
   BasicDetailsPincode: { fromEditProfile?: boolean } | undefined;
   PreferencesSummary: undefined;
@@ -123,7 +129,10 @@ export type ProfileStackParamList = {
   PreferencesIncome: { returnToSummary?: boolean };
   PreferencesReligion: { returnToSummary?: boolean };
   PreferencesMaritalStatus: { returnToSummary?: boolean };
+  PreferencesRelationshipIntent: { returnToSummary?: boolean };
   PreferencesBodyType: { returnToSummary?: boolean };
+  ReferenceImageIntro: { returnToProfileMain?: boolean } | undefined;
+  ReferenceImagePreference: { returnToProfileMain?: boolean } | undefined;
 };
 
 export type ChatStackParamList = {

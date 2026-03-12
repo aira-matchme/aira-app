@@ -24,6 +24,7 @@ import { UK_POSTCODE_REGEX } from '../../../constants/profile';
 import { apiClient } from '../../../services/api/client';
 import { endpoints } from '../../../services/api/endpoints';
 import { useProfileStore } from '../../../store/profile.store';
+import { ETHNICITY_OPTIONS } from '../../../constants/profile';
 import { useApiErrorStore } from '../../../store/apiError.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './styles';
@@ -63,6 +64,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
     religion,
     maritalStatus,
     children,
+    ethnicity,
     interests,
   } = useProfileStore();
 
@@ -127,6 +129,9 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
         return `${dateOfBirth.year}-${pad(dateOfBirth.month)}-${pad(dateOfBirth.day)}`;
       };
 
+      const selectedEthnicity = ETHNICITY_OPTIONS.find((o) => o.key === ethnicity);
+      const ethnicityGroups = selectedEthnicity?.groups;
+
       const payload: Record<string, any> = {
         nickName: name ?? '',
         dob: formatDob(),
@@ -149,6 +154,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
         religion: religion ?? '',
         maritalStatus: maritalStatus ?? undefined,
         children: children ?? undefined,
+        ethnicity: ethnicityGroups ?? undefined,
         hobbies: interests?.length ? interests : undefined,
       };
 
