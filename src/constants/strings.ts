@@ -58,7 +58,7 @@ export const STRINGS = {
     RESEND_OTP_IN: 'Resend OTP in',
     RESEND_OTP: 'Resend OTP',
     ERROR_REQUIRED: 'OTP is required',
-    ERROR_INVALID_LENGTH: 'OTP must be 4 digits',
+    ERROR_INVALID_LENGTH: 'OTP must be 6 digits',
     ERROR_INVALID_OTP: 'Incorrect OTP',
   },
 

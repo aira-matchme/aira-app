@@ -1,0 +1,32 @@
+import React from 'react';
+import Svg, { Path } from 'react-native-svg';
+
+type Props = {
+  size?: number;
+  color?: string;
+};
+
+// Icon derived from "Frame (18).svg" for education essential row
+export const EducationEssentialIcon: React.FC<Props> = ({
+  size = 20,
+  color = '#BBA0F8',
+}) => {
+  const dimension = size;
+
+  return (
+    <Svg
+      width={dimension}
+      height={dimension}
+      viewBox="0 0 20 20"
+      fill="none"
+    >
+      <Path
+        d="M5.19456 7.20044L6.19535 11.8395C6.2639 12.1573 6.42214 12.4542 6.68602 12.6435C8.46299 13.9187 11.512 13.9187 13.289 12.6435C13.5529 12.4542 13.7111 12.1573 13.7797 11.8395L14.7805 7.20044M16.78 6.00033V11.5999M16.78 11.5999C16.1473 12.7568 15.8676 13.3767 15.5834 14.3996C15.5217 14.7636 15.5707 14.947 15.8212 15.1098C15.923 15.176 16.0453 15.1995 16.1665 15.1995H17.3811C17.5102 15.1995 17.6405 15.1726 17.7469 15.0991C17.9797 14.9384 18.0396 14.7619 17.9765 14.3996C17.7274 13.4498 17.4102 12.8004 16.78 11.5999ZM2 4.80043C2 5.87376 8.47547 8.80006 9.98823 8.80006C11.5011 8.80006 17.9765 5.87376 17.9765 4.80043C17.9765 3.7271 11.5011 0.800781 9.98823 0.800781C8.47547 0.800781 2 3.7271 2 4.80043Z"
+        stroke={color}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+};
+

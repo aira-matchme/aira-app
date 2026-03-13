@@ -28,11 +28,11 @@ export const WelcomeScreen: React.FC = () => {
   };
 
   const handleTermsPress = () => {
-    Linking.openURL('https://example.com/terms');
+    Linking.openURL('https://airamatchme.com/terms');
   };
 
   const handlePrivacyPress = () => {
-    Linking.openURL('https://example.com/privacy');
+    Linking.openURL('https://airamatchme.com/privacy');
   };
 
   return (

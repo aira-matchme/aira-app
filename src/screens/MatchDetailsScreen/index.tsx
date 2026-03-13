@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, StatusBar, ActivityIndicator, ScrollView, Image, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StatusBar, ActivityIndicator, ScrollView, Image, TouchableOpacity, Platform, StyleSheet, Modal, TouchableWithoutFeedback, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -11,10 +11,26 @@ import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
 import type { RootStackParamList } from '../../navigation/types';
 import { LocationPinIcon } from '../../assets/icons/common/LocationPinIcon';
-import { MoreVertIcon } from '../../assets/icons/common/MoreVertIcon';
+import { MoreHorizIcon } from '../../assets/icons/common/MoreHorizIcon';
 import { ForwardArrowIcon } from '../../assets/icons/common/ForwardArrowIcon';
 import { ToggleChatHeartIcon } from '../../assets/icons/home/ToggleChatHeartIcon';
-import { HomeLikeFilledIcon } from '../../assets/icons/home/HomeLikeFilledIcon';
+import { ToggleHeartIcon } from '../../assets/icons/home/ToggleHeartIcon';
+import { CloseIcon } from '../../assets/icons/common/CloseIcon';
+import { BlockIcon } from '../../assets/icons/common/BlockIcon';
+import { ReportIcon } from '../../assets/icons/common/ReportIcon';
+import { ReusableBottomSheet } from '../../components/BottomSheet';
+import { GradientText } from '../../components/GradientText';
+import { TabChatIcon } from '../../assets/icons/tabs/TabChatIcon';
+import { TabAICenterIcon } from '../../assets/icons/tabs/TabAICenterIcon';
+import { postAIMessagesApi, blockUserApi, reportUserApi } from '../../modules/chat/api';
+import { EssentialBulletIcon } from '../../assets/icons/match/EssentialBulletIcon';
+import { GenderEssentialIcon } from '../../assets/icons/match/GenderEssentialIcon';
+import { HeightEssentialIcon } from '../../assets/icons/match/HeightEssentialIcon';
+import { LocationEssentialIcon } from '../../assets/icons/match/LocationEssentialIcon';
+import { AgeEssentialIcon } from '../../assets/icons/match/AgeEssentialIcon';
+import { OccupationEssentialIcon } from '../../assets/icons/match/OccupationEssentialIcon';
+import { EducationEssentialIcon } from '../../assets/icons/match/EducationEssentialIcon';
+import { InsightsTabIcon } from '../../assets/icons/match/InsightsTabIcon';
 
 type MatchDetailsRoute = RouteProp<RootStackParamList, 'MatchDetails'>;
 
@@ -379,7 +395,7 @@ const getPersonalityKey = (finder?: PersonalityType, user?: PersonalityType) => 
 };
 
 export const MatchDetailsScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute<MatchDetailsRoute>();
   const { userId } = route.params;
   const insets = useSafeAreaInsets();
@@ -388,6 +404,13 @@ export const MatchDetailsScreen: React.FC = () => {
   const [details, setDetails] = useState<any | null>(null);
   const [activeTab, setActiveTab] = useState<'basics' | 'insights'>('basics');
   const [isAtBottom, setIsAtBottom] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [showFirstMovePopup, setShowFirstMovePopup] = useState(false);
+  const [firstMoveStep, setFirstMoveStep] = useState<'choose' | 'sent'>('choose');
+  const [firstMoveLoading, setFirstMoveLoading] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [blockLoading, setBlockLoading] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
 
   const fetchDetails = async () => {
     try {
@@ -406,16 +429,43 @@ export const MatchDetailsScreen: React.FC = () => {
     fetchDetails();
   }, [userId]);
 
+  const handleLike = async () => {
+    try {
+      await apiClient.post(endpoints.matches.addLike, { likedUserId: userId });
+      setIsLiked(true);
+    } catch {
+      // keep state on failure
+    }
+  };
+
+  const handleUnlike = async () => {
+    try {
+      await apiClient.post(endpoints.matches.removeLike, {
+        likedUserId: userId,
+      });
+      setIsLiked(false);
+    } catch {
+      // keep state on failure
+    }
+  };
+
   const profile = details?.profile;
 
-  const name = profile?.name ?? 'Kelsey Scott';
+  const name = profile?.name ?? 'Match';
+
+  /** Gallery photos from API, sorted by order */
+  const galleryPhotos = useMemo(() => {
+    const list = profile?.galleryPhotos ?? [];
+    return [...list].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }, [profile?.galleryPhotos]);
 
   const distanceLabel = useMemo(() => {
-    if (!details?.distanceKm) {
-      return '1.5km away';
-    }
-    return `${details.distanceKm}km away`;
-  }, [details?.distanceKm]);
+    const miles = details?.distanceMiles;
+    const km = details?.distanceKm;
+    if (miles != null && miles >= 0) return `${Math.round(miles)} mi away`;
+    if (km != null && km >= 0) return `${Math.round(km)} km away`;
+    return 'Nearby';
+  }, [details?.distanceMiles, details?.distanceKm]);
 
   const formatGender = (gender?: string) => {
     if (!gender) return 'Women';
@@ -549,8 +599,15 @@ export const MatchDetailsScreen: React.FC = () => {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.headerPill} activeOpacity={0.8}>
-            <MoreVertIcon size={20} color={colors.black} />
+          <TouchableOpacity
+            style={styles.headerPill}
+            activeOpacity={0.8}
+            onPress={() => {
+              if (blockLoading || reportLoading) return;
+              setShowMoreOptions(true);
+            }}
+          >
+            <MoreHorizIcon size={20} color={colors.black} />
           </TouchableOpacity>
         </View>
 
@@ -572,7 +629,7 @@ export const MatchDetailsScreen: React.FC = () => {
           <View style={styles.nameSection}>
             <View style={styles.nameRow}>
               <Text style={styles.name}>{name}</Text>
-              <View style={styles.verifyDot} />
+              {/* <View style={styles.verifyDot} /> */}
             </View>
 
             <View style={styles.distanceRow}>
@@ -586,8 +643,8 @@ export const MatchDetailsScreen: React.FC = () => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.photosRow}
           >
-            {(details?.photos ?? [null, null, null, null]).slice(0, 4).map((photo: any, index: number) => (
-              <View key={index} style={styles.photoCard}>
+            {(galleryPhotos.length > 0 ? galleryPhotos : [null, null, null, null]).slice(0, 6).map((photo: any, index: number) => (
+              <View key={photo?.id ?? index} style={styles.photoCard}>
                 {photo?.url ? (
                   <Image source={{ uri: photo.url }} style={styles.photoImage} resizeMode="cover" />
                 ) : (
@@ -599,33 +656,7 @@ export const MatchDetailsScreen: React.FC = () => {
 
           <View style={styles.segmentWrapper}>
             <View style={styles.segmentBackground}>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => setActiveTab('insights')}
-                style={styles.segmentInactiveContainer}
-              >
-                <LinearGradient
-                  colors={
-                    activeTab === 'insights'
-                      ? (colors.gradients.primary.colors as any)
-                      : [colors.neutral[50], colors.neutral[50]]
-                  }
-                  start={colors.gradients.primary.start}
-                  end={colors.gradients.primary.end}
-                  style={styles.segmentActive}
-                >
-                  <Text
-                    style={
-                      activeTab === 'insights'
-                        ? styles.segmentActiveText
-                        : styles.segmentInactiveText
-                    }
-                  >
-                    Insights
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-
+             
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => setActiveTab('basics')}
@@ -652,6 +683,36 @@ export const MatchDetailsScreen: React.FC = () => {
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setActiveTab('insights')}
+                style={styles.segmentInactiveContainer}
+              >
+                <LinearGradient
+                  colors={
+                    activeTab === 'insights'
+                      ? (colors.gradients.primary.colors as any)
+                      : [colors.neutral[50], colors.neutral[50]]
+                  }
+                  start={colors.gradients.primary.start}
+                  end={colors.gradients.primary.end}
+                  style={styles.segmentActive}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', columnGap: 6 }}>
+                    <InsightsTabIcon size={18} active={activeTab === 'insights'} />
+                    <Text
+                      style={
+                        activeTab === 'insights'
+                          ? styles.segmentActiveText
+                          : styles.segmentInactiveText
+                      }
+                    >
+                      Insights
+                    </Text>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+
             </View>
           </View>
 
@@ -660,18 +721,41 @@ export const MatchDetailsScreen: React.FC = () => {
               <View style={styles.cardEssentials}>
                 <Text style={styles.cardTitle}>Essentials</Text>
 
-                {essentials.map((item, index) => (
-                  <View
-                    key={item.id}
-                    style={[
-                      styles.essentialRow,
-                      index === essentials.length - 1 ? styles.essentialRowLast : null,
-                    ]}
-                  >
-                    <View style={styles.essentialBullet} />
-                    <Text style={styles.essentialText}>{item.label}</Text>
-                  </View>
-                ))}
+                {essentials.map((item, index) => {
+                  const showGenderIcon = item.id === 'gender';
+                  const showHeightIcon = item.id === 'height';
+                  const showLocationIcon = item.id === 'location';
+                  const showAgeIcon = item.id === 'age';
+                  const showOccupationIcon = item.id === 'occupation';
+                  const showEducationIcon = item.id === 'education';
+
+                  return (
+                    <View
+                      key={item.id}
+                      style={[
+                        styles.essentialRow,
+                        index === essentials.length - 1 ? styles.essentialRowLast : null,
+                      ]}
+                    >
+                      {showGenderIcon ? (
+                        <GenderEssentialIcon size={20} />
+                      ) : showHeightIcon ? (
+                        <HeightEssentialIcon size={20} />
+                      ) : showLocationIcon ? (
+                        <LocationEssentialIcon size={20} />
+                      ) : showAgeIcon ? (
+                        <AgeEssentialIcon size={20} />
+                      ) : showOccupationIcon ? (
+                        <OccupationEssentialIcon size={20} />
+                      ) : showEducationIcon ? (
+                        <EducationEssentialIcon size={20} />
+                      ) : (
+                        <EssentialBulletIcon />
+                      )}
+                      <Text style={styles.essentialText}>{item.label}</Text>
+                    </View>
+                  );
+                })}
               </View>
 
               <View style={styles.cardInterests}>
@@ -738,18 +822,40 @@ export const MatchDetailsScreen: React.FC = () => {
           {isAtBottom && (
             <View style={styles.bottomNavWrapper}>
               <View style={styles.bottomNav}>
-                <LinearGradient
-                  colors={colors.gradients.primary.colors as any}
-                  start={colors.gradients.primary.start}
-                  end={colors.gradients.primary.end}
+                <TouchableOpacity
                   style={styles.bottomChatButton}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setFirstMoveStep('choose');
+                    setShowFirstMovePopup(true);
+                  }}
                 >
+                  <LinearGradient
+                    colors={colors.gradients.primary.colors as any}
+                    start={colors.gradients.primary.start}
+                    end={colors.gradients.primary.end}
+                    style={StyleSheet.absoluteFill}
+                  />
                   <ToggleChatHeartIcon size={28} color={colors.white} />
-                </LinearGradient>
+                </TouchableOpacity>
 
-                <View style={styles.bottomLikeButton}>
-                  <HomeLikeFilledIcon size={28} color={colors.primary.purple} />
-                </View>
+                <TouchableOpacity
+                  style={styles.bottomLikeButton}
+                  activeOpacity={0.8}
+                  onPress={() => (isLiked ? handleUnlike() : handleLike())}
+                >
+                  <View
+                    style={[
+                      StyleSheet.absoluteFill,
+                      { backgroundColor: isLiked ? 'rgba(0,0,0,0.2)' : 'white', borderRadius: 32 },
+                    ]}
+                  />
+                  {isLiked ? (
+                    <CloseIcon size={24} color={colors.white} />
+                  ) : (
+                    <ToggleHeartIcon size={28} color={colors.primary.purple} />
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
           )}
@@ -760,7 +866,226 @@ export const MatchDetailsScreen: React.FC = () => {
         </ScrollView>
       </SafeAreaView>
 
-      <View />
+      <Modal
+        visible={showMoreOptions}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (blockLoading || reportLoading) return;
+          setShowMoreOptions(false);
+        }}
+      >
+        <TouchableWithoutFeedback
+          onPress={() => {
+            if (blockLoading || reportLoading) return;
+            setShowMoreOptions(false);
+          }}
+        >
+          <View style={styles.matchOptionsBackdrop}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.matchOptionsPopup}>
+                {/* <Text style={styles.matchOptionsTitle}>{name}</Text> */}
+
+                <TouchableOpacity
+                  style={styles.matchOptionsItem}
+                  activeOpacity={0.8}
+                  disabled={blockLoading}
+                  onPress={async () => {
+                    if (blockLoading) return;
+                    try {
+                      setBlockLoading(true);
+                      const res = await blockUserApi({ blockUserId: userId, type: 'block' });
+                      const apiMessage =
+                        (res as any)?.data?.message ??
+                        (res as any)?.message ??
+                        'User blocked successfully.';
+                      setShowMoreOptions(false);
+                      Alert.alert('Blocked', apiMessage.toString());
+                      navigation.goBack();
+                    } catch (e: any) {
+                      const errMessage =
+                        e?.response?.data?.message ??
+                        e?.message ??
+                        'Could not block this user. Please try again.';
+                      Alert.alert('Error', errMessage.toString());
+                    } finally {
+                      setBlockLoading(false);
+                    }
+                  }}
+                >
+                  <View style={styles.matchOptionsIconWrap}>
+                    {blockLoading ? (
+                      <ActivityIndicator size="small" color={colors.black} />
+                    ) : (
+                      <BlockIcon size={20} color={colors.black} />
+                    )}
+                  </View>
+                  <Text style={styles.matchOptionsLabel}>
+                    {blockLoading ? 'Blocking…' : 'Block'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.matchOptionsItem}
+                  activeOpacity={0.8}
+                  disabled={reportLoading}
+                  onPress={async () => {
+                    if (reportLoading) return;
+                    try {
+                      setReportLoading(true);
+                      const res = await reportUserApi({
+                        reportedAgainst: userId,
+                        reportMessage: 'Reported from match details',
+                      });
+                      const apiMessage =
+                        (res as any)?.data?.message ??
+                        (res as any)?.message ??
+                        'Report submitted successfully.';
+                      setShowMoreOptions(false);
+                      Alert.alert('Reported', apiMessage.toString());
+                      navigation.goBack();
+                    } catch (e: any) {
+                      const errMessage =
+                        e?.response?.data?.message ??
+                        e?.message ??
+                        'Could not submit report. Please try again.';
+                      Alert.alert('Error', errMessage.toString());
+                    } finally {
+                      setReportLoading(false);
+                    }
+                  }}
+                >
+                  <View style={[styles.matchOptionsIconWrap, styles.matchOptionsIconWrapReport]}>
+                    {reportLoading ? (
+                      <ActivityIndicator size="small" color={colors.black} />
+                    ) : (
+                      <ReportIcon size={20} color={colors.black} />
+                    )}
+                  </View>
+                  <Text style={styles.matchOptionsLabelReport}>
+                    {reportLoading ? 'Reporting…' : 'Report'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      <ReusableBottomSheet
+        isOpen={showFirstMovePopup}
+        onClose={() => setShowFirstMovePopup(false)}
+        snapPoints={firstMoveStep === 'sent' ? ['30%'] : ['48%']}
+        showDragHandle
+        showCloseButton={false}
+        enablePanDownToClose
+        scrollEnabled={false}
+      >
+        {firstMoveStep === 'choose' ? (
+          <View style={styles.firstMoveSheet}>
+            <View style={styles.firstMoveHeader}>
+              <View style={styles.firstMoveIconWrap}>
+                <LinearGradient
+                  colors={[colors.primary.purple, colors.secondary.lavender]}
+                  style={StyleSheet.absoluteFill}
+                />
+                <ToggleChatHeartIcon color={colors.white} size={30} />
+              </View>
+              <View style={styles.firstMoveTextBlock}>
+                <Text style={styles.firstMoveTitle}>Make your first move</Text>
+                <Text style={styles.firstMoveSubtitle}>Your vibe, your call.</Text>
+              </View>
+            </View>
+            <View style={styles.firstMoveButtonsRow}>
+              <TouchableOpacity
+                style={[styles.firstMoveButton, styles.firstMoveButtonSay]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setShowFirstMovePopup(false);
+                  navigation.navigate('Chat', {
+                    screen: 'ChatDetail',
+                    params: {
+                      chatId: userId,
+                      name,
+                      avatar: galleryPhotos[0]?.url ? { uri: galleryPhotos[0].url } : undefined,
+                      isRequest: false,
+                      otherUserId: userId,
+                    },
+                  });
+                }}
+              >
+                <View style={styles.firstMoveButtonIcon}>
+                  <TabChatIcon color={colors.primary.purple} width={24} height={24} />
+                </View>
+                <Text style={styles.firstMoveButtonText}>Say it in your words</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.firstMoveButton, styles.firstMoveButtonAira]}
+                activeOpacity={0.8}
+                disabled={firstMoveLoading}
+                onPress={async () => {
+                  if (firstMoveLoading) return;
+                  try {
+                    setFirstMoveLoading(true);
+                    await postAIMessagesApi({ receiverId: userId });
+                    setFirstMoveStep('sent');
+                  } finally {
+                    setFirstMoveLoading(false);
+                  }
+                }}
+              >
+                <View style={styles.firstMoveButtonIcon}>
+                  <TabAICenterIcon width={44} height={44} />
+                </View>
+                <View style={{ alignItems: 'center', gap: 0 }}>
+                  <GradientText
+                    style={{ fontSize: 16, fontWeight: '500' }}
+                    colors={[colors.primary.purpleLight, colors.primary.purple]}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                  >
+                    Let Aira break
+                  </GradientText>
+                  <GradientText
+                    style={{ fontSize: 16, fontWeight: '500' }}
+                    colors={[colors.primary.purpleLight, colors.primary.purple]}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                  >
+                    the ice
+                  </GradientText>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={[styles.firstMoveSheet, { paddingTop: 8, paddingBottom: 16, gap: 10 }]}>
+            <View style={[styles.firstMoveHeader, { gap: 16 }]}>
+              <View
+                style={[
+                  styles.firstMoveIconWrap,
+                  {
+                    width: 80,
+                    height: 80,
+                    borderRadius: 40,
+                    backgroundColor: colors.primary[50],
+                  },
+                ]}
+              >
+                <ForwardArrowIcon size={24} color={colors.primary.purple} />
+              </View>
+              <View style={styles.firstMoveTextBlock}>
+                <Text style={[styles.firstMoveTitle, { fontSize: 18, lineHeight: 24 }]}>
+                  Request sent
+                </Text>
+                <Text style={[styles.firstMoveSubtitle, { fontSize: 12, lineHeight: 16 }]}>
+                  Waiting for {name} to respond. You'll get notified when they do.
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+      </ReusableBottomSheet>
     </View>
   );
 };

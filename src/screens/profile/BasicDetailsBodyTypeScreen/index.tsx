@@ -34,12 +34,20 @@ type BodyTypeItem = {
   image: number;
 };
 
-const BODY_TYPE_OPTIONS: BodyTypeItem[] = [
+const BODY_TYPE_OPTIONS_DEFAULT: BodyTypeItem[] = [
   { id: 'mesomorph', label: STRINGS.PREFERENCES_BODY_TYPE.TONED, image: require('../../../assets/images/bodytypes/bodytype_toned.png') },
   { id: 'ectomorph', label: STRINGS.PREFERENCES_BODY_TYPE.SLIM, image: require('../../../assets/images/bodytypes/bodytype_slim.png') },
   { id: 'medium_build', label: STRINGS.PREFERENCES_BODY_TYPE.MEDIUM, image: require('../../../assets/images/bodytypes/bodytype_medium.png') },
   { id: 'endomorph', label: STRINGS.PREFERENCES_BODY_TYPE.CURVY, image: require('../../../assets/images/bodytypes/bodytype_curvy.png') },
   { id: 'thick_build', label: STRINGS.PREFERENCES_BODY_TYPE.PLUS_SIZED, image: require('../../../assets/images/bodytypes/bodytype_plus.png') },
+];
+
+const BODY_TYPE_OPTIONS_MALE: BodyTypeItem[] = [
+  { id: 'mesomorph', label: STRINGS.PREFERENCES_BODY_TYPE.TONED, image: require('../../../assets/images/bodytypes/bodytype_toned_man.png') },
+  { id: 'ectomorph', label: STRINGS.PREFERENCES_BODY_TYPE.SLIM, image: require('../../../assets/images/bodytypes/bodytype_slim_man.png') },
+  { id: 'medium_build', label: STRINGS.PREFERENCES_BODY_TYPE.MEDIUM, image: require('../../../assets/images/bodytypes/bodytype_medium_man.png') },
+  { id: 'endomorph', label: STRINGS.PREFERENCES_BODY_TYPE.CURVY, image: require('../../../assets/images/bodytypes/bodytype_curvy_man.png') },
+  { id: 'thick_build', label: STRINGS.PREFERENCES_BODY_TYPE.PLUS_SIZED, image: require('../../../assets/images/bodytypes/bodytype_plus_man.png') },
 ];
 
 type NavigationProp = NativeStackNavigationProp<
@@ -51,7 +59,12 @@ const CURRENT_STEP = 4;
 
 export const BasicDetailsBodyTypeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { bodyType, setBodyType, setCurrentStep } = useProfileStore();
+  const { gender, bodyType, setBodyType, setCurrentStep } = useProfileStore();
+  const normalizedGender = gender?.toLowerCase() ?? null;
+  const bodyTypeOptions =
+    normalizedGender === 'male' || normalizedGender === 'man'
+      ? BODY_TYPE_OPTIONS_MALE
+      : BODY_TYPE_OPTIONS_DEFAULT;
   const [selectedId, setSelectedId] = useState<BodyTypeId | null>(
     (bodyType as BodyTypeId) ?? null
   );
@@ -92,7 +105,7 @@ export const BasicDetailsBodyTypeScreen: React.FC = () => {
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
           >
-            {BODY_TYPE_OPTIONS.map((item) => {
+            {bodyTypeOptions.map((item) => {
               const isSelected = selectedId === item.id;
               return (
                 <Pressable

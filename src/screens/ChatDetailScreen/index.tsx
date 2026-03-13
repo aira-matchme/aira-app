@@ -71,6 +71,7 @@ type ChatMessage =
 // const VOICE_WAVEFORM = [8, 12, 6, 14, 10, 16, 8, 14, 12, 10];
 
 const DONT_SHOW_ASK_AIRA_CONFIRM_KEY = 'dont_show_ask_aira_confirm';
+const MESSAGES_PAGE_SIZE = 5;
 
 const REPORT_REASONS: { value: string; label: string }[] = [
   { value: 'inappropriate_messages', label: 'Inappropriate messages' },
@@ -124,6 +125,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [requestActionLoading, setRequestActionLoading] = useState<'accept' | 'decline' | 'block' | null>(null);
   const [messagesLoading, setMessagesLoading] = useState(!!chatId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messagesPage, setMessagesPage] = useState(1);
+  const [messagesHasMore, setMessagesHasMore] = useState(true);
+  const [messagesLoadingMore, setMessagesLoadingMore] = useState(false);
   const [inputText, setInputText] = useState('');
   const [attachmentSheetOpen, setAttachmentSheetOpen] = useState(false);
   const [showCameraPermissionSheet, setShowCameraPermissionSheet] = useState(false);
@@ -255,7 +259,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
     let cancelled = false;
     setMessagesLoading(true);
-    getChatMessagesApi({ chatId })
+    setMessagesPage(1);
+    setMessagesHasMore(true);
+
+    getChatMessagesApi({ chatId, page: 1, limit: MESSAGES_PAGE_SIZE })
       .then((res) => {
         if (cancelled) return;
         const raw = res.data?.list ?? res.data?.messages ?? [];
@@ -265,14 +272,26 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               .filter((m): m is ChatMessage => m != null)
           : [];
         setMessages(list);
+
+        const meta = res.data?.meta;
+        const currentPage = meta?.currentPage ?? meta?.pageNo ?? 1;
+        const totalPages = meta?.totalPages ?? 1;
+        setMessagesPage(currentPage);
+        setMessagesHasMore(currentPage < totalPages);
       })
       .catch(() => {
-        if (!cancelled) setMessages([]);
+        if (!cancelled) {
+          setMessages([]);
+          setMessagesHasMore(false);
+        }
       })
       .finally(() => {
         if (!cancelled) setMessagesLoading(false);
       });
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, [chatId, currentUserId]);
 
   useEffect(() => {
@@ -299,7 +318,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
       const ui = mapApiMessageToChatMessage(adjusted, currentUserId);
       if (!ui) return;
-      setMessages((prev) => [...prev, ui]);
+      setMessages((prev) => [...prev, ui as ChatMessage]);
       // Mark this chat as seen so unread counts are cleared on other screens.
       if (chatId) {
         markChatSeenApi(chatId).catch(() => {});
@@ -374,6 +393,39 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     };
   }, [chatId, currentUserId, otherUserId, inputText]);
 
+  const loadMoreMessages = useCallback(async () => {
+    if (!chatId || messagesLoading || messagesLoadingMore || !messagesHasMore) {
+      return;
+    }
+    setMessagesLoadingMore(true);
+    const nextPage = messagesPage + 1;
+    try {
+      const res = await getChatMessagesApi({ chatId, page: nextPage, limit: MESSAGES_PAGE_SIZE });
+      const raw = res.data?.list ?? res.data?.messages ?? [];
+      const list = Array.isArray(raw)
+        ? raw
+            .map((item) => mapApiMessageToChatMessage(item, currentUserId ?? undefined))
+            .filter((m): m is ChatMessage => m != null)
+        : [];
+
+      if (list.length > 0) {
+        setMessages((prev) => [...list, ...prev]);
+        const meta = res.data?.meta;
+        const currentPage = meta?.currentPage ?? meta?.pageNo ?? nextPage;
+        const totalPages = meta?.totalPages ?? nextPage;
+        setMessagesPage(currentPage);
+        setMessagesHasMore(currentPage < totalPages);
+      } else {
+        setMessagesHasMore(false);
+      }
+    } catch {
+      // keep existing messages; stop further loads on repeated failure
+      setMessagesHasMore(false);
+    } finally {
+      setMessagesLoadingMore(false);
+    }
+  }, [chatId, currentUserId, messagesHasMore, messagesLoading, messagesLoadingMore, messagesPage]);
+
   useEffect(() => {
     if (messagesLoading || messages.length === 0) return;
     const id = setTimeout(() => {
@@ -406,7 +458,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
   const getMessagePreview = (msg: ChatMessage): string => {
     if (msg.type === 'text') return msg.text;
-    if (msg.type === 'voice') return 'Voice message';
+    // if (msg.type === 'voice') return 'Voice message';
     if (msg.type === 'image') return 'Photo';
     if (msg.type === 'file') return msg.name;
     return '';
@@ -676,7 +728,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         if (apiMessage) {
           const ui = mapApiMessageToChatMessage(apiMessage, currentUserId);
           if (ui) {
-            setMessages((prev) => [...prev, ui]);
+            setMessages((prev) => [...prev, ui as ChatMessage]);
           }
           if (currentUserId && otherUserId) {
             socketService.messageSendFromApi(
@@ -885,6 +937,16 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
     return null;
   };
+
+  const handleMessagesScroll = useCallback(
+    (event: any) => {
+      const { contentOffset } = event.nativeEvent;
+      if (contentOffset.y <= 50) {
+        loadMoreMessages();
+      }
+    },
+    [loadMoreMessages],
+  );
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
@@ -1423,6 +1485,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        onScroll={handleMessagesScroll}
+        scrollEventThrottle={16}
       >
         {messagesLoading ? (
           <View style={styles.messagesLoadingWrap}>
@@ -1431,6 +1495,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           </View>
         ) : (
           <>
+            {messagesLoadingMore && (
+              <View style={styles.messagesLoadingMoreWrap}>
+                <ActivityIndicator size="small" color={colors.primary.purple} />
+              </View>
+            )}
             <View style={styles.datePill}>
               <Text style={styles.datePillText}>{STRINGS.CHAT.TODAY}</Text>
             </View>
@@ -1507,7 +1576,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               </TouchableOpacity>
             </View>
           )}
-          <View style={[styles.inputBar, { paddingBottom: 12 + insets.bottom }]}>
+          {/* <View style={[styles.inputBar, { paddingBottom: 12 + insets.bottom }]}>
             <View style={styles.inputBarContent}>
               {otherUserTyping && (
                 <View style={styles.typingIndicatorWrap}>
@@ -1578,6 +1647,64 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             </View>
             </View>
           <TouchableOpacity
+            style={styles.sendButton}
+            activeOpacity={0.8}
+            onPress={handleSend}
+            disabled={sendLoading}
+          >
+            {sendLoading ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <ForwardArrowIcon size={22} color={colors.white} />
+            )}
+          </TouchableOpacity>
+          </View> */}
+                    <View style={[styles.inputBar, { paddingBottom: 12 + insets.bottom }]}>
+            <View style={styles.inputWrap}>
+            {pendingAttachments.length > 0 && (
+              <View style={styles.attachmentsInsidePill}>
+                {pendingAttachments.map((att, i) => (
+                  <View key={i} style={styles.attachmentPreviewWrapper}>
+                    <View style={att.type === 'image' ? styles.attachmentPreview : styles.attachmentPreviewFileCard}>
+                      {att.type === 'image' ? (
+                        <Image source={{ uri: att.uri }} style={styles.attachmentPreviewImage} resizeMode="cover" />
+                      ) : (
+                        <>
+                          <Text style={styles.attachmentPreviewFileType}>{getFileTypeLabel(att.name)}</Text>
+                          <Text style={styles.attachmentPreviewFileName} numberOfLines={2}>
+                            {att.name}
+                          </Text>
+                        </>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.attachmentRemove}
+                      onPress={() => setPendingAttachments((p) => p.filter((_, idx) => idx !== i))}
+                    >
+                      <Text style={{ color: colors.white, fontSize: 12, fontWeight: '600' }}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+            <View style={styles.inputRow}>
+              <TouchableOpacity style={styles.attachButton} activeOpacity={0.7} onPress={() => setAttachmentSheetOpen(true)}>
+                <PlusIcon size={18} color={colors.black} />
+              </TouchableOpacity>
+              <TextInput
+                style={styles.input}
+                placeholder={STRINGS.CHAT.START_CHAT_PLACEHOLDER}
+                placeholderTextColor={colors.neutral[600]}
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+                returnKeyType="default"
+                cursorColor={colors.primary.purple}
+                selectionColor={colors.primary[50]}
+              />
+            </View>
+          </View>
+                    <TouchableOpacity
             style={styles.sendButton}
             activeOpacity={0.8}
             onPress={handleSend}

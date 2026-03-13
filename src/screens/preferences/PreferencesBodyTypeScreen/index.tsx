@@ -34,12 +34,20 @@ export type BodyTypeItem = {
   image: number;
 };
 
-const BODY_TYPE_OPTIONS: BodyTypeItem[] = [
+const BODY_TYPE_OPTIONS_DEFAULT: BodyTypeItem[] = [
   { id: 'mesomorph', label: STRINGS.PREFERENCES_BODY_TYPE.TONED, image: require('../../../assets/images/bodytypes/bodytype_toned.png') },
   { id: 'ectomorph', label: STRINGS.PREFERENCES_BODY_TYPE.SLIM, image: require('../../../assets/images/bodytypes/bodytype_slim.png') },
   { id: 'medium_build', label: STRINGS.PREFERENCES_BODY_TYPE.MEDIUM, image: require('../../../assets/images/bodytypes/bodytype_medium.png') },
   { id: 'endomorph', label: STRINGS.PREFERENCES_BODY_TYPE.CURVY, image: require('../../../assets/images/bodytypes/bodytype_curvy.png') },
   { id: 'thick_build', label: STRINGS.PREFERENCES_BODY_TYPE.PLUS_SIZED, image: require('../../../assets/images/bodytypes/bodytype_plus.png') },
+];
+
+const BODY_TYPE_OPTIONS_MALE: BodyTypeItem[] = [
+  { id: 'mesomorph', label: STRINGS.PREFERENCES_BODY_TYPE.TONED, image: require('../../../assets/images/bodytypes/bodytype_toned_man.png') },
+  { id: 'ectomorph', label: STRINGS.PREFERENCES_BODY_TYPE.SLIM, image: require('../../../assets/images/bodytypes/bodytype_slim_man.png') },
+  { id: 'medium_build', label: STRINGS.PREFERENCES_BODY_TYPE.MEDIUM, image: require('../../../assets/images/bodytypes/bodytype_medium_man.png') },
+  { id: 'endomorph', label: STRINGS.PREFERENCES_BODY_TYPE.CURVY, image: require('../../../assets/images/bodytypes/bodytype_curvy_man.png') },
+  { id: 'thick_build', label: STRINGS.PREFERENCES_BODY_TYPE.PLUS_SIZED, image: require('../../../assets/images/bodytypes/bodytype_plus_man.png') },
 ];
 
 type NavProp = NativeStackNavigationProp<AuthStackParamList, 'PreferencesBodyType'>;
@@ -51,16 +59,24 @@ export const PreferencesBodyTypeScreen: React.FC = () => {
   const openedEditFromSummary = usePreferencesStore((s) => s.openedEditFromSummary);
   const returnToSummary = (route.params?.returnToSummary ?? false) || openedEditFromSummary;
   const preferredBodyTypes = usePreferencesStore((s) => s.preferredBodyTypes);
+  const lookingForGender = usePreferencesStore((s) => s.lookingForGender);
   const setPreferredBodyTypes = usePreferencesStore((s) => s.setPreferredBodyTypes);
   const setOpenedEditFromSummary = usePreferencesStore((s) => s.setOpenedEditFromSummary);
+
+  const normalizedPreferredGender = (lookingForGender[0] ?? null) as ('man' | 'woman' | null);
+  const bodyTypeOptions =
+    normalizedPreferredGender === 'man'
+      ? BODY_TYPE_OPTIONS_MALE
+      : BODY_TYPE_OPTIONS_DEFAULT;
 
   const [selected, setSelected] = useState<BodyTypeId[]>(
     preferredBodyTypes.length ? (preferredBodyTypes as BodyTypeId[]) : []
   );
 
   useEffect(() => {
-    setSelected(preferredBodyTypes.length ? [...preferredBodyTypes] as BodyTypeId[] : []);
+    setSelected(preferredBodyTypes.length ? ([...preferredBodyTypes] as BodyTypeId[]) : []);
   }, [preferredBodyTypes]);
+  
 
   const handleSelect = (id: BodyTypeId) => {
     setSelected((prev) =>
@@ -73,7 +89,8 @@ export const PreferencesBodyTypeScreen: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (selected.length === 0) return;
+    // Require all available body types to be selected before proceeding
+    if (selected.length !== bodyTypeOptions.length) return;
     setPreferredBodyTypes(selected);
     if (returnToSummary) {
       setOpenedEditFromSummary(false);
@@ -110,12 +127,12 @@ export const PreferencesBodyTypeScreen: React.FC = () => {
           <Text style={styles.subtitle}>{STRINGS.PREFERENCES_BODY_TYPE.SUBTITLE}</Text>
           <View style={styles.howItWorks}>
             <Text style={styles.howItWorksText}>
-              {STRINGS.PREFERENCES_BODY_TYPE.HOW_IT_WORKS}
+              Select and rank all 5 body types in the order you&apos;re open to them. You need to select all 5 to continue.
             </Text>
           </View>
 
           <View style={[styles.optionsContainer, styles.optionsContent]}>
-            {BODY_TYPE_OPTIONS.map((item) => {
+            {bodyTypeOptions.map((item) => {
               const isSelected = selected.includes(item.id);
               const rank = selected.indexOf(item.id) + 1;
 
@@ -156,7 +173,7 @@ export const PreferencesBodyTypeScreen: React.FC = () => {
             onPress={handleSave}
             variant="primary"
             style={styles.primaryButton}
-            disabled={selected.length === 0}
+            disabled={selected.length !== bodyTypeOptions.length}
           />
         </View>
       </SafeAreaView>

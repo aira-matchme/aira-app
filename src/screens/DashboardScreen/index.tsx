@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,10 @@ import {
   StyleSheet,
   StatusBar,
   ImageSourcePropType,
+  Modal,
+  TouchableWithoutFeedback,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -17,21 +21,28 @@ import { ReusableBottomSheet } from '../../components/BottomSheet';
 import { GradientText } from '../../components/GradientText';
 import { LogoWordmarkGradient } from '../../assets/icons/home/LogoWordmarkGradient';
 import { HomeFilterIcon } from '../../assets/icons/home/HomeFilterIcon';
-import { HomeLikeFilledIcon } from '../../assets/icons/home/HomeLikeFilledIcon';
 import { ToggleChatHeartIcon } from '../../assets/icons/home/ToggleChatHeartIcon';
 import { ToggleHeartIcon } from '../../assets/icons/home/ToggleHeartIcon';
 import { BellIcon } from '../../assets/icons/common/BellIcon';
-import { VerifiedIcon } from '../../assets/icons/common/VerifiedIcon';
 import { MoreHorizIcon } from '../../assets/icons/common/MoreHorizIcon';
 import { TabChatIcon } from '../../assets/icons/tabs/TabChatIcon';
-import { MatchEmptyIllustration } from '../../assets/icons/home_figma/MatchEmptyIllustration';
+// import { MatchEmptyIllustration } from '../../assets/icons/home_figma/MatchEmptyIllustration';
+import { MatchesSearchEmptyIcon } from '../../assets/icons/home/MatchesSearchEmptyIcon';
 import { TabAICenterIcon } from '../../assets/icons/tabs/TabAICenterIcon';
+import { BlockIcon } from '../../assets/icons/common/BlockIcon';
+import { ReportIcon } from '../../assets/icons/common/ReportIcon';
 import { ForwardArrowIcon } from '../../assets/icons/common/ForwardArrowIcon';
+import { CloseIcon } from '../../assets/icons/common/CloseIcon';
+import {
+  StatusSignalIcon,
+  StatusConnectionIcon,
+  StatusBatteryIcon,
+} from '../../assets/icons/match/EssentialStatusIcons';
 
 import { colors } from '../../theme';
 import { styles } from './styles';
-import { useNavigation } from '@react-navigation/native';
-import { postAIMessagesApi } from '../../modules/chat/api';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { postAIMessagesApi, blockUserApi, reportUserApi } from '../../modules/chat/api';
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
 
@@ -47,6 +58,8 @@ type MatchItem = {
   id: string;
   name: string;
   age: number;
+  /** Existing chat id with this match, if any */
+  chatId?: string;
   overallPercent: number;
   lifestylePercent: number;
   personalityPercent: number;
@@ -54,10 +67,12 @@ type MatchItem = {
   image: ImageSourcePropType;
   /** Multiple photos for auto-rotating card (story-style). If present, progress segments and timer use this. */
   images?: ImageSourcePropType[];
+  isLiked: boolean;
 };
 
 type GetMatchesItem = {
   userId: string;
+  chatId?: string;
   name: string;
   galleryPhotos?: { order: number; url: string }[];
   verifiedStatus?: boolean;
@@ -85,61 +100,64 @@ type GetMatchesResponse = {
 export const DashboardScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const [toggleLikes, setToggleLikes] = useState<'chat' | 'likes'>('chat');
   const [showFirstMovePopup, setShowFirstMovePopup] = useState(false);
   const [firstMoveStep, setFirstMoveStep] = useState<'choose' | 'sent'>('choose');
   const [firstMoveLoading, setFirstMoveLoading] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchItem | null>(null);
+  const [optionsMatch, setOptionsMatch] = useState<MatchItem | null>(null);
+  const [showMatchOptions, setShowMatchOptions] = useState(false);
+  const [blockLoading, setBlockLoading] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
   const [matches, setMatches] = useState<MatchItem[]>([]);
   /** Current photo index per match (for multi-photo auto-rotate). Key = match.id, value = 0..images.length-1 */
   const [photoIndexByMatchId, setPhotoIndexByMatchId] = useState<Record<string, number>>({});
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchMatches = async () => {
-      try {
-        const { data } = await apiClient.post<GetMatchesResponse>(
-          endpoints.matches.getMatches
+  const refreshMatches = useCallback(async () => {
+    try {
+      const { data } = await apiClient.post<GetMatchesResponse>(
+        endpoints.matches.getMatches
+      );
+      const items = data?.data?.items ?? [];
+      const mapped: MatchItem[] = items.map((item) => {
+        const sortedPhotos = [...(item.galleryPhotos ?? [])].sort(
+          (a, b) => (a.order ?? 0) - (b.order ?? 0)
         );
-        const items = data?.data?.items ?? [];
-        if (!isMounted) return;
+        const imageSources: ImageSourcePropType[] = sortedPhotos.map((p) => ({
+          uri: p.url,
+        }));
+        const primaryImage: ImageSourcePropType =
+          imageSources[0] ?? require('../../assets/images/Profile1.png');
 
-        const mapped: MatchItem[] = items.map((item) => {
-          const sortedPhotos = [...(item.galleryPhotos ?? [])].sort(
-            (a, b) => (a.order ?? 0) - (b.order ?? 0)
-          );
-          const imageSources: ImageSourcePropType[] = sortedPhotos.map((p) => ({
-            uri: p.url,
-          }));
-          const primaryImage: ImageSourcePropType =
-            imageSources[0] ?? require('../../assets/images/Profile1.png');
-
-          return {
-            id: item.userId,
-            name: item.name,
-            age: 0,
-            overallPercent: item.matchScore,
-            lifestylePercent: item.preferenceScore,
-            personalityPercent: item.personalityScore,
-            otherPercent: item.relationshipIntentScore,
-            image: primaryImage,
-            images: imageSources.length > 0 ? imageSources : undefined,
-          };
-        });
-
-        setMatches(mapped);
-      } catch (e) {
-        // On failure, keep matches empty; UI shows empty state.
-      }
-    };
-
-    fetchMatches();
-    return () => {
-      isMounted = false;
-    };
+        return {
+          id: item.userId,
+          chatId: item.chatId,
+          name: item.name,
+          age: 0,
+          overallPercent: item.matchScore,
+          lifestylePercent: item.preferenceScore,
+          personalityPercent: item.personalityScore,
+          otherPercent: item.relationshipIntentScore,
+          image: primaryImage,
+          images: imageSources.length > 0 ? imageSources : undefined,
+          isLiked: item.isLiked ?? false,
+        };
+      });
+      setMatches(mapped);
+    } catch (e) {
+      // On failure, keep current matches.
+    }
   }, []);
+
+  useEffect(() => {
+    refreshMatches();
+  }, [refreshMatches]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshMatches();
+    }, [refreshMatches]),
+  );
 
   useEffect(() => {
     if (intervalRef.current) {
@@ -192,14 +210,21 @@ export const DashboardScreen = () => {
       await apiClient.post(endpoints.matches.addLike, {
         likedUserId: id,
       });
-      // setMatches((prev) => prev.filter((m) => m.id !== id));
+      await refreshMatches();
     } catch {
-      // If the like fails, we currently keep the card in place.
+      // Keep card state on failure
     }
   };
 
-  const handleDislike = (id: string) => {
-    // setMatches((prev) => prev.filter((m) => m.id !== id));
+  const handleUnlike = async (id: string) => {
+    try {
+      await apiClient.post(endpoints.matches.removeLike, {
+        likedUserId: id,
+      });
+      await refreshMatches();
+    } catch {
+      // Keep card state on failure
+    }
   };
 
   const emptyState = matches.length === 0;
@@ -219,9 +244,9 @@ export const DashboardScreen = () => {
           <LogoWordmarkGradient />
         </View>
         <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.headerButton} activeOpacity={0.8}>
+          {/* <TouchableOpacity style={styles.headerButton} activeOpacity={0.8}>
             <HomeFilterIcon />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
           <TouchableOpacity style={styles.headerButton} activeOpacity={0.8}>
             <BellIcon color={colors.neutral[800]} size={20} />
           </TouchableOpacity>
@@ -231,9 +256,9 @@ export const DashboardScreen = () => {
       <View style={styles.cardContainer}>
         {emptyState ? (
           <View style={styles.emptyState}>
-            <View style={styles.emptyIllustrationWrap}>
-              <MatchEmptyIllustration width={180} height={180} />
-            </View>
+          <View style={styles.emptyIllustrationWrap}>
+            <MatchesSearchEmptyIcon size={120} />
+          </View>
             <Text style={styles.emptyTitle}>
               Finding your next great match...
             </Text>
@@ -254,7 +279,7 @@ export const DashboardScreen = () => {
             snapToAlignment="start"
             decelerationRate="fast"
           >
-            {matches.map((match) => (
+            {matches?.map((match) => (
               <View
                 key={match.id}
                 style={[
@@ -305,6 +330,7 @@ export const DashboardScreen = () => {
                       style={styles.cardTopOverlayGradient}
                     />
                     <View style={styles.cardTopOverlay}>
+                     
                       <View style={styles.cardTopRow}>
                         <View style={styles.nameBlock}>
                           <View style={styles.nameRow}>
@@ -338,6 +364,10 @@ export const DashboardScreen = () => {
                         <TouchableOpacity
                           style={styles.optionsButton}
                           activeOpacity={0.8}
+                          onPress={() => {
+                            setOptionsMatch(match);
+                            setShowMatchOptions(true);
+                          }}
                         >
                           <MoreHorizIcon
                             size={20}
@@ -398,62 +428,59 @@ export const DashboardScreen = () => {
                       </TouchableOpacity>
                     
                     </View>
-                    <View style={styles.toggleContainer}>
-                        <TouchableOpacity
-                          style={[
-                            styles.toggleButton,
-                            toggleLikes === 'chat' && styles.toggleButtonGradient,
-                            toggleLikes === 'likes' && styles.toggleButtonInactive,
-                          ]}
-                          onPress={() => {
-                            setToggleLikes('chat');
+                    <View style={styles.matchActionsContainer}>
+                      <TouchableOpacity
+                        style={styles.matchActionButton}
+                        onPress={() => {
+                          if (match.chatId) {
+                            navigation.navigate('Chat', {
+                              screen: 'ChatDetail',
+                              params: {
+                                chatId: match.chatId,
+                                name: match.name,
+                                avatar: match.image,
+                                isRequest: false,
+                                otherUserId: match.id,
+                              },
+                            });
+                          } else {
                             setSelectedMatch(match);
                             setFirstMoveStep('choose');
                             setShowFirstMovePopup(true);
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          {toggleLikes === 'chat' ? (
-                            <LinearGradient
-                              colors={[
-                                colors.primary.purple,
-                                colors.secondary.lavender,
-                              ]}
-                              style={StyleSheet.absoluteFill}
-                            />
-                          ) : null}
-                          <ToggleChatHeartIcon
-                            color={toggleLikes === 'chat' ? colors.white : colors.neutral[500]}
-                            size={24}
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[
-                            styles.toggleButton,
-                            toggleLikes === 'likes' && styles.toggleButtonGradient,
-                            toggleLikes === 'chat' && styles.toggleButtonInactive,
-                          ]}
-                          onPress={() => {
-                            setToggleLikes('likes');
+                          }
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <LinearGradient
+                          colors={[colors.primary.purple, colors.secondary.lavender]}
+                          style={StyleSheet.absoluteFill}
+                        />
+                        <ToggleChatHeartIcon color={colors.white} size={24} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.matchActionButton}
+                        onPress={() => {
+                          if (match.isLiked) {
+                            handleUnlike(match.id);
+                          } else {
                             handleLike(match.id);
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          {toggleLikes === 'likes' ? (
-                            <LinearGradient
-                              colors={[
-                                colors.primary.purple,
-                                colors.secondary.lavender,
-                              ]}
-                              style={StyleSheet.absoluteFill}
-                            />
-                          ) : null}
-                          <ToggleHeartIcon
-                            color={toggleLikes === 'likes' ? colors.white : colors.neutral[500]}
-                            size={24}
-                          />
-                        </TouchableOpacity>
-                      </View>
+                          }
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <View
+                          style={[
+                            StyleSheet.absoluteFill,
+                            { backgroundColor: match.isLiked ? 'rgba(0,0,0,0.2)' : 'white', borderRadius: 24 },
+                          ]}
+                        />
+                        {match.isLiked ? (
+                          <CloseIcon size={22} color={colors.white} />
+                        ) : (
+                          <ToggleHeartIcon size={22} color={colors.primary.purple} />
+                        )}
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   </View>
                 </View>
@@ -498,6 +525,7 @@ export const DashboardScreen = () => {
                 <Text style={styles.firstMoveTitle}>Make your first move</Text>
                 <Text style={styles.firstMoveSubtitle}>Your vibe, your call.</Text>
               </View>
+              
             </View>
             <View style={styles.firstMoveButtonsRow}>
               <TouchableOpacity
@@ -591,6 +619,115 @@ export const DashboardScreen = () => {
           </View>
         )}
       </ReusableBottomSheet>
+
+      <Modal
+        visible={showMatchOptions}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (blockLoading || reportLoading) return;
+          setShowMatchOptions(false);
+          setOptionsMatch(null);
+        }}
+      >
+        <TouchableWithoutFeedback
+          onPress={() => {
+            if (blockLoading || reportLoading) return;
+            setShowMatchOptions(false);
+            setOptionsMatch(null);
+          }}
+        >
+          <View style={styles.matchOptionsBackdrop}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.matchOptionsPopup}>
+                <TouchableOpacity
+                  style={styles.matchOptionsItem}
+                  activeOpacity={0.8}
+                  disabled={blockLoading || !optionsMatch}
+                  onPress={async () => {
+                    const m = optionsMatch;
+                    if (!m || blockLoading) return;
+                    try {
+                      setBlockLoading(true);
+                      const res = await blockUserApi({ blockUserId: m.id, type: 'block' });
+                      const apiMessage =
+                        (res as any)?.data?.message ??
+                        (res as any)?.message ??
+                        'User blocked successfully.';
+                      setShowMatchOptions(false);
+                      setOptionsMatch(null);
+                      await refreshMatches();
+                      Alert.alert('Blocked', apiMessage.toString());
+                    } catch (e: any) {
+                      const errMessage =
+                        e?.response?.data?.message ??
+                        e?.message ??
+                        'Could not block this user. Please try again.';
+                      Alert.alert('Error', errMessage.toString());
+                    } finally {
+                      setBlockLoading(false);
+                    }
+                  }}
+                >
+                  <View style={styles.matchOptionsIconWrap}>
+                    {blockLoading ? (
+                      <ActivityIndicator size="small" color={colors.black} />
+                    ) : (
+                      <BlockIcon size={20} color={colors.black} />
+                    )}
+                  </View>
+                  <Text style={styles.matchOptionsLabel}>
+                    {blockLoading ? 'Blocking…' : 'Block'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.matchOptionsItem}
+                  activeOpacity={0.8}
+                  disabled={reportLoading || !optionsMatch}
+                  onPress={async () => {
+                    const m = optionsMatch;
+                    if (!m || reportLoading) return;
+                    try {
+                      setReportLoading(true);
+                      const res = await reportUserApi({
+                        reportedAgainst: m.id,
+                        reportMessage: 'Reported from matches dashboard',
+                      });
+                      const apiMessage =
+                        (res as any)?.data?.message ??
+                        (res as any)?.message ??
+                        'Report submitted successfully.';
+                      setShowMatchOptions(false);
+                      setOptionsMatch(null);
+                      await refreshMatches();
+                      Alert.alert('Reported', apiMessage.toString());
+                    } catch (e: any) {
+                      const errMessage =
+                        e?.response?.data?.message ??
+                        e?.message ??
+                        'Could not submit report. Please try again.';
+                      Alert.alert('Error', errMessage.toString());
+                    } finally {
+                      setReportLoading(false);
+                    }
+                  }}
+                >
+                  <View style={[styles.matchOptionsIconWrap, styles.matchOptionsIconWrapReport]}>
+                    {reportLoading ? (
+                      <ActivityIndicator size="small" color={colors.black} />
+                    ) : (
+                      <ReportIcon size={20} color={colors.black} />
+                    )}
+                  </View>
+                  <Text style={styles.matchOptionsLabelReport}>
+                    {reportLoading ? 'Reporting…' : 'Report'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 };

@@ -145,7 +145,8 @@ export const styles = StyleSheet.create({
     gap: spacing.md,
   },
   cardEssentials: {
-    backgroundColor: colors.primary[50],
+    backgroundColor: colors.secondary.lavenderLight,
+    // backgroundColor: colors.primary[50],
     borderRadius: 22,
     padding: spacing.md,
     borderWidth: 1,
@@ -205,6 +206,7 @@ export const styles = StyleSheet.create({
   essentialRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    columnGap: spacing.sm,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.primary[100],
@@ -263,6 +265,63 @@ export const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
 
+  /** Match options popup menu (More icon tap) – mirror DashboardScreen */
+  matchOptionsBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+  },
+  matchOptionsPopup: {
+    marginTop: 80,
+    marginRight: 24,
+    minWidth: 160,
+    borderRadius: 16,
+    backgroundColor: colors.white,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+  },
+  matchOptionsTitle: {
+    ...typography.bodyMedium,
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  matchOptionsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    // marginBottom: 8,
+    marginTop: 8,
+    gap: 8,
+  },
+  matchOptionsIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  matchOptionsIconWrapReport: {
+    // backgroundColor: 'rgba(230, 0, 0, 0.16)',
+  },
+  matchOptionsLabel: {
+    ...typography.bodyMedium,
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.black,
+  },
+  matchOptionsLabelReport: {
+    ...typography.bodyMedium,
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.black,
+  },
+
   // Report
   reportContainer: {
     alignItems: 'center',
@@ -294,6 +353,7 @@ export const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -303,9 +363,78 @@ export const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.white,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // First move sheet (same as Dashboard)
+  firstMoveSheet: {
+    paddingTop: 12,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    gap: 24,
+  },
+  firstMoveHeader: {
+    alignItems: 'center',
+    gap: 14,
+  },
+  firstMoveIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  firstMoveTextBlock: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  firstMoveTitle: {
+    fontSize: 24,
+    fontWeight: '500',
+    color: colors.black,
+    textAlign: 'center',
+  },
+  firstMoveSubtitle: {
+    fontSize: 14,
+    color: colors.neutral[600],
+    textAlign: 'center',
+  },
+  firstMoveButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    width: '100%',
+  },
+  firstMoveButton: {
+    flex: 1,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  firstMoveButtonSay: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.neutral[100],
+  },
+  firstMoveButtonAira: {
+    backgroundColor: colors.secondary[50],
+    borderWidth: 1,
+    borderColor: colors.secondary[300],
+  },
+  firstMoveButtonIcon: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  firstMoveButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.black,
+    textAlign: 'center',
   },
 });
 

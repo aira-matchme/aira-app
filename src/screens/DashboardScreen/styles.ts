@@ -48,6 +48,50 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  /** Figma 2101-24831: match actions pill (chat + heart) */
+  matchActionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    borderRadius: 28,
+    backgroundColor: 'rgba(0,0,0,0.20)',
+    gap: 8,
+    marginTop: 14,
+  },
+  matchActionButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  /** Legacy toggle styles (kept for reference, unused after Figma update) */
+  actionButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 12,
+    marginTop: 14,
+  },
+  actionButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionButtonChat: {
+    overflow: 'hidden',
+  },
+  actionButtonHeart: {
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  actionButtonHeartLiked: {
+    overflow: 'hidden',
+  },
   toggleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -137,6 +181,22 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 12,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  statusTime: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  statusIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   cardOverlay: {
     position: 'absolute',
@@ -440,5 +500,62 @@ export const styles = StyleSheet.create({
     letterSpacing: 0.32,
     color: colors.black,
     textAlign: 'center',
+  },
+  /** Match options popup menu (More icon tap) */
+  matchOptionsBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+  },
+  matchOptionsPopup: {
+    marginTop: 80,
+    marginRight: 24,
+    minWidth: 160,
+    borderRadius: 16,
+    backgroundColor: colors.white,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+  },
+  matchOptionsTitle: {
+    ...typography.bodyMedium,
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  matchOptionsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    marginTop: 8,
+    gap: 8,
+  },
+  matchOptionsIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  matchOptionsIconWrapReport: {
+    // backgroundColor: 'rgba(230, 0, 0, 0.16)',
+  },
+  matchOptionsLabel: {
+    ...typography.bodyMedium,
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.black,
+    // color: 'rgba(255,255,255,0.9)',
+  },
+  matchOptionsLabelReport: {
+    ...typography.bodyMedium,
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.black,
+    // color: colors.semantic.error,
   },
 });

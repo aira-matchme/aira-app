@@ -37,6 +37,7 @@ export const endpoints = {
     getMatches: '/user-match-profile/matches',
     getMatchDetails: '/user-match-profile/profile-insights/{id}',
     addLike: '/user-like',
+    removeLike: '/user-like/dislike',
     getLikes: '/user-like/get-like',
   },
   chat: {

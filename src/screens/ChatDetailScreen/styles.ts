@@ -721,6 +721,10 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.neutral[600],
   },
+  messagesLoadingMoreWrap: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+  },
   messageRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',

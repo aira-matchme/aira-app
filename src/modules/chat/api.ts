@@ -7,7 +7,23 @@ export type ChatParticipantDetails = {
   name?: string;
   email?: string;
   nickName?: string;
-  profilePhoto?: string | null;
+  /**
+   * Profile photo from API.
+   * Older responses send a plain string URL.
+   * Newer responses send an object with nested url.{original,medium,thumb}.
+   */
+  profilePhoto?:
+    | string
+    | null
+    | {
+        url?: {
+          original?: string;
+          medium?: string;
+          thumb?: string;
+          [key: string]: unknown;
+        };
+        [key: string]: unknown;
+      };
   isBlocked?: boolean;
 };
 
@@ -114,10 +130,28 @@ export function mapChatResponseToItem(
       : undefined;
   const preview = toPreviewString(previewSource);
   const time = formatChatTime(item.lastActivityAt || item.updatedAt);
-  const photo = participant.profilePhoto;
+  const photo = participant.profilePhoto as
+    | string
+    | null
+    | { url?: { original?: string; medium?: string; thumb?: string; [key: string]: unknown }; [key: string]: unknown }
+    | undefined;
+
+  let avatarUrl: string | undefined;
+  if (typeof photo === 'string') {
+    avatarUrl = photo;
+  } else if (photo && typeof photo === 'object') {
+    const urlObj = (photo.url ?? {}) as {
+      original?: string;
+      medium?: string;
+      thumb?: string;
+      [key: string]: unknown;
+    };
+    avatarUrl = urlObj.medium ?? urlObj.thumb ?? urlObj.original;
+  }
+
   const avatar =
-    typeof photo === 'string' && photo.trim() !== ''
-      ? { uri: photo }
+    typeof avatarUrl === 'string' && avatarUrl.trim() !== ''
+      ? { uri: avatarUrl }
       : null;
   return {
     id: item._id,
