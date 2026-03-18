@@ -44,12 +44,10 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Aira needs access to your camera to verify your identity for face verification.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>AIRA uses your photos to let you upload images to your profile. These can be managed in Settings.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Aira needs microphone access to record and send voice messages in chat.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>AIRA uses your photos to let you upload images to your profile. These can be managed in Settings.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIBackgroundModes</key>

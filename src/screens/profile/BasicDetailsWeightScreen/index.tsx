@@ -55,9 +55,14 @@ export const BasicDetailsWeightScreen: React.FC = () => {
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
-        <View style={{ paddingTop: 16, paddingHorizontal: 20 }}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <BackArrowIcon size={48} />
+        <View style={styles.headerContainer}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            activeOpacity={0.7}
+            accessibilityLabel="Go back"
+          >
+            <BackArrowIcon size={48} backgroundColor="#F1ECFE" strokeColor="#000000" />
           </TouchableOpacity>
         </View>
 

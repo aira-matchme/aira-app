@@ -9,6 +9,21 @@ export const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  backButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+  },
   backgroundGlow: {
     position: 'absolute',
     top: 0,

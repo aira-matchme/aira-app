@@ -13,6 +13,7 @@ import { requestCameraPermission } from '../../../config/permissions';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './styles';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
+import { set } from 'zod';
 
 type NavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -50,10 +51,13 @@ export const FaceVerificationScreen: React.FC = () => {
   };
 
   const handleDontAllow = () => {
+    setShowPermissionSheet(false);
+
     // Keep the sheet open - user must grant permission
   };
 
   const handleCloseSheet = () => {
+    setShowPermissionSheet(false);
     // Prevent closing without granting permission
   };
 
@@ -98,9 +102,7 @@ export const FaceVerificationScreen: React.FC = () => {
               </View>
               <View style={styles.bulletPoint}>
                 <Text style={styles.bulletDot}>•</Text>
-                <Text style={styles.bulletText}>
-                  {STRINGS.PROFILE_SETUP.FACE_VERIFICATION.BULLET_3}
-                </Text>
+
               </View>
             </View>
           </View>

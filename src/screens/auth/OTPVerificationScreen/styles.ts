@@ -30,6 +30,7 @@ export const styles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: spacing.lg,
+    minHeight: 78, // Input 54 + error slot 24 — keeps Verify button position fixed
   },
   resendContainer: {
     alignItems: 'center',

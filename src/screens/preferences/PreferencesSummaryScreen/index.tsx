@@ -28,6 +28,7 @@ import {
   patchEditPreference,
 } from '../../../modules/preferences/api';
 import { styles } from './styles';
+import { ProfileChevronRightIcon } from '../../../assets/icons/profile/ProfileMenuIcons';
 
 /** Param list that includes only screens we navigate to from summary (used in both Auth and Profile stacks) */
 type PreferencesSummaryNavList =
@@ -98,9 +99,9 @@ function getIncomeDisplay(
     eur_30k_40k: 'RANGE_30_40',
     eur_40k_50k: 'RANGE_40_50',
     eur_50k_plus: 'ABOVE_50',
-    prefer_not_to_say: 'PREFER_NOT_TO_SAY',
+    any_income: 'ANY_INCOME',
   };
-  return STRINGS.PREFERENCES_INCOME[map[value] ?? 'PREFER_NOT_TO_SAY'] ?? '—';
+  return STRINGS.PREFERENCES_INCOME[map[value] ?? 'ANY_INCOME'] ?? '—';
 }
 
 function getReligionDisplay(
@@ -124,7 +125,25 @@ function getMaritalStatusDisplay(
     widowed: 'WIDOWED',
     separated: 'SEPARATED',
   };
-  return STRINGS.PREFERENCES_MARITAL_STATUS[map[value] ?? 'NEVER_MARRIED'] ?? '—';
+
+  const toArray = (raw: unknown): string[] => {
+    if (Array.isArray(raw)) {
+      const first = raw[0];
+      if (Array.isArray(first)) {
+        return first as string[];
+      }
+      return raw as string[];
+    }
+    return raw ? [raw as string] : [];
+  };
+
+  const values = toArray(value).filter((v) => typeof v === 'string' && v.length > 0);
+  if (!values.length) return '—';
+
+  const labels = values.map(
+    (v) => STRINGS.PREFERENCES_MARITAL_STATUS[map[v] ?? 'NEVER_MARRIED'] ?? '—'
+  );
+  return labels.join(', ');
 }
 
 function getBodyTypeDisplay(orderedIds: string[]): string {
@@ -137,6 +156,16 @@ function getBodyTypeDisplay(orderedIds: string[]): string {
     thick_build: STRINGS.PREFERENCES_BODY_TYPE.PLUS_SIZED,
   };
   return orderedIds.map((id) => labels[id] ?? id).join(', ');
+}
+
+function getRelationshipIntentDisplay(value: string | null | undefined): string {
+  if (!value) return '—';
+  const labels: Record<string, string> = {
+    serious: 'Serious',
+    flexible: 'Flexible',
+    casual: 'Casual',
+  };
+  return labels[value] ?? value;
 }
 
 export const PreferencesSummaryScreen: React.FC = () => {
@@ -244,7 +273,7 @@ export const PreferencesSummaryScreen: React.FC = () => {
       },
       {
         label: 'Relationship intent',
-        value: relationshipIntentLabel ? relationshipIntentLabel : '—',
+        value: getRelationshipIntentDisplay(relationshipIntentLabel),
         screen: 'PreferencesRelationshipIntent',
         required: true,
       },
@@ -277,6 +306,11 @@ export const PreferencesSummaryScreen: React.FC = () => {
   };
 
   const setPreferenceFlowCompleted = useAuthStore((s) => s.setPreferenceFlowCompleted);
+
+  // If this screen is being shown from the profile flow (ProfileMain in routeNames),
+  // we treat it as an edit and adjust labels accordingly.
+  const routeNames = navigation.getState().routeNames ?? [];
+  const isEditMode = routeNames.includes('ProfileMain');
 
   const handleGetStarted = async () => {
     setLoading(true);
@@ -362,9 +396,10 @@ export const PreferencesSummaryScreen: React.FC = () => {
                       {row.value}
                     </Text>
                   </View>
-                  <View style={styles.chevron}>
+                  {/* <View style={styles.chevron}>
                     <Text style={styles.chevronText}>›</Text>
-                  </View>
+                  </View> */}
+                  <ProfileChevronRightIcon width={24} height={24} color={colors.neutral[400]} />
                 </TouchableOpacity>
                 {index < rows.length - 1 && <View style={styles.separator} />}
               </React.Fragment>
@@ -374,7 +409,11 @@ export const PreferencesSummaryScreen: React.FC = () => {
 
         <View style={styles.actions}>
           <Button
-            title={STRINGS.PREFERENCES_SUMMARY.GET_STARTED}
+            title={
+              isEditMode
+                ? 'Update preferences'
+                : STRINGS.PREFERENCES_SUMMARY.GET_STARTED
+            }
             onPress={handleGetStarted}
             variant="primary"
             style={styles.primaryButton}

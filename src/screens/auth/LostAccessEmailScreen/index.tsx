@@ -64,7 +64,8 @@ export const LostAccessEmailScreen: React.FC = () => {
       <ReusableBottomSheet
         isOpen={true}
         onClose={handleClose}
-        snapPoints={['60%']}
+        snapPoints={['63%']}
+        scrollEnabled={false}
         showDragHandle={true}
         showCloseButton={true}
         enablePanDownToClose={true}

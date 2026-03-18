@@ -235,6 +235,7 @@ export const OTPVerificationScreen: React.FC = () => {
         isOpen={isBottomSheetOpen}
         onClose={handleClose}
         snapPoints={['60%']}
+        scrollEnabled={false}
         showDragHandle={true}
         showCloseButton={true}
         enablePanDownToClose={true}

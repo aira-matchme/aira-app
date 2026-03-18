@@ -29,7 +29,7 @@ function mapIncomeToApi(value: IncomeOption): string {
   return value ?? 'prefer_not_to_say';
 }
 
-function cmToFeetInches(cm: number): { feet: number; inches: number } {
+export function cmToFeetInches(cm: number): { feet: number; inches: number } {
   const totalInches = cm / CM_PER_INCH;
   const feet = Math.floor(totalInches / INCHES_PER_FOOT);
   const inches = Math.round(totalInches % INCHES_PER_FOOT);
@@ -144,11 +144,23 @@ function hydratePreferencesStoreFromApi(raw: unknown): void {
     usePreferencesStore.getState().setPreferredBodyTypes(data.preferredBodyTypes);
   }
 
-  const marital = Array.isArray(data.preferredMaritalStatus)
-    ? data.preferredMaritalStatus[0]
-    : data.preferredMaritalStatus;
-  if (typeof marital === 'string' && marital.length > 0) {
-    usePreferencesStore.getState().setPreferredMaritalStatus(marital as MaritalStatusOption);
+  if (Array.isArray(data.preferredMaritalStatus)) {
+    const normalized = (data.preferredMaritalStatus as string[]).filter(
+      (m) => typeof m === 'string' && m.length > 0
+    ) as MaritalStatusOption[];
+    if (normalized.length > 0) {
+      // Store as first value for backwards compatibility in store typings
+      usePreferencesStore.getState().setPreferredMaritalStatus(
+        normalized[0] as MaritalStatusOption
+      );
+    }
+  } else if (
+    typeof data.preferredMaritalStatus === 'string' &&
+    data.preferredMaritalStatus.length > 0
+  ) {
+    usePreferencesStore
+      .getState()
+      .setPreferredMaritalStatus(data.preferredMaritalStatus as MaritalStatusOption);
   }
 
   const relIntentRaw =
@@ -188,9 +200,16 @@ export function buildAddPreferencePayload(
   const minFtIn = cmToFeetInches(state.preferredMinHeightcm);
   const maxFtIn = cmToFeetInches(state.preferredMaxHeightcm);
 
-  const preferredMaritalStatus =
-    state.preferredMaritalStatus != null
-      ? [state.preferredMaritalStatus]
+  // preferredMaritalStatus may be a single value or an array (from multi-select screen).
+  // Normalize to string[] for the API.
+  const preferredMaritalStatusRaw = state.preferredMaritalStatus as
+    | MaritalStatusOption
+    | MaritalStatusOption[]
+    | null;
+  const preferredMaritalStatus = Array.isArray(preferredMaritalStatusRaw)
+    ? preferredMaritalStatusRaw
+    : preferredMaritalStatusRaw != null
+      ? [preferredMaritalStatusRaw]
       : [];
 
   return {

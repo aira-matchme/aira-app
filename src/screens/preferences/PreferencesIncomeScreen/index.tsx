@@ -26,7 +26,7 @@ export type IncomeOption =
   | 'eur_30k_40k'
   | 'eur_40k_50k'
   | 'eur_50k_plus'
-  | 'prefer_not_to_say';
+  | 'any_income';
 
 const INCOME_OPTIONS: {
   value: IncomeOption;
@@ -36,7 +36,7 @@ const INCOME_OPTIONS: {
   { value: 'eur_30k_40k', labelKey: 'RANGE_30_40' },
   { value: 'eur_40k_50k', labelKey: 'RANGE_40_50' },
   { value: 'eur_50k_plus', labelKey: 'ABOVE_50' },
-  { value: 'prefer_not_to_say', labelKey: 'PREFER_NOT_TO_SAY' },
+  { value: 'any_income', labelKey: 'ANY_INCOME' },
 ];
 
 type PreferencesIncomeNavigationProp = NativeStackNavigationProp<
@@ -56,10 +56,27 @@ export const PreferencesIncomeScreen: React.FC = () => {
   const preferredIncome = usePreferencesStore((s) => s.preferredIncome);
   const setPreferredIncome = usePreferencesStore((s) => s.setPreferredIncome);
   const setOpenedEditFromSummary = usePreferencesStore((s) => s.setOpenedEditFromSummary);
-  const [selected, setSelected] = useState<IncomeOption | null>(preferredIncome);
+
+  // Normalize store value to one of our local IncomeOption values (or null if it doesn't match)
+  const [selected, setSelected] = useState<IncomeOption | null>(() => {
+    if (
+      preferredIncome &&
+      INCOME_OPTIONS.some((opt) => opt.value === preferredIncome)
+    ) {
+      return preferredIncome as IncomeOption;
+    }
+    return null;
+  });
 
   useEffect(() => {
-    setSelected(preferredIncome);
+    if (
+      preferredIncome &&
+      INCOME_OPTIONS.some((opt) => opt.value === preferredIncome)
+    ) {
+      setSelected(preferredIncome as IncomeOption);
+    } else {
+      setSelected(null);
+    }
   }, [preferredIncome]);
 
   const handleSelect = (value: IncomeOption) => {
@@ -72,7 +89,7 @@ export const PreferencesIncomeScreen: React.FC = () => {
 
   const handleSave = async () => {
     if (selected === null) return;
-    setPreferredIncome(selected);
+    setPreferredIncome(selected as any);
     if (returnToSummary) {
       setOpenedEditFromSummary(false);
       try {

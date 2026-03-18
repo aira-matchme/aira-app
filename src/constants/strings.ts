@@ -71,14 +71,6 @@ export const STRINGS = {
     SECONDARY_CTA: 'May Be Later',
   },
 
-  // Enable Location Screen
-  ENABLE_LOCATION: {
-    TITLE: 'Find people near to you',
-    SUBTITLE:
-      'AIRA uses your location to show matches within your state - so connections feel more relevant and real. We don’t track precise movement.',
-    PRIMARY_CTA: 'Allow Location Access',
-    SECONDARY_CTA: 'May Be Later',
-  },
   // Profile Intro Screen
   PROFILE_INTRO: {
     TITLE: "Let's find the right connection!",
@@ -107,7 +99,7 @@ export const STRINGS = {
     GENDER: {
       TITLE: 'What best describes you?',
       SUBTITLE:
-        'This helps us personalize your experience. You can change it anytime.',
+        'This helps us personalize your experience.',
       OPTIONS: {
         MAN: 'Man',
         WOMAN: 'Woman',
@@ -199,9 +191,8 @@ export const STRINGS = {
       DESCRIPTION: 'Your selfie is used only for verification and isn\'t shown on your profile.',
       BULLET_1: 'Your verification selfie is securely stored',
       BULLET_2: "It's never shared with other users",
-      BULLET_3: 'You can re-verify anytime from settings',
       BUTTON: 'Start Verification',
-      PERMISSION_TITLE: '"Aira" Would Like to Access Your Camera',
+      PERMISSION_TITLE: 'Aira Would Like to Access Your Camera',
       PERMISSION_DESCRIPTION: 'Aira uses your camera to verify your identity and ensure account security. Your selfie is only used for verification and is never shared.',
     },
     VIDEO_VERIFICATION: {
@@ -209,7 +200,6 @@ export const STRINGS = {
       DESCRIPTION: 'Your video is used only for verification and isn\'t shown on your profile.',
       BULLET_1: 'Your verification video is securely stored',
       BULLET_2: "It's never shared with other users",
-      BULLET_3: 'You can re-verify anytime from settings',
       BUTTON: 'Start Verification',
       PERMISSION_TITLE: '"Aira" Would Like to Access Your Camera',
       PERMISSION_DESCRIPTION: 'Aira uses your camera to verify your identity with a short video. Your video is only used for verification and is never shared.',
@@ -327,7 +317,7 @@ export const STRINGS = {
   },
   PREFERENCES_GENDER: {
     TITLE: 'Who would you like to meet?',
-    SUBTITLE: 'Select one or more options.',
+    SUBTITLE: 'Select one option.',
     MAN: 'Man',
     WOMAN: 'Woman',
   },
@@ -368,7 +358,7 @@ export const STRINGS = {
     RANGE_30_40: '£30k-40k',
     RANGE_40_50: '£40k-50k',
     ABOVE_50: '> £50k',
-    PREFER_NOT_TO_SAY: 'Prefer not to say',
+    ANY_INCOME: 'Any Income',
   },
   PREFERENCES_RELIGION: {
     TITLE: 'Religious preference',

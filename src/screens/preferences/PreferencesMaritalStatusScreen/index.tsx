@@ -54,14 +54,33 @@ export const PreferencesMaritalStatusScreen: React.FC = () => {
   const preferredMaritalStatus = usePreferencesStore((s) => s.preferredMaritalStatus);
   const setPreferredMaritalStatus = usePreferencesStore((s) => s.setPreferredMaritalStatus);
   const setOpenedEditFromSummary = usePreferencesStore((s) => s.setOpenedEditFromSummary);
-  const [selected, setSelected] = useState<MaritalStatusOption | null>(preferredMaritalStatus);
+
+  const normalizePreferred = (raw: unknown): MaritalStatusOption[] => {
+    if (!Array.isArray(raw)) return [];
+    // API may send [["never_married"]] or ["never_married"]
+    const first = raw[0];
+    if (Array.isArray(first)) {
+      return (first as unknown[]).filter(
+        (v): v is MaritalStatusOption => typeof v === 'string'
+      );
+    }
+    return (raw as unknown[]).filter(
+      (v): v is MaritalStatusOption => typeof v === 'string'
+    );
+  };
+
+  const [selected, setSelected] = useState<MaritalStatusOption[]>(() =>
+    normalizePreferred(preferredMaritalStatus)
+  );
 
   useEffect(() => {
-    setSelected(preferredMaritalStatus);
+    setSelected(normalizePreferred(preferredMaritalStatus));
   }, [preferredMaritalStatus]);
 
   const handleSelect = (value: MaritalStatusOption) => {
-    setSelected((prev) => (prev === value ? null : value));
+    setSelected((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    );
   };
 
   const handleBack = () => {
@@ -69,8 +88,8 @@ export const PreferencesMaritalStatusScreen: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (selected === null) return;
-    setPreferredMaritalStatus(selected);
+    if (selected.length === 0) return;
+    setPreferredMaritalStatus(selected as any);
     if (returnToSummary) {
       setOpenedEditFromSummary(false);
       try {
@@ -120,18 +139,30 @@ export const PreferencesMaritalStatusScreen: React.FC = () => {
                 onPress={() => handleSelect(value)}
                 style={[
                   styles.optionRow,
-                  selected === value ? styles.optionRowSelected : styles.optionRowUnselected,
+                  selected.includes(value)
+                    ? styles.optionRowSelected
+                    : styles.optionRowUnselected,
                 ]}
               >
                 <Text
                   style={[
                     styles.optionText,
-                    selected === value && styles.optionTextSelected,
+                    selected.includes(value) && styles.optionTextSelected,
                   ]}
                   numberOfLines={1}
                 >
                   {STRINGS.PREFERENCES_MARITAL_STATUS[labelKey]}
                 </Text>
+                <View
+                  style={[
+                    styles.checkbox,
+                    selected.includes(value) && styles.checkboxSelected,
+                  ]}
+                >
+                  {selected.includes(value) && (
+                    <InterestChipCheckIcon size={14} color="#FFFFFF" />
+                  )}
+                </View>
               </Pressable>
             ))}
           </ScrollView>
@@ -143,7 +174,7 @@ export const PreferencesMaritalStatusScreen: React.FC = () => {
             onPress={handleSave}
             variant="primary"
             style={styles.primaryButton}
-            disabled={selected === null}
+            disabled={selected.length === 0}
           />
         </View>
       </SafeAreaView>

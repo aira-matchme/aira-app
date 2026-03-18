@@ -12,6 +12,7 @@ import { Thumb, Rail, RailSelected } from '../../../components/RangeSlider/Range
 import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { usePreferencesStore } from '../../../store/preferences.store';
+import { cmToFeetInches } from '../../../modules/preferences/api';
 import { buildAddPreferencePayload, patchEditPreference } from '../../../modules/preferences/api';
 import { styles } from './styles';
 
@@ -99,7 +100,10 @@ export const PreferencesHeightScreen: React.FC = () => {
                 setLow(l);
                 setHigh(h);
               }}
-              formatLabel={(value) => STRINGS.PREFERENCES.HEIGHT_CM(value)}
+              formatLabel={(value) => {
+                const { feet, inches } = cmToFeetInches(value);
+                return `${feet} ft ${inches} in`;
+              }}
               renderThumb={() => <Thumb />}
               renderRail={() => <Rail />}
               renderRailSelected={() => <RailSelected />}

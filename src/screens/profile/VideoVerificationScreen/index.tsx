@@ -154,10 +154,12 @@ export const VideoVerificationScreen: React.FC = () => {
   };
 
   const handleDontAllow = () => {
+    setShowPermissionSheet(false);
     // User declined
   };
 
   const handleCloseSheet = () => {
+    setShowPermissionSheet(false);
     // Close sheet
   };
 
@@ -267,9 +269,6 @@ export const VideoVerificationScreen: React.FC = () => {
               </View>
               <View style={styles.bulletPoint}>
                 <Text style={styles.bulletDot}>•</Text>
-                <Text style={styles.bulletText}>
-                  {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.BULLET_3}
-                </Text>
               </View>
             </View>
           </View>

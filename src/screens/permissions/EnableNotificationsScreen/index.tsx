@@ -46,8 +46,8 @@ export const EnableNotificationsScreen = () => {
 
   const handleDontAllow = () => {
     setShowPermissionSheet(false);
-    setShouldShowEnableNotifications(false);
-    navigation.navigate('ProfileIntro');
+    // setShouldShowEnableNotifications(false);
+    // navigation.navigate('ProfileIntro');
   };
 
   const handleMayBeLater = () => {
@@ -106,15 +106,16 @@ export const EnableNotificationsScreen = () => {
       <ReusableBottomSheet
         isOpen={showPermissionSheet}
         onClose={handleCloseSheet}
-        snapPoints={['50%']}
+        snapPoints={['55%']}
         showDragHandle={true}
         showCloseButton={true}
         enablePanDownToClose={true}
         backgroundStyle={styles.bottomSheetBackground}
+        scrollEnabled={false}
       >
         <View style={styles.permissionSheetContent}>
           <Text style={styles.permissionTitle}>
-            "Aira" Would Like to Send You Notifications
+            Aira would like to send you notifications
           </Text>
           
           <Text style={styles.permissionDescription}>

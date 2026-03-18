@@ -6,7 +6,7 @@ import {
   StatusBar,
   Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { Button } from '../../../components/Button';
 import { LoginOptionsBottomSheet } from '../../../components/LoginOptionsBottomSheet';
@@ -17,6 +17,7 @@ import { getApps } from '@react-native-firebase/app';
 const IMAGE_BACKGROUND = require('../../../assets/images/welcomescreen.png');
 
 export const WelcomeScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const [showLoginOptions, setShowLoginOptions] = useState(false);
 
   const handleGetStarted = () => {
@@ -57,7 +58,12 @@ export const WelcomeScreen: React.FC = () => {
             <LogoWordmark />
           </View>
 
-          <View style={styles.contentContainer}>
+          <View
+            style={[
+              styles.contentContainer,
+              { paddingBottom: Math.max(insets.bottom, 20) + 16 },
+            ]}
+          >
             <Text style={styles.heading}>
               Meaningful connections, intelligently matched.
             </Text>
@@ -70,7 +76,11 @@ export const WelcomeScreen: React.FC = () => {
               />
             </View>
 
-            <Text style={styles.termsText}>
+            <Text
+              style={styles.termsText}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
               <Text>By continuing you agree to our </Text>
               <Text style={styles.link} onPress={handleTermsPress}>
                 T&C
@@ -83,12 +93,10 @@ export const WelcomeScreen: React.FC = () => {
           </View>
         </LinearGradient>
       </ImageBackground>
-{showLoginOptions && (
-  <LoginOptionsBottomSheet
-    isOpen={showLoginOptions}
-    onClose={handleCloseLoginOptions}
-  />
-)}
+      <LoginOptionsBottomSheet
+        isOpen={showLoginOptions}
+        onClose={handleCloseLoginOptions}
+      />
     </SafeAreaView>
   );
 };

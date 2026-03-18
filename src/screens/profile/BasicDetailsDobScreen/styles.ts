@@ -58,10 +58,8 @@ export const styles = StyleSheet.create({
     height: 180, // approx. 3 rows visible
   },
   scrollContent: {
-    // Small vertical padding so full list (top & bottom) is reachable,
-    // especially on iOS where large symmetric padding can prevent
-    // scrolling to the very first / last items.
-    paddingVertical: spacing.sm,
+    // Symmetric vertical padding so the selected row sits in the middle.
+    paddingVertical: (180 - (52 + spacing.sm)) / 2,
   },
   dateOption: {
     height: 52,
@@ -71,9 +69,8 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   dateOptionSelected: {
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
+    // Light purple pill behind the selected value
+    backgroundColor: 'rgba(107, 92, 255, 0.1)',
   },
   dateText: {
     fontSize: 28,

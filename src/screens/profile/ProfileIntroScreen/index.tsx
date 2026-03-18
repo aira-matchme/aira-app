@@ -26,7 +26,7 @@ export const ProfileIntroScreen: React.FC = () => {
     <View style={styles.wrapper}>
       <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
         <View style={styles.container}>
           {/* Header Video Section */}
           <View style={styles.headerCard}>

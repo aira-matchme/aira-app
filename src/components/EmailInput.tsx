@@ -4,6 +4,7 @@ import {
   TextInput,
   StyleSheet,
   Text,
+  Platform,
 } from 'react-native';
 import { colors, typography, spacing } from '../theme';
 
@@ -51,9 +52,9 @@ export const EmailInput: React.FC<EmailInputProps> = ({
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
       />
-      {error && (
-        <Text style={styles.errorText}>{error}</Text>
-      )}
+      <View style={styles.errorSlot}>
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      </View>
     </View>
   );
 };
@@ -82,8 +83,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md, // 16px (py-[16px])
     fontSize: 16,
     lineHeight: 20,
-    letterSpacing: 0.32,
-    fontFamily: typography.fontFamily.regular,
+    letterSpacing: 0,
+    fontFamily: Platform.OS === 'ios' ? typography.fontFamily.regular : undefined,
     color: colors.neutral[900], // #1A1A1A - text color when typing (per Figma)
     backgroundColor: colors.white,
   },
@@ -93,13 +94,17 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: colors.semantic.error, // red(alert) per Figma - from theme
   },
+  errorSlot: {
+    height: spacing.xs + 20, // Fixed height so button position never shifts
+    justifyContent: 'flex-end',
+  },
   errorText: {
-    marginTop: spacing.xs, // 4px (py-[4px] in Figma)
-    marginLeft: spacing.lg + 4, // 20px (px-[20px] in Figma) - align with input padding
-    fontSize: 14, // text-[14px] per Figma
-    lineHeight: 20, // leading-[20px] per Figma
-    letterSpacing: 0.28, // tracking-[0.28px] per Figma
-    color: colors.semantic.error, // red(alert) per Figma - from theme
+    marginTop: spacing.xs,
+    marginLeft: spacing.lg + 4,
+    fontSize: 14,
+    lineHeight: 20,
+    letterSpacing: 0.28,
+    color: colors.semantic.error,
     fontFamily: typography.fontFamily.regular,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   Linking,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -41,8 +42,35 @@ const MIN_PHOTOS_REQUIRED = 2;
 
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList, 'ProfilePhotos'>;
 
+const GRID_COLUMNS = 3;
+const CARD_GAP = 12;
+const HORIZONTAL_PADDING = 20;
+
 export const ProfilePhotosScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const { width: screenWidth } = useWindowDimensions();
+  const gridStyles = useMemo(() => {
+    const availableWidth = screenWidth - HORIZONTAL_PADDING * 2;
+    const cardSize = (availableWidth - CARD_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
+    return {
+      grid: {
+        flexDirection: 'row' as const,
+        flexWrap: 'wrap' as const,
+        gap: CARD_GAP,
+        marginBottom: 24,
+      },
+      photoCard: {
+        width: cardSize,
+        height: cardSize,
+        borderRadius: 16,
+        overflow: 'hidden' as const,
+        borderWidth: 1.5,
+        borderStyle: 'dashed' as const,
+        borderColor: colors.neutral[200],
+        backgroundColor: colors.white,
+      },
+    };
+  }, [screenWidth]);
   const [photos, setPhotos] = useState<(string | null)[]>(
     Array(PHOTO_SLOTS).fill(null)
   );
@@ -58,7 +86,7 @@ export const ProfilePhotosScreen: React.FC = () => {
 
   const handlePickerResponse = async (
     response: { didCancel?: boolean; errorCode?: string; errorMessage?: string; assets?: Array<{ uri?: string }> },
-    index: number
+    _tappedIndex: number
   ) => {
     if (response.didCancel) return;
     if (response.errorCode) {
@@ -67,37 +95,41 @@ export const ProfilePhotosScreen: React.FC = () => {
     const uri = response.assets?.[0]?.uri;
     if (!uri) return;
 
+    // Always place in the first empty slot (position 1, 2, 3...) regardless of which slot was tapped
+    const targetIndex = photos.findIndex((p) => p === null);
+    if (targetIndex === -1) return; // all slots full
+
+    const order = targetIndex + 1; // 1-based: 1st slot = order 1, 2nd = order 2, etc.
+
     setPhotos((prev) => {
       const next = [...prev];
-      next[index] = uri;
+      next[targetIndex] = uri;
       return next;
     });
     setUploadedSlots((prev) => {
       const next = new Set(prev);
-      next.delete(index);
+      next.delete(targetIndex);
       return next;
     });
-
-    const order = index + 1; // 1-based: 1st slot = 1, 6th slot = 6
-    setUploadingSlots((prev) => new Set(prev).add(index));
+    setUploadingSlots((prev) => new Set(prev).add(targetIndex));
     try {
       await uploadProfilePhotoApi(uri, order);
-      setUploadedSlots((prev) => new Set(prev).add(index));
+      setUploadedSlots((prev) => new Set(prev).add(targetIndex));
     } catch (err: unknown) {
       setPhotos((prev) => {
         const next = [...prev];
-        next[index] = null;
+        next[targetIndex] = null;
         return next;
       });
       setUploadedSlots((prev) => {
         const next = new Set(prev);
-        next.delete(index);
+        next.delete(targetIndex);
         return next;
       });
     } finally {
       setUploadingSlots((prev) => {
         const next = new Set(prev);
-        next.delete(index);
+        next.delete(targetIndex);
         return next;
       });
     }
@@ -226,14 +258,14 @@ export const ProfilePhotosScreen: React.FC = () => {
             {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.TITLE}
           </Text>
 
-          <View style={styles.grid}>
+          <View style={gridStyles.grid}>
             {photos.map((uri, index) => (
               (() => {
                 const isUploading = uploadingSlots.has(index);
                 return (
               <TouchableOpacity
                 key={index}
-                style={styles.photoCard}
+                style={gridStyles.photoCard}
                 activeOpacity={0.8}
                 onPress={() => openActionSheet(index)}
                 disabled={isUploading}
@@ -336,11 +368,14 @@ export const ProfilePhotosScreen: React.FC = () => {
           setShowCameraPermissionSheet(false);
           setPendingCameraIndex(null);
         }}
-        snapPoints={['45%']}
+        snapPoints={[336]}
         showDragHandle={true}
         showCloseButton={false}
         enablePanDownToClose={true}
         backgroundStyle={permissionSheetStyles.sheet}
+        backdropStyle={permissionSheetStyles.backdrop}
+        dragHandleContainerStyle={permissionSheetStyles.dragHandleContainer}
+        dragHandleStyle={permissionSheetStyles.dragHandle}
         scrollEnabled={false}
       >
         <View style={permissionSheetStyles.content}>
@@ -350,14 +385,41 @@ export const ProfilePhotosScreen: React.FC = () => {
           <Text style={permissionSheetStyles.description}>
             {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.CAMERA_PERMISSION_DESCRIPTION}
           </Text>
-          <Button
-            title={STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
-            onPress={handleAllowCameraPermission}
-            variant="primary"
-            disabled={isRequestingPermission}
-            loading={isRequestingPermission}
-            style={permissionSheetStyles.allowButton}
-          />
+          <View style={permissionSheetStyles.actions}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={handleAllowCameraPermission}
+              disabled={isRequestingPermission}
+              style={permissionSheetStyles.primaryButton}
+            >
+              <LinearGradient
+                colors={['#C671F4', '#7640F0']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={permissionSheetStyles.primaryButtonGradient}
+              />
+              <View pointerEvents="none" style={permissionSheetStyles.primaryButtonInset} />
+              {isRequestingPermission ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={permissionSheetStyles.primaryButtonText}>
+                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => {
+                setShowCameraPermissionSheet(false);
+                setPendingCameraIndex(null);
+              }}
+              disabled={isRequestingPermission}
+              style={permissionSheetStyles.secondaryButton}
+            >
+              <Text style={permissionSheetStyles.secondaryButtonText}>Don’t Allow</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ReusableBottomSheet>
 
@@ -367,11 +429,14 @@ export const ProfilePhotosScreen: React.FC = () => {
           setShowGalleryPermissionSheet(false);
           setPendingGalleryIndex(null);
         }}
-        snapPoints={['45%']}
+        snapPoints={[336]}
         showDragHandle={true}
         showCloseButton={false}
         enablePanDownToClose={true}
         backgroundStyle={permissionSheetStyles.sheet}
+        backdropStyle={permissionSheetStyles.backdrop}
+        dragHandleContainerStyle={permissionSheetStyles.dragHandleContainer}
+        dragHandleStyle={permissionSheetStyles.dragHandle}
         scrollEnabled={false}
       >
         <View style={permissionSheetStyles.content}>
@@ -381,14 +446,41 @@ export const ProfilePhotosScreen: React.FC = () => {
           <Text style={permissionSheetStyles.description}>
             {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.PHOTOS_PERMISSION_DESCRIPTION}
           </Text>
-          <Button
-            title={STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
-            onPress={handleAllowGalleryPermission}
-            variant="primary"
-            disabled={isRequestingPermission}
-            loading={isRequestingPermission}
-            style={permissionSheetStyles.allowButton}
-          />
+          <View style={permissionSheetStyles.actions}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={handleAllowGalleryPermission}
+              disabled={isRequestingPermission}
+              style={permissionSheetStyles.primaryButton}
+            >
+              <LinearGradient
+                colors={['#C671F4', '#7640F0']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={permissionSheetStyles.primaryButtonGradient}
+              />
+              <View pointerEvents="none" style={permissionSheetStyles.primaryButtonInset} />
+              {isRequestingPermission ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={permissionSheetStyles.primaryButtonText}>
+                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => {
+                setShowGalleryPermissionSheet(false);
+                setPendingGalleryIndex(null);
+              }}
+              disabled={isRequestingPermission}
+              style={permissionSheetStyles.secondaryButton}
+            >
+              <Text style={permissionSheetStyles.secondaryButtonText}>Don’t Allow</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ReusableBottomSheet>
     </View>
@@ -452,35 +544,92 @@ const sheetStyles = StyleSheet.create({
 });
 
 const permissionSheetStyles = StyleSheet.create({
+  backdrop: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  dragHandleContainer: {
+    paddingTop: 12,
+    paddingBottom: 0,
+  },
+  dragHandle: {
+    backgroundColor: '#CCCCCC',
+  },
   sheet: {
     backgroundColor: colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderRadius: 32,
+    left: 8,
+    right: 8,
+    bottom: 8,
+    overflow: 'hidden',
   },
   content: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 32,
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 16,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '500',
     fontFamily: typography.fontFamily.medium,
     color: colors.neutral[900],
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   description: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '400',
     fontFamily: typography.fontFamily.regular,
-    color: colors.neutral[600],
+    color: '#999999',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 24,
     marginBottom: 24,
   },
-  allowButton: {
+  actions: {
+    gap: 8,
+  },
+  primaryButton: {
+    height: 56,
     width: '100%',
-    height: 54,
+    borderRadius: 100,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  primaryButtonGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  primaryButtonInset: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 100,
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    opacity: 0.6,
+  },
+  primaryButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.white,
+    letterSpacing: 0.32,
+  },
+  secondaryButton: {
+    height: 56,
+    width: '100%',
+    borderRadius: 100,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  secondaryButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.neutral[900],
+    letterSpacing: 0.32,
   },
 });

@@ -193,13 +193,17 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
     return null;
   }
 
+  const hasApple = Platform.OS === 'ios';
+  const snapPoints = hasApple ? ['60%'] : ['48%'];
+
   return (
       <ReusableBottomSheet
         isOpen={isOpen}
         onClose={onClose}
-        snapPoints={['60%']} // Same height as other bottom sheets
+        snapPoints={snapPoints}
         showDragHandle={true}
         showCloseButton={true}
+        scrollEnabled={false}
         enablePanDownToClose={true}
       >
       {/* Title */}
@@ -220,10 +224,14 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
           onPress={handleGoogleLogin}
           activeOpacity={0.8}
         >
-          <View style={styles.iconContainer}>
-            <GoogleIcon size={24} />
+          <View style={styles.buttonContent}>
+            <View style={styles.iconContainer}>
+              <GoogleIcon size={24} />
+            </View>
+            <View style={styles.buttonTextWrapper}>
+              <Text style={styles.buttonText}>Continue With Google</Text>
+            </View>
           </View>
-          <Text style={styles.buttonText}>Continue With Google</Text>
         </TouchableOpacity>
 
         {/* Apple Button - Only on iOS */}
@@ -233,10 +241,14 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
             onPress={handleAppleLogin}
             activeOpacity={0.8}
           >
-            <View style={styles.iconContainer}>
-              <AppleIcon size={24} color={colors.text.dark} />
+            <View style={styles.buttonContent}>
+              <View style={styles.iconContainer}>
+                <AppleIcon size={24} color={colors.text.dark} />
+              </View>
+              <View style={styles.buttonTextWrapper}>
+                <Text style={styles.buttonText}>Continue With Apple</Text>
+              </View>
             </View>
-            <Text style={styles.buttonText}>Continue With Apple</Text>
           </TouchableOpacity>
         )}
 
@@ -246,10 +258,14 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
           onPress={handleEmailLogin}
           activeOpacity={0.8}
         >
-          <View style={styles.iconContainer}>
-            <EmailIcon size={24} color={colors.text.dark} />
+          <View style={styles.buttonContent}>
+            <View style={styles.iconContainer}>
+              <EmailIcon size={24} color={colors.text.dark} />
+            </View>
+            <View style={styles.buttonTextWrapper}>
+              <Text style={styles.buttonText}>Continue With Email</Text>
+            </View>
           </View>
-          <Text style={styles.buttonText}>Continue With Email</Text>
         </TouchableOpacity>
       </View>
     </ReusableBottomSheet>
@@ -290,7 +306,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.regular, // Clash Grotesk Regular
   },
   buttonsContainer: {
-    gap: 12, // 12px gap between buttons (per Figma: gap-[12px])
+    gap: 12,
   },
   loginButton: {
     flexDirection: 'row',
@@ -298,10 +314,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.neutral[50],
     borderRadius: 100,
-    paddingVertical: spacing.md, // 16px (py-[16px])
-    paddingHorizontal: spacing.xl, // 32px (px-[32px])
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
     height: 54,
-    gap: spacing.sm, // 8px gap between icon and text (gap-[8px])
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   iconContainer: {
     width: 24,
@@ -309,8 +329,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconText: {
-    fontSize: 16,
+  buttonTextWrapper: {
+    justifyContent: 'center',
   },
   buttonText: {
     ...typography.button,

@@ -23,7 +23,6 @@ export type AuthStackParamList = {
   LostAccessEmail: undefined;
   OTPVerification: { email: string };
   EnableNotifications: undefined;
-  EnableLocation: undefined;
   ProfileIntro: undefined;
   BasicDetailsName: { fromEditProfile?: boolean } | undefined;
   BasicDetailsDob: { fromEditProfile?: boolean } | undefined;

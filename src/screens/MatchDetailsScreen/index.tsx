@@ -860,9 +860,22 @@ export const MatchDetailsScreen: React.FC = () => {
             </View>
           )}
 
-          <View style={styles.reportContainer}>
+          <TouchableOpacity
+            style={styles.reportContainer}
+            activeOpacity={0.8}
+            onPress={async () => {
+              try {
+                await apiClient.post(endpoints.chat.blockreportUser, {
+                  targetUserId: userId,
+                });
+                navigation.goBack();
+              } catch {
+                // Silently fail for now; you can add a toast or alert if needed
+              }
+            }}
+          >
             <Text style={styles.reportText}>Report &amp; Block</Text>
-          </View>
+          </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
 

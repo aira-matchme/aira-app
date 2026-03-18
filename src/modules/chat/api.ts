@@ -214,6 +214,7 @@ export async function blockUserApi(params: BlockUserParams): Promise<{ statusCod
   return data;
 }
 
+
 export type ReportUserParams = {
   reportedAgainst: string;
   reportMessage: string;
@@ -331,7 +332,11 @@ export async function uploadChatFileApi(
   options: { mimeType: string; fileName: string }
 ): Promise<{ url: string; key: string }> {
   const formData = new FormData();
-  const uri = fileUri.startsWith('file://') ? fileUri : `file://${fileUri}`;
+  const uri = fileUri.startsWith('ph://')
+    ? fileUri
+    : fileUri.startsWith('file://')
+      ? fileUri
+      : `file://${fileUri}`;
   formData.append('file', {
     uri,
     type: options.mimeType,
@@ -340,7 +345,6 @@ export async function uploadChatFileApi(
 
   const { data } = await apiClient.post<UploadChatFileResponse>(endpoints.chat.fileUpload, formData, {
     timeout: 60000,
-    headers: { 'Content-Type': 'multipart/form-data' },
   });
 
   const url = data?.url ?? data?.data?.url ?? '';

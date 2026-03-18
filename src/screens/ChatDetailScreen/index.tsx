@@ -59,12 +59,14 @@ import { useAuthStore } from '../../store/auth.store';
 import socketService, { type MessageReceivePayload, type MessageDeletePayload, type TypingPayload } from '../../services/socket/socketService';
 import { styles, H_PADDING } from './styles';
 import { TabAICenterIcon } from '../../assets/icons/tabs/TabAICenterIcon';
+import { apiClient } from '../../services/api/client';
+import { endpoints } from '../../services/api/endpoints';
 
 type Props = NativeStackScreenProps<ChatStackParamList, 'ChatDetail'>;
 
 type ChatMessage =
   | { type: 'text'; text: string; timestamp: string; sent: boolean; replyTo?: { senderName: string; preview: string }; messageId?: string }
-  // | { type: 'voice'; uri: string; timestamp: string; sent: boolean; messageId?: string }
+  | { type: 'voice'; uri: string; timestamp: string; sent: boolean; messageId?: string }
   | { type: 'image'; uri: string; timestamp: string; sent: boolean; messageId?: string }
   | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean; messageId?: string };
 
@@ -119,9 +121,10 @@ function formatMessageTimestamp(value: string | number | undefined): string {
 }
 
 export const ChatDetailScreen = ({ route, navigation }: Props) => {
-  const { name, avatar, chatId, isRequest, otherUserId } = route.params;
+  const { name, avatar, chatId: initialChatId, isRequest, otherUserId } = route.params;
   const insets = useSafeAreaInsets();
   const currentUserId = useAuthStore((s) => s.user?.id);
+  const [chatId, setChatId] = useState<string | null>(initialChatId ?? null);
   const [requestActionLoading, setRequestActionLoading] = useState<'accept' | 'decline' | 'block' | null>(null);
   const [messagesLoading, setMessagesLoading] = useState(!!chatId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -164,6 +167,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [selectedReplyIndex, setSelectedReplyIndex] = useState(0);
   const [messageContextIndex, setMessageContextIndex] = useState<number | null>(null);
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
+  const isPickingFileRef = useRef(false);
   const [replyingTo, setReplyingTo] = useState<{ index: number; message: ChatMessage; senderName: string; messageId?: string } | null>(null);
   const [sendLoading, setSendLoading] = useState(false);
   const [otherUserTyping, setOtherUserTyping] = useState(false);
@@ -270,6 +274,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           ? raw
               .map((item) => mapApiMessageToChatMessage(item, currentUserId ?? undefined))
               .filter((m): m is ChatMessage => m != null)
+              // Backend returns newest first; reverse so UI shows oldest -> newest.
+              .reverse()
           : [];
         setMessages(list);
 
@@ -347,6 +353,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     const unsubConnection = socketService.onConnectionChange((connected) => {
       setSocketConnected(connected);
       if (connected) {
+        // Ensure we (re)join the chat room after reconnect so
+        // incoming messages are received reliably (especially on iOS).
+        if (chatId) {
+          socketService.join(chatId);
+        }
+
         getChatMessagesApi({ chatId })
           .then((res) => {
             const raw = res.data?.list ?? res.data?.messages ?? [];
@@ -354,6 +366,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               ? raw
                   .map((item) => mapApiMessageToChatMessage(item, currentUserId ?? undefined))
                   .filter((m): m is ChatMessage => m != null)
+                  .reverse()
               : [];
             setMessages(list);
           })
@@ -406,6 +419,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         ? raw
             .map((item) => mapApiMessageToChatMessage(item, currentUserId ?? undefined))
             .filter((m): m is ChatMessage => m != null)
+            .reverse()
         : [];
 
       if (list.length > 0) {
@@ -640,14 +654,27 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   };
 
   const openFilePicker = async () => {
+    // Prevent overlapping pickers (iOS throws: previous promise did not settle)
+    if (isPickingFileRef.current) return;
+    isPickingFileRef.current = true;
     try {
-      const results = await pick({ allowMultiSelection: false });
+      console.log('openFilePicker');
+      const results = await pick({ allowMultiSelection: false, copyTo: 'cachesDirectory' } as any);
+      console.log('results', results);
       if (results?.length && results[0]) {
-        const { uri, name: fileName } = results[0];
-        setPendingAttachments((p) => [...p, { type: 'file', uri, name: fileName ?? 'File' }]);
+        const item: any = results[0];
+        const uri: string | undefined = item.fileCopyUri ?? item.uri;
+        const fileName: string | undefined = item.name;
+        if (uri) {
+          setPendingAttachments((p) => [...p, { type: 'file', uri, name: fileName ?? 'File' }]);
+        }
       }
-    } catch {
+    } catch (error) {
+      console.log('openFilePicker error');
+      console.log(error);
       // User cancelled or error
+    } finally {
+      isPickingFileRef.current = false;
     }
   };
 
@@ -711,14 +738,39 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     const trimmed = inputText.trim();
     const hasAttachments = pendingAttachments.length > 0;
     if (!trimmed && !hasAttachments) return;
-    if (!chatId || !currentUserId || !otherUserId) return;
+    if (!currentUserId || !otherUserId) return;
     setSendLoading(true);
     const replyToPayload = replyingTo?.messageId ?? null;
     try {
+      let effectiveChatId = chatId;
+
+      // If there is no existing chat, create it first with the first message
+      if (!effectiveChatId) {
+        const addRes = await apiClient.post(endpoints.chat.addChat, {
+          senderId: currentUserId,
+          receiverId: otherUserId,
+          firstMessage: trimmed,
+        });
+        effectiveChatId =
+          addRes.data?.chatId ??
+          addRes.data?.id ??
+          (addRes.data?.data && (addRes.data.data.chatId ?? addRes.data.data.id)) ??
+          null;
+
+        if (!effectiveChatId) {
+          setSendLoading(false);
+          return;
+        }
+
+        setChatId(effectiveChatId);
+        // Update navigation params so future navigations have the chat id
+        navigation.setParams({ chatId: effectiveChatId } as any);
+      }
+
       if (trimmed) {
         socketService.typing(currentUserId, otherUserId, false);
         const res = await sendMessageApi({
-          chatId,
+          chatId: effectiveChatId!,
           content: trimmed,
           messageType: 'text',
           files: [],
@@ -747,7 +799,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         const fileName = att.type === 'image' ? `image_${Date.now()}.jpg` : att.name;
         const { url, key } = await uploadChatFileApi(att.uri, { mimeType, fileName });
         const res = await sendMessageApi({
-          chatId,
+          chatId: effectiveChatId!,
           content: '',
           messageType,
           files: [{ url, key }],
@@ -810,7 +862,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
     setRequestActionLoading('block');
     try {
-      await blockUserApi({ blockUserId: otherUserId, type: 'block' });
+      await apiClient.post(endpoints.chat.blockreportUser, {
+        targetUserId: otherUserId,
+      });
       navigation.goBack();
     } catch (err: unknown) {
       // Block failed
@@ -819,18 +873,25 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
   };
 
-  const handleAttachmentSelect = (option: AttachmentOption) => {
+  const handleAttachmentSelect = async (option: AttachmentOption) => {
     if (option === 'camera') {
-      handleCamera();
+      await handleCamera();
       return;
     }
     if (option === 'gallery') {
-      handleGallery();
+      await handleGallery();
       return;
     }
     if (option === 'files') {
-      setAttachmentSheetOpen(false);
-      openFilePicker();
+      try {
+        // Wait for the attachment bottom sheet (Modal) to close before presenting
+        // the native iOS document picker, otherwise iOS can reject the second modal.
+        await new Promise<void>((resolve) => setTimeout(resolve, 350));
+        await openFilePicker();
+      } catch (error) {
+        console.log('handleAttachmentSelect error');
+        console.log(error);
+      }
     }
   };
 
@@ -1729,11 +1790,14 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       <ReusableBottomSheet
         isOpen={showCameraPermissionSheet}
         onClose={() => setShowCameraPermissionSheet(false)}
-        snapPoints={['45%']}
+        snapPoints={[336]}
         showDragHandle
         showCloseButton={false}
         enablePanDownToClose
         backgroundStyle={permissionSheetStyles.sheet}
+        backdropStyle={permissionSheetStyles.backdrop}
+        dragHandleContainerStyle={permissionSheetStyles.dragHandleContainer}
+        dragHandleStyle={permissionSheetStyles.dragHandle}
         scrollEnabled={false}
       >
         <View style={permissionSheetStyles.content}>
@@ -1743,25 +1807,52 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           <Text style={permissionSheetStyles.description}>
             {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.CAMERA_PERMISSION_DESCRIPTION}
           </Text>
-          <Button
-            title={STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
-            onPress={handleAllowCameraPermission}
-            variant="primary"
-            disabled={isRequestingPermission}
-            loading={isRequestingPermission}
-            style={permissionSheetStyles.allowButton}
-          />
+          <View style={permissionSheetStyles.actions}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={handleAllowCameraPermission}
+              disabled={isRequestingPermission}
+              style={permissionSheetStyles.primaryButton}
+            >
+              <LinearGradient
+                colors={['#C671F4', '#7640F0']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={permissionSheetStyles.primaryButtonGradient}
+              />
+              <View pointerEvents="none" style={permissionSheetStyles.primaryButtonInset} />
+              {isRequestingPermission ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={permissionSheetStyles.primaryButtonText}>
+                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => setShowCameraPermissionSheet(false)}
+              disabled={isRequestingPermission}
+              style={permissionSheetStyles.secondaryButton}
+            >
+              <Text style={permissionSheetStyles.secondaryButtonText}>Don’t Allow</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ReusableBottomSheet>
 
       <ReusableBottomSheet
         isOpen={showGalleryPermissionSheet}
         onClose={() => setShowGalleryPermissionSheet(false)}
-        snapPoints={['45%']}
+        snapPoints={[336]}
         showDragHandle
         showCloseButton={false}
         enablePanDownToClose
         backgroundStyle={permissionSheetStyles.sheet}
+        backdropStyle={permissionSheetStyles.backdrop}
+        dragHandleContainerStyle={permissionSheetStyles.dragHandleContainer}
+        dragHandleStyle={permissionSheetStyles.dragHandle}
         scrollEnabled={false}
       >
         <View style={permissionSheetStyles.content}>
@@ -1771,25 +1862,52 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           <Text style={permissionSheetStyles.description}>
             {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.PHOTOS_PERMISSION_DESCRIPTION}
           </Text>
-          <Button
-            title={STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
-            onPress={handleAllowGalleryPermission}
-            variant="primary"
-            disabled={isRequestingPermission}
-            loading={isRequestingPermission}
-            style={permissionSheetStyles.allowButton}
-          />
+          <View style={permissionSheetStyles.actions}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={handleAllowGalleryPermission}
+              disabled={isRequestingPermission}
+              style={permissionSheetStyles.primaryButton}
+            >
+              <LinearGradient
+                colors={['#C671F4', '#7640F0']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={permissionSheetStyles.primaryButtonGradient}
+              />
+              <View pointerEvents="none" style={permissionSheetStyles.primaryButtonInset} />
+              {isRequestingPermission ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={permissionSheetStyles.primaryButtonText}>
+                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => setShowGalleryPermissionSheet(false)}
+              disabled={isRequestingPermission}
+              style={permissionSheetStyles.secondaryButton}
+            >
+              <Text style={permissionSheetStyles.secondaryButtonText}>Don’t Allow</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ReusableBottomSheet>
 
       <ReusableBottomSheet
         isOpen={showMicrophonePermissionSheet}
         onClose={() => setShowMicrophonePermissionSheet(false)}
-        snapPoints={['45%']}
+        snapPoints={[336]}
         showDragHandle
         showCloseButton={false}
         enablePanDownToClose
         backgroundStyle={permissionSheetStyles.sheet}
+        backdropStyle={permissionSheetStyles.backdrop}
+        dragHandleContainerStyle={permissionSheetStyles.dragHandleContainer}
+        dragHandleStyle={permissionSheetStyles.dragHandle}
         scrollEnabled={false}
       >
         <View style={permissionSheetStyles.content}>
@@ -1799,38 +1917,40 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           <Text style={permissionSheetStyles.description}>
             {STRINGS.CHAT.MICROPHONE_PERMISSION_DESCRIPTION}
           </Text>
-          <TouchableOpacity
-            style={permissionSheetStyles.allowButton}
-            // Voice recording disabled – just close the sheet
-            onPress={() => setShowMicrophonePermissionSheet(false)}
-            disabled={isRequestingPermission}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={[...colors.gradients.primary.colors]}
-              start={{ x: 0, y: 0.5 }}
-              end={{ x: 1, y: 0.5 }}
-              style={permissionSheetStyles.allowButtonGradient}
+          <View style={permissionSheetStyles.actions}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              // Voice recording disabled – just close the sheet
+              onPress={() => setShowMicrophonePermissionSheet(false)}
+              disabled={isRequestingPermission}
+              style={permissionSheetStyles.primaryButton}
             >
+              <LinearGradient
+                colors={['#C671F4', '#7640F0']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={permissionSheetStyles.primaryButtonGradient}
+              />
+              <View pointerEvents="none" style={permissionSheetStyles.primaryButtonInset} />
               {isRequestingPermission ? (
-                <ActivityIndicator size="small" color={colors.white} />
+                <ActivityIndicator color={colors.white} />
               ) : (
-                <Text style={permissionSheetStyles.allowButtonLabel}>
+                <Text style={permissionSheetStyles.primaryButtonText}>
                   {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
                 </Text>
               )}
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={permissionSheetStyles.dontAllowButton}
-            onPress={() => setShowMicrophonePermissionSheet(false)}
-            disabled={isRequestingPermission}
-            activeOpacity={0.8}
-          >
-            <Text style={permissionSheetStyles.dontAllowButtonLabel}>
-              {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.DONT_ALLOW}
-            </Text>
-          </TouchableOpacity>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => setShowMicrophonePermissionSheet(false)}
+              disabled={isRequestingPermission}
+              style={permissionSheetStyles.secondaryButton}
+            >
+              <Text style={permissionSheetStyles.secondaryButtonText}>
+                {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.DONT_ALLOW}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ReusableBottomSheet>
 
@@ -1943,64 +2063,93 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 };
 
 const permissionSheetStyles = StyleSheet.create({
+  backdrop: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  dragHandleContainer: {
+    paddingTop: 12,
+    paddingBottom: 0,
+  },
+  dragHandle: {
+    backgroundColor: '#CCCCCC',
+  },
   sheet: {
     backgroundColor: colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderRadius: 32,
+    left: 8,
+    right: 8,
+    bottom: 8,
+    overflow: 'hidden',
   },
   content: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 32,
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 16,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '500',
     fontFamily: typography.fontFamily.medium,
     color: colors.neutral[900],
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   description: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '400',
     fontFamily: typography.fontFamily.regular,
-    color: colors.neutral[600],
+    color: '#999999',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 24,
     marginBottom: 24,
   },
-  allowButton: {
+  actions: {
+    gap: 8,
+  },
+  primaryButton: {
+    height: 56,
     width: '100%',
-    height: 54,
-    marginBottom: 8,
-    overflow: 'hidden',
     borderRadius: 100,
-  },
-  allowButtonGradient: {
-    flex: 1,
-    justifyContent: 'center',
+    overflow: 'hidden',
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  allowButtonLabel: {
+  primaryButtonGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  primaryButtonInset: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 100,
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    opacity: 0.6,
+  },
+  primaryButtonText: {
     fontSize: 16,
     fontWeight: '500',
     fontFamily: typography.fontFamily.medium,
     color: colors.white,
+    letterSpacing: 0.32,
   },
-  dontAllowButton: {
+  secondaryButton: {
+    height: 56,
     width: '100%',
-    height: 54,
     borderRadius: 100,
     backgroundColor: 'rgba(0,0,0,0.05)',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
-  dontAllowButtonLabel: {
+  secondaryButtonText: {
     fontSize: 16,
     fontWeight: '500',
     fontFamily: typography.fontFamily.medium,
     color: colors.black,
+    letterSpacing: 0.32,
   },
 });
 

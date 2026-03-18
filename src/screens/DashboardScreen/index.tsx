@@ -33,12 +33,6 @@ import { BlockIcon } from '../../assets/icons/common/BlockIcon';
 import { ReportIcon } from '../../assets/icons/common/ReportIcon';
 import { ForwardArrowIcon } from '../../assets/icons/common/ForwardArrowIcon';
 import { CloseIcon } from '../../assets/icons/common/CloseIcon';
-import {
-  StatusSignalIcon,
-  StatusConnectionIcon,
-  StatusBatteryIcon,
-} from '../../assets/icons/match/EssentialStatusIcons';
-
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -337,12 +331,6 @@ export const DashboardScreen = () => {
                             <Text style={styles.name} numberOfLines={1}>
                               {match.name}
                             </Text>
-                            {/* <View style={styles.verifiedBadge}>
-                              <VerifiedIcon
-                                size={12}
-                                color={colors.white}
-                              />
-                            </View> */}
                           </View>
                           <View style={styles.nameProgressSegments}>
                             {(match.images ?? [match.image]).slice(0, PHOTO_COUNT).map((_, i) => {
@@ -432,7 +420,7 @@ export const DashboardScreen = () => {
                       <TouchableOpacity
                         style={styles.matchActionButton}
                         onPress={() => {
-                          if (match.chatId) {
+                          if (match.chatId && match.chatId !== '' && match.chatId !== null) {
                             navigation.navigate('Chat', {
                               screen: 'ChatDetail',
                               params: {
@@ -538,10 +526,13 @@ export const DashboardScreen = () => {
                   navigation.navigate('Chat', {
                     screen: 'ChatDetail',
                     params: {
-                      chatId: m.id,
+                      // If a chat already exists, use its id; otherwise let ChatDetail
+                      // handle creating the chat on first send.
+                      chatId: m.chatId ?? null,
                       name: m.name,
                       avatar: m.image,
                       isRequest: false,
+                      otherUserId: m.id,
                     },
                   });
                 }}

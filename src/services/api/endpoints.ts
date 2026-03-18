@@ -56,6 +56,12 @@ export const endpoints = {
     unpinChat: '/chat/unpin-chat',
     blockUser: '/block-user' ,
     reportUser: '/report-user',
+    blockreportUser: '/report-block',
     unblockUser: '/chat/unblock',
+    addChat: 'chat/add-chat-list',
+  },
+  chatbot: {
+    getChatbotMessages: '/ai-chat-log/get-logs',
+    postChatbotMessages: '/ai-chat-log/send',
   },
 };

@@ -1,10 +1,13 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   TextInput,
   StyleSheet,
   Text,
   TextInputProps,
+  Platform,
+  NativeSyntheticEvent,
+  TextInputSelectionChangeEventData,
 } from 'react-native';
 import { colors, typography, spacing } from '../theme';
 
@@ -13,7 +16,7 @@ export interface OTPInputProps
   value: string;
   onChangeText: (text: string) => void;
   error?: string | undefined;
-  success?: boolean | undefined; // For verified state (green border)
+  success?: boolean | undefined;
   length?: number;
 }
 
@@ -26,14 +29,29 @@ export const OTPInput: React.FC<OTPInputProps> = ({
   ...rest
 }) => {
   const [isFocused, setIsFocused] = useState(false);
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
+
   const inputRef = useRef<TextInput>(null);
 
+  useEffect(() => {
+    // keep cursor at end whenever value changes
+    setSelection({
+      start: value.length,
+      end: value.length,
+    });
+  }, [value]);
+
   const handleChangeText = (text: string) => {
-    // Only allow numeric input
     const numericText = text.replace(/[^0-9]/g, '');
-    // Limit to OTP length
     const limitedText = numericText.slice(0, length);
+
     onChangeText(limitedText);
+  };
+
+  const handleSelectionChange = (
+    e: NativeSyntheticEvent<TextInputSelectionChangeEventData>,
+  ) => {
+    setSelection(e.nativeEvent.selection);
   };
 
   const handleFocus = () => {
@@ -51,12 +69,12 @@ export const OTPInput: React.FC<OTPInputProps> = ({
   };
 
   const borderColor = error
-    ? colors.semantic.error // Error red from Figma
+    ? colors.semantic.error
     : success
-    ? colors.semantic.success // Green (success) from Figma
+    ? colors.semantic.success
     : isFocused
-    ? colors.primary.purple // #7742F0 - purple border when focused
-    : colors.border.light; // neutral.100
+    ? colors.primary.purple
+    : colors.border.light;
 
   return (
     <View style={styles.container}>
@@ -70,16 +88,22 @@ export const OTPInput: React.FC<OTPInputProps> = ({
         ]}
         value={value}
         onChangeText={handleChangeText}
-        placeholderTextColor={colors.neutral[500]} // #8C8C8C
+        selection={selection}
+        onSelectionChange={handleSelectionChange}
+        placeholderTextColor={colors.neutral[500]}
         keyboardType="number-pad"
         maxLength={length}
         autoFocus={rest.autoFocus}
         onFocus={handleFocus}
         onBlur={handleBlur}
-        editable={!success} // Disable input when verified
+        editable={!success}
+        textAlign="center"
         {...rest}
       />
-      {error && <Text style={styles.errorText}>{error}</Text>}
+
+      <View style={styles.errorSlot}>
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      </View>
     </View>
   );
 };
@@ -91,33 +115,37 @@ const styles = StyleSheet.create({
   input: {
     height: 54,
     borderWidth: 1,
-    borderRadius: 100, // Fully rounded
-    paddingHorizontal: spacing.lg + 4, // 20px (px-[20px])
-    paddingVertical: spacing.md, // 16px (py-[16px])
+    borderRadius: 100,
+    paddingHorizontal: spacing.lg + 4,
+    paddingVertical: spacing.md,
     fontSize: 16,
     lineHeight: 22,
-    letterSpacing: 0.32,
-    fontFamily: typography.fontFamily.regular,
-    color: colors.neutral[900], // #1A1A1A - text color when typing
+    letterSpacing: 0,
+    fontFamily:
+      Platform.OS === 'ios' ? typography.fontFamily.regular : undefined,
+    color: colors.neutral[900],
     backgroundColor: colors.white,
     textAlign: 'center',
   },
   inputError: {
-    borderColor: colors.semantic.error, // Error red from Figma
+    borderColor: colors.semantic.error,
   },
   inputSuccess: {
-    borderColor: colors.semantic.success, // Green (success) from Figma
+    borderColor: colors.semantic.success,
+  },
+  errorSlot: {
+    height: spacing.xs + 20,
+    justifyContent: 'flex-end',
   },
   errorText: {
-    marginTop: spacing.xs, // 4px (py-[4px] in Figma)
-    marginLeft: spacing.lg + 4, // 20px (pl-[20px] in Figma)
-    marginRight: spacing.sm, // 8px (pr-[8px] in Figma)
+    marginTop: spacing.xs,
+    marginLeft: spacing.lg + 4,
+    marginRight: spacing.sm,
     fontSize: 14,
     lineHeight: 20,
     letterSpacing: 0.28,
-    color: '#E50000', // Error red from Figma
+    color: '#E50000',
     fontFamily: typography.fontFamily.regular,
-    alignSelf: 'flex-start', // Align to left
+    alignSelf: 'flex-start',
   },
 });
-

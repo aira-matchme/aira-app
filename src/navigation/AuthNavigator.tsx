@@ -5,7 +5,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { EnableNotificationsScreen } from '../screens/permissions/EnableNotificationsScreen';
-import { EnableLocationScreen } from '../screens/permissions/EnableLocationScreen';
 import { ProfileIntroScreen } from '../screens/profile/ProfileIntroScreen';
 import { BasicDetailsNameScreen } from '../screens/profile/BasicDetailsNameScreen';
 import { BasicDetailsDobScreen } from '../screens/profile/BasicDetailsDobScreen';
@@ -102,7 +101,6 @@ export const AuthNavigator = () => {
       <Stack.Screen name="Login" component={LoginScreen} />
 
       <Stack.Screen name="EnableNotifications" component={EnableNotificationsScreen} />
-      <Stack.Screen name="EnableLocation" component={EnableLocationScreen} />
 
       <Stack.Screen
         name="ProfileIntro"

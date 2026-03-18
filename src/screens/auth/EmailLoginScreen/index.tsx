@@ -73,20 +73,30 @@ export const EmailLoginScreen: React.FC = () => {
       const response = await sendOtpMutation.mutateAsync({ email });
       
       if (response.statusCode === 200) {
-        Toast.show({
-          type: 'success',
-          text1: 'OTP Sent',
-          text2: 'Please check your email for the verification code',
-        });
+        // Toast.show({
+        //   type: 'success',
+        //   text1: 'OTP Sent',
+        //   text2: 'Please check your email for the verification code',
+        // });
         navigation.navigate('OTPVerification', { email });
       }
     } catch (error: any) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to send OTP. Please try again.',
+        });
+        
+
       // Send OTP failed
     }
   };
 
   const handleClose = () => {
-    navigation.goBack();
+    // Just navigate back to Welcome; this is always a valid route
+    // on the auth stack and avoids RESET warnings when no navigator
+    // handles the action.
+    navigation.navigate('Welcome');
   };
 
   const handleLostAccess = () => {

@@ -24,6 +24,9 @@ interface BottomSheetProps {
   showCloseButton?: boolean;
   enablePanDownToClose?: boolean;
   backgroundStyle?: object;
+  backdropStyle?: object;
+  dragHandleContainerStyle?: object;
+  dragHandleStyle?: object;
   scrollEnabled?: boolean;
 }
 
@@ -38,6 +41,9 @@ export const ReusableBottomSheet: React.FC<BottomSheetProps> = ({
   showCloseButton = true,
   enablePanDownToClose = true,
   backgroundStyle,
+  backdropStyle,
+  dragHandleContainerStyle,
+  dragHandleStyle,
   scrollEnabled = true,
 }) => {
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -237,6 +243,7 @@ export const ReusableBottomSheet: React.FC<BottomSheetProps> = ({
           <Animated.View
             style={[
               styles.backdrop,
+              backdropStyle,
               {
                 opacity: backdropOpacity,
               },
@@ -278,8 +285,8 @@ export const ReusableBottomSheet: React.FC<BottomSheetProps> = ({
           >
             {/* Drag Handle */}
             {showDragHandle && (
-              <View style={styles.dragHandleContainer}>
-                <View style={styles.dragHandle} />
+              <View style={[styles.dragHandleContainer, dragHandleContainerStyle]}>
+                <View style={[styles.dragHandle, dragHandleStyle]} />
               </View>
             )}
 

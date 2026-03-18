@@ -35,6 +35,7 @@ const ITEM_HEIGHT = 52;
 const ROW_HEIGHT = ITEM_HEIGHT + spacing.sm; // option height + margin for scroll/snap
 const VISIBLE_ROWS = 3;
 const PICKER_VISIBLE_HEIGHT = ROW_HEIGHT * VISIBLE_ROWS;
+const TOP_BOTTOM_SPACER = (PICKER_VISIBLE_HEIGHT - ROW_HEIGHT) / 2;
 
 // Validation
 const dobSchema = z
@@ -84,19 +85,34 @@ export const BasicDetailsDobScreen: React.FC = () => {
   const monthValue = watch('month');
   const yearValue = watch('year');
 
-  // Align all three columns to show selected row in center (no scroll animation)
+  // Align all three columns once on mount so selected row starts centered.
+  // Do NOT rerun on every value change, or it will fight with user scrolling.
   useEffect(() => {
     const id = setTimeout(() => {
-      const dayIndex = Math.min(Math.max((dayValue ?? 1) - 1, 0), DOB_DAYS.length - 1);
-      const monthIndex = Math.min(Math.max((monthValue ?? 1) - 1, 0), DOB_MONTHS.length - 1);
-      const yearVal = yearValue ?? DOB_YEARS[0];
-      const yearIndex = Math.max(0, DOB_YEARS.indexOf(yearVal));
-      dayScrollRef.current?.scrollTo({ y: dayIndex * ROW_HEIGHT, animated: false });
-      monthScrollRef.current?.scrollTo({ y: monthIndex * ROW_HEIGHT, animated: false });
-      yearScrollRef.current?.scrollTo({ y: yearIndex * ROW_HEIGHT, animated: false });
+      const initialDay = dayValue ?? 1;
+      const initialMonth = monthValue ?? 1;
+      const initialYear = yearValue ?? DOB_YEARS[0];
+
+      const dayIndex = Math.min(Math.max(initialDay - 1, 0), DOB_DAYS.length - 1);
+      const monthIndex = Math.min(Math.max(initialMonth - 1, 0), DOB_MONTHS.length - 1);
+      const yearIndex = Math.max(0, DOB_YEARS.indexOf(initialYear));
+
+      dayScrollRef.current?.scrollTo({
+        y: TOP_BOTTOM_SPACER + dayIndex * ROW_HEIGHT,
+        animated: false,
+      });
+      monthScrollRef.current?.scrollTo({
+        y: TOP_BOTTOM_SPACER + monthIndex * ROW_HEIGHT,
+        animated: false,
+      });
+      yearScrollRef.current?.scrollTo({
+        y: TOP_BOTTOM_SPACER + yearIndex * ROW_HEIGHT,
+        animated: false,
+      });
     }, 50);
     return () => clearTimeout(id);
-  }, [dayValue, monthValue, yearValue]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onContinue = (data: DobFormData) => {
     setDateOfBirth(data.day, data.month, data.year);
@@ -150,22 +166,24 @@ export const BasicDetailsDobScreen: React.FC = () => {
                     ref={dayScrollRef}
                     showsVerticalScrollIndicator={false}
                     snapToInterval={ROW_HEIGHT}
-                    decelerationRate="fast"
+                    // Match year column for smoother scrolling
+                    decelerationRate="normal"
                     contentContainerStyle={styles.scrollContent}
                     onMomentumScrollEnd={(e) => {
                       const offsetY = e.nativeEvent.contentOffset.y;
-                      let index = Math.round(offsetY / ROW_HEIGHT);
+                      let index = Math.round((offsetY - TOP_BOTTOM_SPACER) / ROW_HEIGHT);
                       if (index < 0) index = 0;
                       if (index >= DOB_DAYS.length) index = DOB_DAYS.length - 1;
                       const snappedDay = DOB_DAYS[index]!;
                       setValue('day', snappedDay, { shouldValidate: true });
                       dayScrollRef.current?.scrollTo({
-                        y: index * ROW_HEIGHT,
-                        animated: false,
+                        y: TOP_BOTTOM_SPACER + index * ROW_HEIGHT,
+                        animated: true,
                       });
                     }}
                   >
-                    {DOB_DAYS.map((day, index) => {
+                    <View style={{ height: TOP_BOTTOM_SPACER }} />
+                    {DOB_DAYS.map((day) => {
                       const selected = day === value;
                       return (
                         <TouchableOpacity
@@ -176,6 +194,14 @@ export const BasicDetailsDobScreen: React.FC = () => {
                           ]}
                           onPress={() => {
                             setValue('day', day, { shouldValidate: true });
+                            const idx = Math.min(
+                              Math.max(DOB_DAYS.indexOf(day), 0),
+                              DOB_DAYS.length - 1,
+                            );
+                            dayScrollRef.current?.scrollTo({
+                              y: TOP_BOTTOM_SPACER + idx * ROW_HEIGHT,
+                              animated: true,
+                            });
                           }}
                         >
                           <Text
@@ -189,6 +215,7 @@ export const BasicDetailsDobScreen: React.FC = () => {
                         </TouchableOpacity>
                       );
                     })}
+                    <View style={{ height: TOP_BOTTOM_SPACER }} />
                   </ScrollView>
                 </View>
               )}
@@ -203,11 +230,12 @@ export const BasicDetailsDobScreen: React.FC = () => {
                     ref={monthScrollRef}
                     showsVerticalScrollIndicator={false}
                     snapToInterval={ROW_HEIGHT}
-                    decelerationRate="fast"
+                    // Match day/year columns for consistent feel
+                    decelerationRate="normal"
                     contentContainerStyle={styles.scrollContent}
                     onMomentumScrollEnd={(e) => {
                       const offsetY = e.nativeEvent.contentOffset.y;
-                      let index = Math.round(offsetY / ROW_HEIGHT);
+                      let index = Math.round((offsetY - TOP_BOTTOM_SPACER) / ROW_HEIGHT);
                       if (index < 0) index = 0;
                       if (index >= DOB_MONTHS.length) index = DOB_MONTHS.length - 1;
                       const snappedMonthValue = index + 1;
@@ -215,11 +243,12 @@ export const BasicDetailsDobScreen: React.FC = () => {
                         shouldValidate: true,
                       });
                       monthScrollRef.current?.scrollTo({
-                        y: index * ROW_HEIGHT,
-                        animated: false,
+                        y: TOP_BOTTOM_SPACER + index * ROW_HEIGHT,
+                        animated: true,
                       });
                     }}
                   >
+                    <View style={{ height: TOP_BOTTOM_SPACER }} />
                     {DOB_MONTHS.map((month, index) => {
                       const monthValue = index + 1;
                       const selected = monthValue === value;
@@ -234,6 +263,14 @@ export const BasicDetailsDobScreen: React.FC = () => {
                             setValue('month', monthValue, {
                               shouldValidate: true,
                             });
+                            const idx = Math.min(
+                              Math.max(index, 0),
+                              DOB_MONTHS.length - 1,
+                            );
+                            monthScrollRef.current?.scrollTo({
+                              y: TOP_BOTTOM_SPACER + idx * ROW_HEIGHT,
+                              animated: true,
+                            });
                           }}
                         >
                           <Text
@@ -247,6 +284,7 @@ export const BasicDetailsDobScreen: React.FC = () => {
                         </TouchableOpacity>
                       );
                     })}
+                    <View style={{ height: TOP_BOTTOM_SPACER }} />
                   </ScrollView>
                 </View>
               )}
@@ -261,22 +299,25 @@ export const BasicDetailsDobScreen: React.FC = () => {
                     ref={yearScrollRef}
                     showsVerticalScrollIndicator={false}
                     snapToInterval={ROW_HEIGHT}
-                    decelerationRate="fast"
+                    // Slightly slower deceleration for smoother year scrolling
+                    decelerationRate="normal"
                     contentContainerStyle={styles.scrollContent}
                     onMomentumScrollEnd={(e) => {
                       const offsetY = e.nativeEvent.contentOffset.y;
-                      let index = Math.round(offsetY / ROW_HEIGHT);
+                      let index = Math.round((offsetY - TOP_BOTTOM_SPACER) / ROW_HEIGHT);
                       if (index < 0) index = 0;
                       if (index >= DOB_YEARS.length) index = DOB_YEARS.length - 1;
                       const snappedYear = DOB_YEARS[index]!;
                       setValue('year', snappedYear, { shouldValidate: true });
                       yearScrollRef.current?.scrollTo({
-                        y: index * ROW_HEIGHT,
-                        animated: false,
+                        y: TOP_BOTTOM_SPACER + index * ROW_HEIGHT,
+                        // Use a small animation so the final snap feels less jerky
+                        animated: true,
                       });
                     }}
                   >
-                    {DOB_YEARS.map((year, index) => {
+                    <View style={{ height: TOP_BOTTOM_SPACER }} />
+                    {DOB_YEARS.map((year) => {
                       const selected = year === value;
                       return (
                         <TouchableOpacity
@@ -288,6 +329,14 @@ export const BasicDetailsDobScreen: React.FC = () => {
                           onPress={() => {
                             setValue('year', year, {
                               shouldValidate: true,
+                            });
+                            const idx = Math.min(
+                              Math.max(DOB_YEARS.indexOf(year), 0),
+                              DOB_YEARS.length - 1,
+                            );
+                            yearScrollRef.current?.scrollTo({
+                              y: TOP_BOTTOM_SPACER + idx * ROW_HEIGHT,
+                              animated: true,
                             });
                           }}
                         >
@@ -302,6 +351,7 @@ export const BasicDetailsDobScreen: React.FC = () => {
                         </TouchableOpacity>
                       );
                     })}
+                    <View style={{ height: TOP_BOTTOM_SPACER }} />
                   </ScrollView>
                 </View>
               )}

@@ -36,6 +36,11 @@ import {
   EMPLOYMENT_OPTIONS,
   INCOME_OPTIONS,
   INTEREST_KEY_TO_LABEL,
+  GENDER_OPTIONS,
+  EDUCATION_OPTIONS,
+  RELIGION_OPTIONS,
+  MARITAL_OPTIONS,
+  CHILDREN_OPTIONS,
 } from '../../../constants/profile';
 import { colors, typography } from '../../../theme';
 import type { ProfileStackParamList } from '../../../navigation/types';
@@ -315,6 +320,15 @@ export const EditProfileScreen: React.FC = () => {
     return String(v);
   };
 
+  const getLabelFromOptions = (
+    options: Array<{ key: string; label: string }>,
+    raw: unknown,
+  ): string | undefined => {
+    const key = toDisplayString(raw);
+    if (!key) return undefined;
+    return options.find((o) => o.key === key)?.label;
+  };
+
   const detailRows = useMemo(
     () =>
       DETAIL_ROWS.map((row) => {
@@ -323,10 +337,12 @@ export const EditProfileScreen: React.FC = () => {
 
         switch (row.key) {
           case 'name':
-            value = toDisplayString(u.name ?? displayName);
+            value = toDisplayString(u.nickName ?? displayName);
             break;
           case 'gender':
-            value = toDisplayString(u.gender);
+            value =
+              getLabelFromOptions(GENDER_OPTIONS as Array<{ key: string; label: string }>, u.gender) ??
+              toDisplayString(u.gender);
             break;
           case 'height': {
             const feet = u.heightFeet != null ? Number(u.heightFeet) : null;
@@ -339,7 +355,13 @@ export const EditProfileScreen: React.FC = () => {
             break;
           }
           case 'education':
-            value = toDisplayString((u.education as any)?.level ?? u.education);
+            value = (() => {
+              const raw = (u.education as any)?.level ?? (u.education as any)?.key ?? u.education;
+              return (
+                getLabelFromOptions(EDUCATION_OPTIONS, raw) ??
+                toDisplayString(raw)
+              );
+            })();
             break;
           case 'employment': {
             const employmentStatus = (u.career as any)?.employmentStatus ?? u.employment;
@@ -356,13 +378,19 @@ export const EditProfileScreen: React.FC = () => {
             break;
           }
           case 'religion':
-            value = toDisplayString(u.religion);
+            value =
+              getLabelFromOptions(RELIGION_OPTIONS, u.religion) ??
+              toDisplayString(u.religion);
             break;
           case 'marital':
-            value = toDisplayString(u.maritalStatus);
+            value =
+              getLabelFromOptions(MARITAL_OPTIONS, u.maritalStatus) ??
+              toDisplayString(u.maritalStatus);
             break;
           case 'children':
-            value = toDisplayString(u.children);
+            value =
+              getLabelFromOptions(CHILDREN_OPTIONS, u.children) ??
+              toDisplayString(u.children);
             break;
           case 'interests': {
             const rawList = Array.isArray(u.hobbies) ? u.hobbies : u.interests;
@@ -584,11 +612,14 @@ export const EditProfileScreen: React.FC = () => {
           setShowCameraPermissionSheet(false);
           setPendingCameraIndex(null);
         }}
-        snapPoints={['45%']}
+        snapPoints={[336]}
         showDragHandle={true}
         showCloseButton={false}
         enablePanDownToClose={true}
         backgroundStyle={permissionSheetStyles.sheet}
+        backdropStyle={permissionSheetStyles.backdrop}
+        dragHandleContainerStyle={permissionSheetStyles.dragHandleContainer}
+        dragHandleStyle={permissionSheetStyles.dragHandle}
         scrollEnabled={false}
       >
         <View style={permissionSheetStyles.content}>
@@ -598,14 +629,41 @@ export const EditProfileScreen: React.FC = () => {
           <Text style={permissionSheetStyles.description}>
             {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.CAMERA_PERMISSION_DESCRIPTION}
           </Text>
-          <Button
-            title={STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
-            onPress={handleAllowCameraPermission}
-            variant="primary"
-            disabled={isRequestingPermission}
-            loading={isRequestingPermission}
-            style={permissionSheetStyles.allowButton}
-          />
+          <View style={permissionSheetStyles.actions}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={handleAllowCameraPermission}
+              disabled={isRequestingPermission}
+              style={permissionSheetStyles.primaryButton}
+            >
+              <LinearGradient
+                colors={['#C671F4', '#7640F0']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={permissionSheetStyles.primaryButtonGradient}
+              />
+              <View pointerEvents="none" style={permissionSheetStyles.primaryButtonInset} />
+              {isRequestingPermission ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={permissionSheetStyles.primaryButtonText}>
+                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => {
+                setShowCameraPermissionSheet(false);
+                setPendingCameraIndex(null);
+              }}
+              disabled={isRequestingPermission}
+              style={permissionSheetStyles.secondaryButton}
+            >
+              <Text style={permissionSheetStyles.secondaryButtonText}>Don’t Allow</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ReusableBottomSheet>
 
@@ -615,11 +673,14 @@ export const EditProfileScreen: React.FC = () => {
           setShowGalleryPermissionSheet(false);
           setPendingGalleryIndex(null);
         }}
-        snapPoints={['45%']}
+        snapPoints={[336]}
         showDragHandle={true}
         showCloseButton={false}
         enablePanDownToClose={true}
         backgroundStyle={permissionSheetStyles.sheet}
+        backdropStyle={permissionSheetStyles.backdrop}
+        dragHandleContainerStyle={permissionSheetStyles.dragHandleContainer}
+        dragHandleStyle={permissionSheetStyles.dragHandle}
         scrollEnabled={false}
       >
         <View style={permissionSheetStyles.content}>
@@ -629,14 +690,41 @@ export const EditProfileScreen: React.FC = () => {
           <Text style={permissionSheetStyles.description}>
             {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.PHOTOS_PERMISSION_DESCRIPTION}
           </Text>
-          <Button
-            title={STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
-            onPress={handleAllowGalleryPermission}
-            variant="primary"
-            disabled={isRequestingPermission}
-            loading={isRequestingPermission}
-            style={permissionSheetStyles.allowButton}
-          />
+          <View style={permissionSheetStyles.actions}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={handleAllowGalleryPermission}
+              disabled={isRequestingPermission}
+              style={permissionSheetStyles.primaryButton}
+            >
+              <LinearGradient
+                colors={['#C671F4', '#7640F0']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={permissionSheetStyles.primaryButtonGradient}
+              />
+              <View pointerEvents="none" style={permissionSheetStyles.primaryButtonInset} />
+              {isRequestingPermission ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={permissionSheetStyles.primaryButtonText}>
+                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => {
+                setShowGalleryPermissionSheet(false);
+                setPendingGalleryIndex(null);
+              }}
+              disabled={isRequestingPermission}
+              style={permissionSheetStyles.secondaryButton}
+            >
+              <Text style={permissionSheetStyles.secondaryButtonText}>Don’t Allow</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ReusableBottomSheet>
     </View>
@@ -703,35 +791,92 @@ const sheetStyles = StyleSheet.create({
 });
 
 const permissionSheetStyles = StyleSheet.create({
+  backdrop: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  dragHandleContainer: {
+    paddingTop: 12,
+    paddingBottom: 0,
+  },
+  dragHandle: {
+    backgroundColor: '#CCCCCC',
+  },
   sheet: {
     backgroundColor: colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderRadius: 32,
+    left: 8,
+    right: 8,
+    bottom: 8,
+    overflow: 'hidden',
   },
   content: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 32,
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 16,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '500',
     fontFamily: typography.fontFamily.medium,
     color: colors.neutral[900],
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   description: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '400',
     fontFamily: typography.fontFamily.regular,
-    color: colors.neutral[600],
+    color: '#999999',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 24,
     marginBottom: 24,
   },
-  allowButton: {
+  actions: {
+    gap: 8,
+  },
+  primaryButton: {
+    height: 56,
     width: '100%',
-    height: 54,
+    borderRadius: 100,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  primaryButtonGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  primaryButtonInset: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 100,
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    opacity: 0.6,
+  },
+  primaryButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.white,
+    letterSpacing: 0.32,
+  },
+  secondaryButton: {
+    height: 56,
+    width: '100%',
+    borderRadius: 100,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  secondaryButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily.medium,
+    color: colors.neutral[900],
+    letterSpacing: 0.32,
   },
 });

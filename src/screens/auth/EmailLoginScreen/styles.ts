@@ -29,6 +29,7 @@ export const styles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: 0,
+    minHeight: 78, // Input 54 + error slot 24 — keeps Continue button position fixed
   },
   actionContainer: {
     gap: spacing.sm,

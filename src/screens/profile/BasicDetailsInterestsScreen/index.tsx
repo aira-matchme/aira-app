@@ -181,14 +181,6 @@ export const BasicDetailsInterestsScreen: React.FC = () => {
                       )}
                     </View>
                     <Text style={styles.categoryLabel}>{category.label}</Text>
-                    {/* <Text
-                      style={[
-                        styles.categoryCountText,
-                        { color: totalSelected >= MIN_TOTAL ? colors.primary.purple : colors.neutral[500] },
-                      ]}
-                    >
-                      {categoryState?.count ?? 0} selected
-                    </Text> */}
                   </TouchableOpacity>
                   {isExpanded && (
                     <View style={styles.categoryTags}>
@@ -212,12 +204,14 @@ export const BasicDetailsInterestsScreen: React.FC = () => {
                             >
                               {opt.label}
                             </Text>
-                            {selected && (
-                              <InterestChipCheckIcon
-                                size={16}
-                                color={colors.primary.purple}
-                              />
-                            )}
+                            <View style={styles.chipIconSlot}>
+                              {selected && (
+                                <InterestChipCheckIcon
+                                  size={16}
+                                  color={colors.primary.purple}
+                                />
+                              )}
+                            </View>
                           </TouchableOpacity>
                         );
                       })}

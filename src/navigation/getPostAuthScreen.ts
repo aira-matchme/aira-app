@@ -30,6 +30,7 @@ export type PostAuthScreen = keyof Pick<
   | 'ReferenceImageIntro'
   | 'ReferenceImagePreference'
   | 'PreferencesStart'
+  | 'PreferencesSummary'
   | 'Likes'
 >;
 
@@ -59,8 +60,11 @@ export function getPostAuthScreen(
 
   // Show main app with bottom tabs; RootNavigator shows TabNavigator and initial tab is Home (Dashboard)
   return 'Likes';
+// return 'ProfileIntro'
+// return 'ProfilePhotos';
   // return 'ReferenceImageIntro';
   // return 'FaceVerification';
   // return 'OnboardingIntro'
+  // return 'PreferencesSummary';
 
 }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Image,
   ImageSourcePropType,
   Pressable,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -31,33 +32,29 @@ import { VerifiedIcon } from '../../assets/icons/common/VerifiedIcon';
 import { LogoWordmarkGradient } from '../../assets/icons/home/LogoWordmarkGradient';
 import { AiraPlusLogo } from '../../assets/icons/profile/AiraPlusLogo';
 import { getPreferencesAndHydrateStore } from '../../modules/preferences/api';
+import { getProfileApi } from '../../modules/auth/api';
 
 import { styles } from './styles';
 import { HomeFilterIcon } from '../../assets/icons/home/HomeFilterIcon';
 
 const AIRA_PLUS_CARD_IMAGE = require('../../assets/images/AiraPlusCardBackground.png');
+const PRIVACY_POLICY_URL = 'https://airamatchme.com/privacy';
+const SUPPORT_EMAIL_URL = 'mailto:support@airamtachme.com';
 
 const MENU_ITEMS: Array<{
   id: string;
   label: string;
   Icon: React.FC<{ width?: number; height?: number; color?: string }>;
   screen?: string;
+  url?: string;
   iconColor?: string;
 }> = [
   { id: 'preferences', label: 'Preferences', Icon: HomeFilterIcon, screen: 'PreferencesSummary', iconColor: colors.primary.purple },
   { id: 'referral', label: 'Referral Points', Icon: ProfileReferralIcon },
   { id: 'subscription', label: 'My Subscription', Icon: ProfileSubscriptionIcon },
-  { id: 'help', label: 'Help Center', Icon: ProfileHelpIcon },
-  { id: 'privacy', label: 'Privacy & Terms', Icon: ProfileHelpIcon },
+  { id: 'help', label: 'Help Center', Icon: ProfileHelpIcon, url: SUPPORT_EMAIL_URL },
+  { id: 'privacy', label: 'Privacy & Terms', Icon: ProfileHelpIcon, url: PRIVACY_POLICY_URL },
 ];
-
-function getProfileImageSource(): ImageSourcePropType | null {
-  try {
-    return require('../../assets/images/ProfileImage.png');
-  } catch {
-    return null;
-  }
-}
 
 type ProfileMainNav = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -65,9 +62,55 @@ const PHOTO_SLOTS = 6;
 
 export const ProfileTabScreen = () => {
   const navigation = useNavigation<ProfileMainNav>();
-  const { user, logout } = useAuthStore();
-  const displayName = user?.name ?? 'David Taylor';
-  const profileImage = getProfileImageSource();
+  const { user, logout, setUser } = useAuthStore();
+  const [profileImage, setProfileImage] = useState<ImageSourcePropType | null>(null);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const profile = await getProfileApi();
+        if (profile?.data) {
+          // Keep auth store in sync with latest profile
+          setUser(profile.data as any);
+          const nickname = (profile.data as any)?.nickName ?? (profile.data as any)?.nickname;
+          if (nickname) {
+            // nothing else needed here; displayName uses user from store
+          }
+          const photo =
+            (profile.data as any)?.profilePhoto?.url?.medium ??
+            (profile.data as any)?.profilePhoto?.url?.original ??
+            (profile.data as any)?.profilePicture;
+          if (typeof photo === 'string' && photo.length > 0) {
+            setProfileImage({ uri: photo });
+            return;
+          }
+        }
+        // Fallback to bundled placeholder if API has no photo
+        try {
+          const local = require('../../assets/images/ProfileImage.png');
+          setProfileImage(local);
+        } catch {
+          setProfileImage(null);
+        }
+      } catch {
+        // On error, fall back to any existing store user / local image
+        try {
+          const local = require('../../assets/images/ProfileImage.png');
+          setProfileImage(local);
+        } catch {
+          setProfileImage(null);
+        }
+      }
+    };
+
+    loadProfile();
+  }, [setUser]);
+
+  const displayName =
+    (user as any)?.nickName ??
+    (user as any)?.nickname ??
+    user?.name ??
+    'Guest';
   const galleryCount = (user as { galleryImages?: unknown[] })?.galleryImages?.length ?? 0;
   const profilePercent = Math.round((galleryCount / PHOTO_SLOTS) * 100);
 
@@ -75,7 +118,16 @@ export const ProfileTabScreen = () => {
     navigation.navigate('EditProfile');
   };
 
-  const onMenuPress = async (screen?: string) => {
+  const onMenuPress = async (menuItem: (typeof MENU_ITEMS)[number]) => {
+    if (menuItem.url) {
+      const canOpen = await Linking.canOpenURL(menuItem.url);
+      if (canOpen) {
+        await Linking.openURL(menuItem.url);
+      }
+      return;
+    }
+
+    const screen = menuItem.screen;
     if (screen === 'PreferencesSummary') {
       try {
         await getPreferencesAndHydrateStore();
@@ -112,7 +164,7 @@ export const ProfileTabScreen = () => {
             </View>
             <View style={styles.nameRow}>
               <Text style={styles.name}>{displayName}</Text>
-              <VerifiedIcon size={24} color={colors.neutral[500]} />
+              {/* <VerifiedIcon size={24} color={colors.neutral[500]} /> */}
             </View>
             <TouchableOpacity style={styles.editButton} onPress={onEditProfile} activeOpacity={0.8}>
               <Text style={styles.editButtonText}>Edit Profile</Text>
@@ -157,16 +209,16 @@ export const ProfileTabScreen = () => {
 
           {/* Menu list */}
           <View style={styles.menuList}>
-            {MENU_ITEMS.map(({ id, label, Icon, screen, iconColor }) => (
+            {MENU_ITEMS.map((menuItem) => (
               <TouchableOpacity
-                key={id}
+                key={menuItem.id}
                 style={styles.menuRow}
-                onPress={() => onMenuPress(screen)}
+                onPress={() => onMenuPress(menuItem)}
                 activeOpacity={0.7}
               >
                 <View style={styles.menuRowLeft}>
-                  <Icon width={20} height={20} color={iconColor} />
-                  <Text style={styles.menuRowLabel}>{label}</Text>
+                  <menuItem.Icon width={20} height={20} color={menuItem.iconColor} />
+                  <Text style={styles.menuRowLabel}>{menuItem.label}</Text>
                 </View>
                 <ProfileChevronRightIcon width={24} height={24} />
               </TouchableOpacity>

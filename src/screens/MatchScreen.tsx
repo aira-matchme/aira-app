@@ -13,87 +13,29 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 
-  import { BackArrowIcon } from '../assets/icons/common/BackArrowIcon';
-  import { TabAICenterIcon } from '../assets/icons/tabs/TabAICenterIcon';
-  // import { PlusIcon } from '../assets/icons/common/PlusIcon';
-  // import { MicIcon } from '../assets/icons/common/MicIcon';
-  import { GradientText } from '../components/GradientText';
-  import { colors, typography } from '../theme';
+import { BackArrowIcon } from '../assets/icons/common/BackArrowIcon';
+import { TabAICenterIcon } from '../assets/icons/tabs/TabAICenterIcon';
+// import { PlusIcon } from '../assets/icons/common/PlusIcon';
+// import { MicIcon } from '../assets/icons/common/MicIcon';
+import { GradientText } from '../components/GradientText';
+import { colors, typography } from '../theme';
 import { ProfileScreenGradient } from '../components/ProfileScreenGradient';
 import { ForwardArrowIcon } from '../assets/icons/common/ForwardArrowIcon';
-
-  const QUICK_ACTIONS = [
-    {
-      title: 'Help Me Break the Ice',
-      subtitle: "I’ll suggest something natural to say.",
-    },
-    {
-      title: 'Plan a Great Date',
-      subtitle: "Tell me where you are - I’ll handle the rest.",
-    },
-    {
-      title: 'Revive a Quiet Chat',
-      subtitle: "I’ll suggest something to keep things flowing.",
-    },
-    {
-      title: 'Ask Aira for Advice',
-      subtitle: "Feeling stuck? Let’s talk it through.",
-    },
-  ];
+import { apiClient } from '../services/api/client';
+import { endpoints } from '../services/api/endpoints';
 
 type AiraBlock =
   | { type: 'paragraph'; text: string }
   | { type: 'divider' }
   | { type: 'ordered'; index: number; text: string }
-  | { type: 'bullet'; indent: 0 | 1; text: string };
+  | { type: 'bullet'; indent: 0 | 1; text: string }
+  | { type: 'heading'; text: string }
+  | { type: 'bullet_item'; title: string; description: string }
+  | { type: 'follow_up'; text: string };
 
 type ChatItem =
   | { id: string; from: 'user'; text: string }
   | { id: string; from: 'aira'; blocks: AiraBlock[] };
-
-function getAiraReplyBlocks(prompt: string): AiraBlock[] {
-  const key = prompt.trim();
-  if (key === 'Plan a Great Date') {
-    return [
-      {
-        type: 'paragraph',
-        text:
-          "Here’s a great, thoughtfully structured date plan—romantic, modern, and memorable. I’ll give you a core plan plus smart variations so you can adapt based on vibe, budget, or time.",
-      },
-      { type: 'divider' },
-      { type: 'paragraph', text: '🌤️ The Ideal “Balanced” Date (Emotion + Fun + Connection)' },
-      { type: 'ordered', index: 1, text: 'Soft Start — Coffee / Mocktails (45–60 min)' },
-      { type: 'bullet', indent: 1, text: 'Why: Low pressure, easy conversation, instant comfort.' },
-      { type: 'bullet', indent: 1, text: 'Choose a quiet café with good seating (no loud music).' },
-      { type: 'bullet', indent: 1, text: 'Order something shareable (dessert or snack) — subtle bonding hack.' },
-      { type: 'bullet', indent: 1, text: 'Conversation starters:' },
-      { type: 'bullet', indent: 1, text: '“What’s something you’re obsessed with lately?”' },
-      { type: 'bullet', indent: 1, text: '“What does a perfect Sunday look like for you?”' },
-    ];
-  }
-  if (key === 'Help Me Break the Ice') {
-    return [
-      {
-        type: 'paragraph',
-        text: 'Tell me what you two have in common (or share a screenshot of the chat), and I’ll craft 3 icebreakers that sound like you.',
-      },
-    ];
-  }
-  if (key === 'Revive a Quiet Chat') {
-    return [
-      {
-        type: 'paragraph',
-        text: 'No worries — quiet chats are normal. Tell me the last thing they said (or what your last message was) and I’ll suggest a smooth follow‑up.',
-      },
-    ];
-  }
-  return [
-    {
-      type: 'paragraph',
-      text: 'What’s the situation? Give me a little context and I’ll help you with the next message.',
-    },
-  ];
-}
 
 export const MatchScreen = () => {
   const navigation = useNavigation();
@@ -102,31 +44,153 @@ export const MatchScreen = () => {
   const [composerHeight, setComposerHeight] = React.useState(0);
   const [chatItems, setChatItems] = React.useState<ChatItem[]>([]);
   const scrollRef = React.useRef<ScrollView>(null);
+  const [isTyping, setIsTyping] = React.useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = React.useState(false);
 
   const hasText = message.trim().length > 0;
   const hasChat = chatItems.length > 0;
 
+  const loadChatHistory = React.useCallback(async () => {
+    try {
+      setIsLoadingHistory(true);
+      const response = await apiClient.post(
+        endpoints.chatbot.getChatbotMessages,
+        { page: 1, limit: 10 },
+        { timeout: 60000 }
+      );
+
+      const rawList =
+        response.data?.data?.list ??
+        response.data?.list ??
+        [];
+
+      // Backend returns newest first; sort by _id so we always render oldest → newest.
+      const items = Array.isArray(rawList)
+        ? [...rawList].sort((a, b) => {
+            const aId = String(a._id ?? a.id ?? '');
+            const bId = String(b._id ?? b.id ?? '');
+            if (aId === bId) return 0;
+            return aId < bId ? -1 : 1;
+          })
+        : [];
+
+      const mapped: ChatItem[] = items.length
+        ? items.map((item: any, index: number) => {
+            const role = (item.role ?? '').toString().toLowerCase();
+            const from: 'user' | 'aira' = role === 'user' ? 'user' : 'aira';
+
+            if (from === 'user') {
+              const text: string =
+                typeof item.content === 'string'
+                  ? item.content
+                  : item.message ?? item.text ?? '';
+              return {
+                id: String(item._id ?? item.id ?? index),
+                from: 'user',
+                text,
+              };
+            }
+
+            const blocks: AiraBlock[] = [];
+            const content = item.content;
+            const responseType = (item.response_type ?? '').toString().toLowerCase();
+
+            if (
+              responseType === 'rich_content' &&
+              Array.isArray(content)
+            ) {
+              for (const block of content as any[]) {
+                if (block.type === 'heading' && block.text) {
+                  blocks.push({ type: 'heading', text: block.text });
+                } else if (block.type === 'bullet_list' && Array.isArray(block.items)) {
+                  for (const it of block.items) {
+                    if (!it) continue;
+                    blocks.push({
+                      type: 'bullet_item',
+                      title: it.title ?? '',
+                      description: it.description ?? '',
+                    });
+                  }
+                } else if (block.type === 'follow_up' && block.text) {
+                  blocks.push({ type: 'follow_up', text: block.text });
+                } else if (block.type === 'paragraph' && block.text) {
+                  blocks.push({ type: 'paragraph', text: block.text });
+                }
+              }
+            } else {
+              const fallbackText: string =
+                typeof content === 'string'
+                  ? content
+                  : item.message ?? item.text ?? '';
+              if (fallbackText) {
+                blocks.push({ type: 'paragraph', text: fallbackText });
+              }
+            }
+
+            return {
+              id: String(item._id ?? item.id ?? index),
+              from: 'aira',
+              blocks,
+            };
+          })
+        : [];
+
+      setChatItems(mapped);
+    } catch {
+      // ignore history errors for now
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, []);
+
   const handleSend = React.useCallback(
-    (text: string) => {
+    async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
-
-      const userId = `${Date.now()}_u`;
-      const airaId = `${Date.now()}_a`;
-      const blocks = getAiraReplyBlocks(trimmed);
+      if (isTyping) return;
+      // Optimistically show the user's message immediately
+      const tempId = `temp_${Date.now()}`;
       setChatItems((prev) => [
         ...prev,
-        { id: userId, from: 'user', text: trimmed },
-        { id: airaId, from: 'aira', blocks },
+        { id: tempId, from: 'user', text: trimmed },
       ]);
+      setIsTyping(true);
       setMessage('');
 
       requestAnimationFrame(() => {
         scrollRef.current?.scrollToEnd({ animated: true });
       });
+
+      try {
+        const response = await apiClient.post(
+          endpoints.chatbot.postChatbotMessages,
+          {
+            message: trimmed,
+            receiverId: '',
+          },
+          { timeout: 60000 }
+        );
+
+        // After sending, always refresh from server so
+        // the UI reflects backend history only.
+        setTimeout(() => {
+          loadChatHistory().finally(() => {
+            setIsTyping(false);
+            requestAnimationFrame(() => {
+              scrollRef.current?.scrollToEnd({ animated: true });
+            });
+          });
+        }, 800);
+      } catch {
+        setIsTyping(false);
+      }
     },
-    [setChatItems]
+    [isTyping, loadChatHistory]
   );
+
+  React.useEffect(() => {
+    loadChatHistory();
+  }, [loadChatHistory]);
 
   React.useEffect(() => {
     if (!hasChat) return;
@@ -146,7 +210,7 @@ export const MatchScreen = () => {
           end={colors.gradients.onboardingIntro.end}
           style={StyleSheet.absoluteFill}
         /> */}
-        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right','top']}>
           <TouchableOpacity
             onPress={() => {
               // When opened from a tab press, there may be no back stack.
@@ -183,7 +247,7 @@ export const MatchScreen = () => {
               bounces={false}
               keyboardShouldPersistTaps="handled"
             >
-              {!hasChat ? (
+              {!hasChat && !isLoadingHistory ? (
                 <View style={styles.hero}>
                   <View style={styles.aiBadgeShadow} pointerEvents="none" />
                   <View style={styles.aiBadge}>
@@ -225,6 +289,13 @@ export const MatchScreen = () => {
                           if (b.type === 'divider') {
                             return <View key={`${item.id}_${idx}`} style={styles.airaDivider} />;
                           }
+                          if (b.type === 'heading') {
+                            return (
+                              <Text key={`${item.id}_${idx}`} style={styles.airaHeading}>
+                                {b.text}
+                              </Text>
+                            );
+                          }
                           if (b.type === 'ordered') {
                             return (
                               <View key={`${item.id}_${idx}`} style={styles.airaListRow}>
@@ -244,6 +315,28 @@ export const MatchScreen = () => {
                               </View>
                             );
                           }
+                          if (b.type === 'bullet_item') {
+                            return (
+                              <View
+                                key={`${item.id}_${idx}`}
+                                style={[styles.airaListRow, styles.airaListRowIndented]}
+                              >
+                                <Text style={styles.airaBullet}>{'•'}</Text>
+                                <Text style={styles.airaBulletItemText}>
+                                  <Text style={styles.airaBulletItemTitle}>{b.title}</Text>
+                                  {b.description ? ` ${b.description}` : ''}
+                                </Text>
+                              </View>
+                            );
+                          }
+                          if (b.type === 'follow_up') {
+                            return (
+                              <View key={`${item.id}_${idx}`} style={styles.followUpCard}>
+                                <Text style={styles.followUpLabel}>Follow-up idea</Text>
+                                <Text style={styles.followUpText}>{b.text}</Text>
+                              </View>
+                            );
+                          }
                           return (
                             <Text key={`${item.id}_${idx}`} style={styles.airaParagraph}>
                               {b.text}
@@ -253,6 +346,13 @@ export const MatchScreen = () => {
                       </View>
                     );
                   })}
+                  {isTyping && (
+                    <View style={styles.airaMessageWrap}>
+                      <Text style={styles.airaParagraph}>
+                        Aira is typing…
+                      </Text>
+                    </View>
+                  )}
                 </View>
               )}
             </ScrollView>
@@ -264,31 +364,6 @@ export const MatchScreen = () => {
                 setComposerHeight(e.nativeEvent.layout.height);
               }}
             >
-              {!hasChat && message.trim().length === 0 && (
-                <View style={styles.quickActionsWrap}>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.quickActions}
-                    keyboardShouldPersistTaps="handled"
-                  >
-                    {QUICK_ACTIONS.map((item) => (
-                      <TouchableOpacity
-                        key={item.title}
-                        activeOpacity={0.85}
-                        style={styles.quickActionCard}
-                        onPress={() => {
-                          handleSend(item.title);
-                        }}
-                      >
-                        <Text style={styles.quickActionTitle}>{item.title}</Text>
-                        <Text style={styles.quickActionSubtitle}>{item.subtitle}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-
               <View style={[styles.composerRow, { paddingBottom: 12 + insets.bottom }]}>
                 <View style={styles.inputPill}>
                   <TextInput
@@ -343,10 +418,10 @@ export const MatchScreen = () => {
       height: 48,
       borderRadius: 16,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.07,
-      shadowRadius: 14,
-      elevation: 4,
+      // shadowOffset: { width: 0, height: 4 }
+      // shadowOpacity: 0.07,
+      // shadowRadius: 14,
+      // elevation: 4,
     },
     topGlowWrap: {
       position: 'absolute',
@@ -444,6 +519,12 @@ export const MatchScreen = () => {
       lineHeight: 22,
       marginBottom: 12,
     },
+    airaHeading: {
+      ...typography.h4,
+      color: colors.black,
+      marginBottom: 12,
+      alignSelf: 'flex-start',
+    },
     airaDivider: {
       width: '100%',
       height: StyleSheet.hairlineWidth,
@@ -485,6 +566,33 @@ export const MatchScreen = () => {
       flex: 1,
       lineHeight: 22,
       letterSpacing: 0.32,
+    },
+    airaBulletItemText: {
+      flex: 1,
+      lineHeight: 22,
+    },
+    airaBulletItemTitle: {
+      ...typography.bodyMedium,
+      color: colors.black,
+      lineHeight: 22,
+    },
+    followUpCard: {
+      marginTop: 16,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 14,
+      backgroundColor: colors.neutral[50],
+      alignSelf: 'stretch',
+      gap: 4,
+    },
+    followUpLabel: {
+      ...typography.label,
+      color: colors.neutral[700],
+    },
+    followUpText: {
+      ...typography.body,
+      color: colors.neutral[900],
+      lineHeight: 20,
     },
     quickActionsWrap: {
       width: '100%',
@@ -552,7 +660,7 @@ export const MatchScreen = () => {
       backgroundColor: '#F3F3F3',
       justifyContent: 'center',
       paddingHorizontal: 16,
-      minHeight: 48,
+      minHeight: 56,
     },
     input: {
       ...typography.body,

@@ -12,6 +12,21 @@ export const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  backButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+  },
   backgroundGlow: {
     position: 'absolute',
     top: 0,
@@ -23,15 +38,6 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm * 2,
-  },
-  backButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary[50],
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
   },
   header: {
     marginBottom: spacing.xl * 2,

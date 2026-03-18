@@ -1,11 +1,7 @@
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../../theme';
 
-// Figma 802-3084: 2x3 grid, consistent spacing
-const CARD_GAP = 12;
 const HORIZONTAL_PADDING = 20;
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const CARD_SIZE = (SCREEN_WIDTH - HORIZONTAL_PADDING * 2 - CARD_GAP * 2) / 3;
 
 export const styles = StyleSheet.create({
   wrapper: {
@@ -41,23 +37,7 @@ export const styles = StyleSheet.create({
     letterSpacing: 0,
     marginBottom: spacing.xl,
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: CARD_GAP,
-    marginBottom: spacing.xl,
-  },
-  // Figma 802-3084: rounded rect, light gray dashed border, white background
-  photoCard: {
-    width: CARD_SIZE,
-    height: CARD_SIZE,
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: colors.neutral[200],
-    backgroundColor: colors.white,
-  },
+  // Grid and photoCard are computed dynamically in component for 3-column layout
   photoImage: {
     width: '100%',
     height: '100%',

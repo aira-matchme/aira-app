@@ -149,13 +149,18 @@ export const BasicDetailsHeightScreen: React.FC = () => {
     >
       <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
-        <View style={styles.content}>
-        <View style={{ paddingBottom: 16}}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <BackArrowIcon size={48} />
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.headerContainer}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            activeOpacity={0.7}
+            accessibilityLabel="Go back"
+          >
+            <BackArrowIcon size={48} backgroundColor="#F1ECFE" strokeColor="#000000" />
           </TouchableOpacity>
         </View>
+        <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.title}>{STRINGS.PROFILE_SETUP.HEIGHT.TITLE}</Text>
             <Text style={styles.subtitle}>

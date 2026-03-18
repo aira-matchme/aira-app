@@ -1,4 +1,4 @@
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { colors, typography, spacing } from '../../../theme';
 
 export const styles = StyleSheet.create({
@@ -45,14 +45,13 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 60 : 39,
   },
   heading: {
     ...typography.h2,
+    fontWeight: '600',
     color: colors.text.primary,
     textAlign: 'center',
     marginBottom: 30,
-    paddingHorizontal: spacing.md,
   },
   buttonContainer: {
     marginBottom: spacing.lg,
@@ -62,6 +61,7 @@ export const styles = StyleSheet.create({
     color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 18,
+    paddingHorizontal: spacing.sm,
   },
   link: {
     color: colors.text.primary,

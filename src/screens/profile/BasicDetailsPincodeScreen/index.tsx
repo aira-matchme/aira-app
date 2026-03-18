@@ -120,7 +120,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
         return;
       }
 
-      const { latitude, longitude, admin_district      } = json.result;
+      const { latitude, longitude, ttwa      } = json.result;
 
       // Build payload for /edit/profile
       const formatDob = (): string | undefined => {
@@ -150,7 +150,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
         income: finalChoice ?? '',
         latitude: latitude != null ? String(latitude) : undefined,
         longitude: longitude != null ? String(longitude) : undefined,
-        city: admin_district ?? '',
+        city: ttwa ?? '',
         religion: religion ?? '',
         maritalStatus: maritalStatus ?? undefined,
         children: children ?? undefined,

@@ -117,6 +117,12 @@ export const styles = StyleSheet.create({
   chipTextSelected: {
     color: colors.primary.purple,
   },
+  chipIconSlot: {
+    width: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   buttonContainer: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,

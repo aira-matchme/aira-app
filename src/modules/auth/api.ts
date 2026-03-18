@@ -75,9 +75,11 @@ export const uploadSelfieApi = async (
     const formData = new FormData();
 
     formData.append('file', {
-      uri: photoUri.startsWith('file://')
+      uri: photoUri.startsWith('ph://')
         ? photoUri
-        : `file://${photoUri}`,
+        : photoUri.startsWith('file://')
+          ? photoUri
+          : `file://${photoUri}`,
       type: 'image/jpeg',
       name: `selfie_${Date.now()}.jpg`,
     } as any);
@@ -87,9 +89,6 @@ export const uploadSelfieApi = async (
       formData,
       {
         timeout: 60000,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
       },
     );
     return data;
@@ -121,7 +120,11 @@ export const uploadProfilePhotoApi = async (
 ): Promise<UploadProfilePhotoResponse> => {
   const formData = new FormData();
   formData.append('file', {
-    uri: photoUri.startsWith('file://') ? photoUri : `file://${photoUri}`,
+    uri: photoUri.startsWith('ph://')
+      ? photoUri
+      : photoUri.startsWith('file://')
+        ? photoUri
+        : `file://${photoUri}`,
     type: 'image/jpeg',
     name: `profile_photo_${order}_${Date.now()}.jpg`,
   } as any);
@@ -132,9 +135,6 @@ export const uploadProfilePhotoApi = async (
     formData,
     {
       timeout: 60000,
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
     }
   );
   return data;
