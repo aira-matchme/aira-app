@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '../../navigation/types';
 
@@ -39,7 +39,7 @@ import { HomeFilterIcon } from '../../assets/icons/home/HomeFilterIcon';
 
 const AIRA_PLUS_CARD_IMAGE = require('../../assets/images/AiraPlusCardBackground.png');
 const PRIVACY_POLICY_URL = 'https://airamatchme.com/privacy';
-const SUPPORT_EMAIL_URL = 'mailto:support@airamtachme.com';
+const SUPPORT_EMAIL_URL = 'mailto:support@airamatchme.com';
 
 const MENU_ITEMS: Array<{
   id: string;
@@ -60,58 +60,78 @@ type ProfileMainNav = NativeStackNavigationProp<ProfileStackParamList, 'ProfileM
 
 const PHOTO_SLOTS = 6;
 
+/** Extract display URL from API gallery image photo (object or string). */
+function getGalleryImageUrl(photo: unknown): string | null {
+  if (photo == null) return null;
+  if (typeof photo === 'string') return photo;
+  if (typeof photo === 'object' && photo !== null && 'url' in photo) {
+    const u = (photo as { url?: unknown }).url;
+    if (typeof u === 'string') return u;
+    if (u && typeof u === 'object' && 'S' in (u as object)) return (u as { S?: string }).S ?? null;
+  }
+  return null;
+}
+
 export const ProfileTabScreen = () => {
   const navigation = useNavigation<ProfileMainNav>();
   const { user, logout, setUser } = useAuthStore();
   const [profileImage, setProfileImage] = useState<ImageSourcePropType | null>(null);
+  const [galleryCount, setGalleryCount] = useState(0);
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        const profile = await getProfileApi();
-        if (profile?.data) {
-          // Keep auth store in sync with latest profile
-          setUser(profile.data as any);
-          const nickname = (profile.data as any)?.nickName ?? (profile.data as any)?.nickname;
-          if (nickname) {
-            // nothing else needed here; displayName uses user from store
-          }
-          const photo =
-            (profile.data as any)?.profilePhoto?.url?.medium ??
-            (profile.data as any)?.profilePhoto?.url?.original ??
-            (profile.data as any)?.profilePicture;
-          if (typeof photo === 'string' && photo.length > 0) {
-            setProfileImage({ uri: photo });
-            return;
-          }
-        }
-        // Fallback to bundled placeholder if API has no photo
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadProfile = async () => {
         try {
-          const local = require('../../assets/images/ProfileImage.png');
-          setProfileImage(local);
-        } catch {
-          setProfileImage(null);
-        }
-      } catch {
-        // On error, fall back to any existing store user / local image
-        try {
-          const local = require('../../assets/images/ProfileImage.png');
-          setProfileImage(local);
-        } catch {
-          setProfileImage(null);
-        }
-      }
-    };
+          const profile = await getProfileApi();
+          if (profile?.data) {
+            // Keep auth store in sync with latest profile
+            setUser(profile.data as any);
 
-    loadProfile();
-  }, [setUser]);
+            const galleryImages = (profile.data as any)?.galleryImages;
+            const filledCount = Array.isArray(galleryImages)
+              ? galleryImages.filter((img: any) => getGalleryImageUrl(img?.photo)).length
+              : 0;
+            setGalleryCount(Math.min(filledCount, PHOTO_SLOTS));
+
+            const photo =
+              (profile.data as any)?.profilePhoto?.url?.medium ??
+              (profile.data as any)?.profilePhoto?.url?.original ??
+              (profile.data as any)?.profilePicture;
+            if (typeof photo === 'string' && photo.length > 0) {
+              setProfileImage({ uri: photo });
+              return;
+            }
+          }
+
+          // Fallback to bundled placeholder if API has no photo
+          try {
+            const local = require('../../assets/images/ProfileImage.png');
+            setProfileImage(local);
+          } catch {
+            setProfileImage(null);
+          }
+          setGalleryCount(0);
+        } catch {
+          // On error, fall back to any existing store user / local image
+          try {
+            const local = require('../../assets/images/ProfileImage.png');
+            setProfileImage(local);
+          } catch {
+            setProfileImage(null);
+          }
+          setGalleryCount(0);
+        }
+      };
+
+      loadProfile();
+    }, [setUser])
+  );
 
   const displayName =
     (user as any)?.nickName ??
     (user as any)?.nickname ??
     user?.name ??
     'Guest';
-  const galleryCount = (user as { galleryImages?: unknown[] })?.galleryImages?.length ?? 0;
   const profilePercent = Math.round((galleryCount / PHOTO_SLOTS) * 100);
 
   const onEditProfile = () => {
@@ -120,9 +140,11 @@ export const ProfileTabScreen = () => {
 
   const onMenuPress = async (menuItem: (typeof MENU_ITEMS)[number]) => {
     if (menuItem.url) {
-      const canOpen = await Linking.canOpenURL(menuItem.url);
-      if (canOpen) {
+      try {
+        // External links (privacy policy, support mail) should always open.
         await Linking.openURL(menuItem.url);
+      } catch {
+        // Ignore; user can still tap other menu items.
       }
       return;
     }
@@ -232,14 +254,7 @@ export const ProfileTabScreen = () => {
             </View>
             <Text style={styles.version}>Version 2026.0.1-123</Text>
             <TouchableOpacity style={styles.logoutButton} onPress={logout} activeOpacity={0.9}>
-              <LinearGradient
-                colors={[colors.secondary.lavender, colors.primary.purple] as [string, string]}
-                start={{ x: 0.2, y: 0 }}
-                end={{ x: 0.9, y: 1 }}
-                style={styles.logoutGradient}
-              >
-                <Text style={styles.logoutText}>Logout</Text>
-              </LinearGradient>
+             x
             </TouchableOpacity>
           </View>
         </ScrollView>

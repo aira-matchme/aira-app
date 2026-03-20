@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -103,8 +103,8 @@ export const EditProfileScreen: React.FC = () => {
   const [showGalleryPermissionSheet, setShowGalleryPermissionSheet] = useState(false);
   const [pendingGalleryIndex, setPendingGalleryIndex] = useState<number | null>(null);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  const isPickingGalleryRef = useRef(false);
   const [uploadingSlot, setUploadingSlot] = useState<number | null>(null);
-  console.log('photoSlots', photoSlots, user);
 
   // Sync gallery photos from user API (order-wise), with id for delete
   useEffect(() => {
@@ -209,9 +209,13 @@ export const EditProfileScreen: React.FC = () => {
   };
 
   const openGalleryForSlot = (index: number) => {
-    launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, (response) =>
-      handlePickerResponse(response, index)
-    );
+    // Prevent overlapping native pickers (can cause iOS picker issues)
+    if (isPickingGalleryRef.current) return;
+    isPickingGalleryRef.current = true;
+    launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, (response) => {
+      isPickingGalleryRef.current = false;
+      handlePickerResponse(response, index);
+    });
   };
 
   const handleGallery = async () => {
@@ -221,6 +225,7 @@ export const EditProfileScreen: React.FC = () => {
     const status = await checkPhotoLibraryPermission();
     const hasAccess = status === 'granted' || status === 'limited';
     if (hasAccess) {
+      setPendingGalleryIndex(null);
       openGalleryForSlot(index);
       return;
     }
@@ -513,9 +518,6 @@ export const EditProfileScreen: React.FC = () => {
                   activeOpacity={0.7}
                   onPress={() => {
                     switch (row.key) {
-                      // case 'name':
-                      //   navigation.navigate('BasicDetailsName', { fromEditProfile: true });
-                      //   break;
                       case 'height':
                         navigation.navigate('BasicDetailsHeight', { fromEditProfile: true });
                         break;
@@ -549,6 +551,7 @@ export const EditProfileScreen: React.FC = () => {
                     <Text style={styles.detailLabel}>{row.label}</Text>
                     <Text style={styles.detailValue} numberOfLines={1}>
                       {row.value}
+                     
                     </Text>
                   </View>
                   <ProfileChevronRightIcon width={24} height={24} color={colors.neutral[400]} />

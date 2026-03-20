@@ -4,14 +4,16 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Image,
   ScrollView,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   TextInput,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 import { BackArrowIcon } from '../assets/icons/common/BackArrowIcon';
 import { TabAICenterIcon } from '../assets/icons/tabs/TabAICenterIcon';
@@ -31,7 +33,16 @@ type AiraBlock =
   | { type: 'bullet'; indent: 0 | 1; text: string }
   | { type: 'heading'; text: string }
   | { type: 'bullet_item'; title: string; description: string }
-  | { type: 'follow_up'; text: string };
+  | { type: 'follow_up'; text: string }
+  | {
+      type: 'missing_info_list';
+      options: Array<{
+        _id: string;
+        name?: string;
+        nickName?: string;
+        photos?: Array<{ url?: string; order?: number }>;
+      }>;
+    };
 
 type ChatItem =
   | { id: string; from: 'user'; text: string }
@@ -41,14 +52,24 @@ export const MatchScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [message, setMessage] = React.useState('');
-  const [composerHeight, setComposerHeight] = React.useState(0);
   const [chatItems, setChatItems] = React.useState<ChatItem[]>([]);
   const scrollRef = React.useRef<ScrollView>(null);
+  const lastUserMessageRef = React.useRef<string>('');
   const [isTyping, setIsTyping] = React.useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = React.useState(false);
 
   const hasText = message.trim().length > 0;
   const hasChat = chatItems.length > 0;
+  const lastUserText = React.useMemo(() => {
+    // When the user picks a `missing_info` card, we need "the last user message".
+    // Prefer the last `chatItems` user bubble; fall back to whatever was stored
+    // during the latest manual send.
+    for (let i = chatItems.length - 1; i >= 0; i--) {
+      const item = chatItems[i];
+      if (item.from === 'user') return item.text;
+    }
+    return lastUserMessageRef.current;
+  }, [chatItems]);
 
   const loadChatHistory = React.useCallback(async () => {
     try {
@@ -92,14 +113,52 @@ export const MatchScreen = () => {
             }
 
             const blocks: AiraBlock[] = [];
-            const content = item.content;
-            const responseType = (item.response_type ?? '').toString().toLowerCase();
+            const rawContentCandidate =
+              item.content ?? item?.data?.content ?? item?.data?.data?.content ?? undefined;
+            const rawResponseTypeCandidate =
+              item.response_type ??
+              item?.data?.response_type ??
+              item?.data?.data?.response_type ??
+              (typeof item?.content === 'object' && item?.content != null
+                ? (item.content as any).response_type
+                : undefined);
 
-            if (
-              responseType === 'rich_content' &&
-              Array.isArray(content)
-            ) {
-              for (const block of content as any[]) {
+            const responseType = String(rawResponseTypeCandidate ?? '').toLowerCase();
+
+            // Backend sometimes nests the real payload under `content.content`.
+            const contentArray: any[] | undefined = Array.isArray(rawContentCandidate)
+              ? rawContentCandidate
+              : rawContentCandidate &&
+                  typeof rawContentCandidate === 'object' &&
+                  Array.isArray((rawContentCandidate as any).content)
+                ? (rawContentCandidate as any).content
+                : rawContentCandidate &&
+                    typeof rawContentCandidate === 'object' &&
+                    Array.isArray((rawContentCandidate as any).content?.content)
+                  ? (rawContentCandidate as any).content.content
+                : undefined;
+
+            if (responseType === 'missing_info' && contentArray) {
+              const options = contentArray
+                .map((opt: any) => {
+                  const id = String(opt?._id ?? opt?.id ?? '');
+                  if (!id) return null;
+                  return {
+                    _id: id,
+                    name: opt?.name,
+                    nickName: opt?.nickName,
+                    photos: Array.isArray(opt?.photos)
+                      ? opt.photos.map((p: any) => ({ url: p?.url, order: p?.order }))
+                      : undefined,
+                  };
+                })
+                .filter((x): x is NonNullable<typeof x> => x != null);
+
+              if (options.length > 0) {
+                blocks.push({ type: 'missing_info_list', options });
+              }
+            } else if (responseType === 'rich_content' && contentArray) {
+              for (const block of contentArray) {
                 if (block.type === 'heading' && block.text) {
                   blocks.push({ type: 'heading', text: block.text });
                 } else if (block.type === 'bullet_list' && Array.isArray(block.items)) {
@@ -119,9 +178,20 @@ export const MatchScreen = () => {
               }
             } else {
               const fallbackText: string =
-                typeof content === 'string'
-                  ? content
+                typeof rawContentCandidate === 'string'
+                  ? rawContentCandidate
                   : item.message ?? item.text ?? '';
+              if (fallbackText) {
+                blocks.push({ type: 'paragraph', text: fallbackText });
+              }
+            }
+
+            // If backend returned something we don't parse into blocks, fall back to a string payload.
+            if (blocks.length === 0) {
+              const fallbackText: string =
+                typeof rawContentCandidate === 'string'
+                  ? rawContentCandidate
+                  : item?.message ?? item?.text ?? item?.data?.message ?? item?.data?.text ?? '';
               if (fallbackText) {
                 blocks.push({ type: 'paragraph', text: fallbackText });
               }
@@ -143,11 +213,103 @@ export const MatchScreen = () => {
     }
   }, []);
 
+  const buildBlocksFromBotResponse = React.useCallback(
+    (item: any): AiraBlock[] => {
+      const blocks: AiraBlock[] = [];
+
+      const rawContentCandidate =
+        item?.content ?? item?.data?.content ?? item?.data?.data?.content ?? undefined;
+      const rawResponseTypeCandidate =
+        item?.response_type ??
+        item?.data?.response_type ??
+        item?.data?.data?.response_type ??
+        (typeof item?.content === 'object' && item?.content != null
+          ? (item.content as any).response_type
+          : undefined);
+
+      const responseType = String(rawResponseTypeCandidate ?? '').toLowerCase();
+
+      // Backend sometimes nests the real payload under `content.content`.
+      const contentArray: any[] | undefined = Array.isArray(rawContentCandidate)
+        ? rawContentCandidate
+        : rawContentCandidate &&
+            typeof rawContentCandidate === 'object' &&
+            Array.isArray((rawContentCandidate as any).content)
+          ? (rawContentCandidate as any).content
+          : rawContentCandidate &&
+              typeof rawContentCandidate === 'object' &&
+              Array.isArray((rawContentCandidate as any).content?.content)
+            ? (rawContentCandidate as any).content.content
+          : undefined;
+
+      if (responseType === 'missing_info' && contentArray) {
+        const options = contentArray
+          .map((opt: any) => {
+            const id = String(opt?._id ?? opt?.id ?? '');
+            if (!id) return null;
+            return {
+              _id: id,
+              name: opt?.name,
+              nickName: opt?.nickName,
+              photos: Array.isArray(opt?.photos)
+                ? opt.photos.map((p: any) => ({ url: p?.url, order: p?.order }))
+                : undefined,
+            };
+          })
+          .filter((x): x is NonNullable<typeof x> => x != null);
+
+        if (options.length > 0) {
+          blocks.push({ type: 'missing_info_list', options });
+        }
+      } else if (responseType === 'rich_content' && contentArray) {
+        for (const block of contentArray) {
+          if (block?.type === 'heading' && block?.text) {
+            blocks.push({ type: 'heading', text: block.text });
+          } else if (block?.type === 'bullet_list' && Array.isArray(block.items)) {
+            for (const it of block.items) {
+              if (!it) continue;
+              blocks.push({
+                type: 'bullet_item',
+                title: it.title ?? '',
+                description: it.description ?? '',
+              });
+            }
+          } else if (block?.type === 'follow_up' && block?.text) {
+            blocks.push({ type: 'follow_up', text: block.text });
+          } else if (block?.type === 'paragraph' && block?.text) {
+            blocks.push({ type: 'paragraph', text: block.text });
+          }
+        }
+      } else {
+        const fallbackText: string =
+          typeof rawContentCandidate === 'string' ? rawContentCandidate : item?.message ?? item?.text ?? '';
+        if (fallbackText) {
+          blocks.push({ type: 'paragraph', text: fallbackText });
+        }
+      }
+
+      // If rich_content was parsed but produced no blocks, still try to show a fallback text.
+      if (blocks.length === 0) {
+        const fallbackText: string =
+          typeof rawContentCandidate === 'string'
+            ? rawContentCandidate
+            : item?.message ?? item?.text ?? item?.data?.message ?? item?.data?.text ?? '';
+        if (fallbackText) {
+          blocks.push({ type: 'paragraph', text: fallbackText });
+        }
+      }
+
+      return blocks;
+    },
+    []
+  );
+
   const handleSend = React.useCallback(
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
       if (isTyping) return;
+      lastUserMessageRef.current = trimmed;
       // Optimistically show the user's message immediately
       const tempId = `temp_${Date.now()}`;
       setChatItems((prev) => [
@@ -162,6 +324,7 @@ export const MatchScreen = () => {
       });
 
       try {
+       
         const response = await apiClient.post(
           endpoints.chatbot.postChatbotMessages,
           {
@@ -171,26 +334,98 @@ export const MatchScreen = () => {
           { timeout: 60000 }
         );
 
-        // After sending, always refresh from server so
-        // the UI reflects backend history only.
-        setTimeout(() => {
-          loadChatHistory().finally(() => {
-            setIsTyping(false);
-            requestAnimationFrame(() => {
-              scrollRef.current?.scrollToEnd({ animated: true });
-            });
-          });
-        }, 800);
+        const postData = response?.data?.data ?? response?.data ?? response;
+        const blocks = buildBlocksFromBotResponse(postData);
+        if (blocks.length > 0) {
+          setChatItems((prev) => [
+            ...prev,
+            {
+              id: `aira_${Date.now()}`,
+              from: 'aira',
+              blocks,
+            },
+          ]);
+        }
+
+        setIsTyping(false);
+        requestAnimationFrame(() => {
+          scrollRef.current?.scrollToEnd({ animated: true });
+        });
       } catch {
         setIsTyping(false);
       }
     },
-    [isTyping, loadChatHistory]
+    [isTyping, buildBlocksFromBotResponse]
   );
 
-  React.useEffect(() => {
-    loadChatHistory();
-  }, [loadChatHistory]);
+  const sendChatWithReceiver = React.useCallback(
+    async (messageText: string, receiverId: string) => {
+      const bubbleText = messageText.trim();
+      if (!bubbleText) return;
+      const payloadMessage = lastUserMessageRef.current.trim() || bubbleText;
+      if (isTyping) return;
+
+      const tempId = `temp_${Date.now()}`;
+      setChatItems((prev) => [
+        ...prev,
+        { id: tempId, from: 'user', text: bubbleText },
+      ]);
+      setIsTyping(true);
+      setMessage('');
+
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      });
+
+      try {
+        const shouldLog = (globalThis as any).__DEV__ ?? false;
+        if (shouldLog) {
+          // Debug: verify the exact payload we send to the chatbot
+          console.log('[MatchScreen] sendChatWithReceiver payload', {
+            message: payloadMessage,
+            bubbleMessage: bubbleText,
+            receiverId,
+          });
+        }
+
+        const response = await apiClient.post(
+          endpoints.chatbot.postChatbotMessages,
+          {
+            message: payloadMessage,
+            receiverId,
+          },
+          { timeout: 60000 }
+        );
+
+        const postData = response?.data?.data ?? response?.data ?? response;
+        const blocks = buildBlocksFromBotResponse(postData);
+        if (blocks.length > 0) {
+          setChatItems((prev) => [
+            ...prev,
+            {
+              id: `aira_${Date.now()}`,
+              from: 'aira',
+              blocks,
+            },
+          ]);
+        }
+
+        setIsTyping(false);
+        requestAnimationFrame(() => {
+          scrollRef.current?.scrollToEnd({ animated: true });
+        });
+      } catch {
+        setIsTyping(false);
+      }
+    },
+    [isTyping, buildBlocksFromBotResponse]
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadChatHistory();
+    }, [loadChatHistory])
+  );
 
   React.useEffect(() => {
     if (!hasChat) return;
@@ -200,17 +435,22 @@ export const MatchScreen = () => {
     return () => clearTimeout(id);
   }, [hasChat, chatItems.length]);
 
+  // Android keyboard transitions can leave ScrollView in an incorrect position
+  // after show/hide. Re-sync to bottom with multiple attempts.
+  React.useEffect(() => {
+    if (Platform.OS !== 'android') return;
+  
+    const sub = Keyboard.addListener('keyboardDidHide', () => {
+      scrollRef.current?.scrollToEnd({ animated: false });
+    });
+  
+    return () => sub.remove();
+  }, []);
+
     return (
       <View style={styles.screen}>
               <ProfileScreenGradient />
-        {/* Soft top gradient background */}
-        {/* <LinearGradient
-          colors={colors.gradients.onboardingIntro.colors as unknown as string[]}
-          start={colors.gradients.onboardingIntro.start}
-          end={colors.gradients.onboardingIntro.end}
-          style={StyleSheet.absoluteFill}
-        /> */}
-        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right','top']}>
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
           <TouchableOpacity
             onPress={() => {
               // When opened from a tab press, there may be no back stack.
@@ -228,175 +468,224 @@ export const MatchScreen = () => {
           >
             <BackArrowIcon size={48} backgroundColor="rgba(255,255,255,0.5)" strokeColor={colors.black} />
           </TouchableOpacity>
+          {/* <KeyboardAvoidingView
+  style={styles.flex}
+  behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+  keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+> */}
+<View style={styles.flex}>
+  {/* CHAT */}
+  <ScrollView
+    ref={scrollRef}
+    style={styles.flex}
+    contentContainerStyle={{
+      flexGrow: 1,
+      paddingHorizontal: 16,
+      paddingTop: 36,
+      paddingBottom: 150, // 🔥 IMPORTANT (space for input)
+    }}
+    keyboardShouldPersistTaps="handled"
+    keyboardDismissMode="on-drag"
+    showsVerticalScrollIndicator={false}
+  >
+    {!hasChat && !isLoadingHistory ? (
+      <View style={styles.hero}>
+        <View style={styles.aiBadgeShadow} pointerEvents="none" />
+        <View style={styles.aiBadge}>
+          <TabAICenterIcon width={138} height={138} />
+        </View>
 
-          <KeyboardAvoidingView
-            style={styles.flex}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={0}
-          >
-            <ScrollView
-              ref={scrollRef}
-              style={styles.flex}
-              contentContainerStyle={[
-                styles.content,
-                {
-                  paddingBottom: Math.max(16, composerHeight + 16),
-                },
-              ]}
-              showsVerticalScrollIndicator={false}
-              bounces={false}
-              keyboardShouldPersistTaps="handled"
+        <View style={styles.heroText}>
+          <View style={{ alignItems: 'center' }}>
+            <GradientText
+              style={{
+                fontSize: typography.h2.fontSize,
+                fontWeight: typography.h2.fontWeight,
+                fontFamily: typography.h2.fontFamily,
+              }}
             >
-              {!hasChat && !isLoadingHistory ? (
-                <View style={styles.hero}>
-                  <View style={styles.aiBadgeShadow} pointerEvents="none" />
-                  <View style={styles.aiBadge}>
-                    <TabAICenterIcon width={138} height={138} />
-                  </View>
-
-                  <View style={styles.heroText}>
-                  <View style={{ alignItems: 'center' }}>
-                    <GradientText
-                      style={{
-                        fontSize: typography.h2.fontSize,
-                        fontWeight: typography.h2.fontWeight,
-                        fontFamily: typography.h2.fontFamily,
-                      }}
-                    >
-                      Hi , I’m Aira.
-                    </GradientText>
-                  </View>
-                    <Text style={styles.subtitle}>
-                      Your dating wingman - here to help you connect better.
-                    </Text>
-                  </View>
+              Hi , I’m Aira.
+            </GradientText>
+          </View>
+          <Text style={styles.subtitle}>
+            Your dating wingman - here to help you connect better.
+          </Text>
+        </View>
+      </View>
+    ) : (
+      <View style={styles.thread}>
+        {chatItems.map((item) => {
+          if (item.from === 'user') {
+            return (
+              <View key={item.id} style={styles.userMessageRow}>
+                <View style={styles.userBubble}>
+                  <Text style={styles.userBubbleText}>{item.text}</Text>
                 </View>
-              ) : (
-                <View style={styles.thread}>
-                  {chatItems.map((item) => {
-                    if (item.from === 'user') {
-                      return (
-                        <View key={item.id} style={styles.userMessageRow}>
-                          <View style={styles.userBubble}>
-                            <Text style={styles.userBubbleText}>{item.text}</Text>
-                          </View>
-                        </View>
-                      );
-                    }
+              </View>
+            );
+          }
+
+          return (
+            <View key={item.id} style={styles.airaMessageWrap}>
+              {item.blocks.map((b, idx) => {
+                switch (b.type) {
+                  case 'heading':
                     return (
-                      <View key={item.id} style={styles.airaMessageWrap}>
-                        {item.blocks.map((b, idx) => {
-                          if (b.type === 'divider') {
-                            return <View key={`${item.id}_${idx}`} style={styles.airaDivider} />;
-                          }
-                          if (b.type === 'heading') {
-                            return (
-                              <Text key={`${item.id}_${idx}`} style={styles.airaHeading}>
-                                {b.text}
-                              </Text>
-                            );
-                          }
-                          if (b.type === 'ordered') {
-                            return (
-                              <View key={`${item.id}_${idx}`} style={styles.airaListRow}>
-                                <Text style={styles.airaOrderedIndex}>{b.index}.</Text>
-                                <Text style={styles.airaOrderedText}>{b.text}</Text>
-                              </View>
-                            );
-                          }
-                          if (b.type === 'bullet') {
-                            return (
-                              <View
-                                key={`${item.id}_${idx}`}
-                                style={[styles.airaListRow, b.indent === 1 && styles.airaListRowIndented]}
-                              >
-                                <Text style={styles.airaBullet}>{'•'}</Text>
-                                <Text style={styles.airaBulletText}>{b.text}</Text>
-                              </View>
-                            );
-                          }
-                          if (b.type === 'bullet_item') {
-                            return (
-                              <View
-                                key={`${item.id}_${idx}`}
-                                style={[styles.airaListRow, styles.airaListRowIndented]}
-                              >
-                                <Text style={styles.airaBullet}>{'•'}</Text>
-                                <Text style={styles.airaBulletItemText}>
-                                  <Text style={styles.airaBulletItemTitle}>{b.title}</Text>
-                                  {b.description ? ` ${b.description}` : ''}
-                                </Text>
-                              </View>
-                            );
-                          }
-                          if (b.type === 'follow_up') {
-                            return (
-                              <View key={`${item.id}_${idx}`} style={styles.followUpCard}>
-                                <Text style={styles.followUpLabel}>Follow-up idea</Text>
-                                <Text style={styles.followUpText}>{b.text}</Text>
-                              </View>
-                            );
-                          }
+                      <Text key={idx} style={styles.airaHeading}>
+                        {b.text}
+                      </Text>
+                    );
+                  case 'paragraph':
+                    return (
+                      <Text key={idx} style={styles.airaParagraph}>
+                        {b.text}
+                      </Text>
+                    );
+                  case 'divider':
+                    return <View key={idx} style={styles.airaDivider} />;
+                  case 'ordered':
+                    return (
+                      <View key={idx} style={styles.airaListRow}>
+                        <Text style={styles.airaOrderedIndex}>{b.index}.</Text>
+                        <Text style={styles.airaOrderedText}>{b.text}</Text>
+                      </View>
+                    );
+                  case 'bullet':
+                    return (
+                      <View
+                        key={idx}
+                        style={[styles.airaListRow, b.indent === 1 ? styles.airaListRowIndented : null]}
+                      >
+                        <Text style={styles.airaBullet}>•</Text>
+                        <Text style={styles.airaBulletText}>{b.text}</Text>
+                      </View>
+                    );
+                  case 'bullet_item':
+                    return (
+                      <View key={idx} style={styles.airaListRow}>
+                        <Text style={styles.airaBullet}>•</Text>
+                        <View style={{ flex: 1 }}>
+                          {b.title ? <Text style={styles.airaBulletItemTitle}>{b.title}</Text> : null}
+                          {b.description ? (
+                            <Text style={styles.airaBulletItemText}>{b.description}</Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    );
+                  case 'follow_up':
+                    return (
+                      <View key={idx} style={styles.followUpCard}>
+                        <Text style={styles.followUpLabel}>Next</Text>
+                        <Text style={styles.followUpText}>{b.text}</Text>
+                      </View>
+                    );
+                  case 'missing_info_list':
+                    return (
+                      <View key={idx} style={styles.missingInfoWrap}>
+                        {b.options.map((opt) => {
+                          const sortedPhotos = Array.isArray(opt.photos)
+                            ? [...opt.photos].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+                            : [];
+                          const photoUrl = sortedPhotos[0]?.url;
+                          const thumbFallbackText =
+                            (opt.nickName ?? opt.name ?? '?').toString().trim().slice(0, 1) || '?';
+
+                          const title = opt.nickName ?? opt.name ?? 'Profile';
+                          const subtitle = opt.name && opt.nickName && opt.name !== opt.nickName ? opt.name : opt.nickName;
+
                           return (
-                            <Text key={`${item.id}_${idx}`} style={styles.airaParagraph}>
-                              {b.text}
-                            </Text>
+                            <TouchableOpacity
+                              key={opt._id}
+                              style={styles.missingInfoCard}
+                              activeOpacity={0.85}
+                              disabled={!lastUserText || isTyping}
+                              onPress={() => {
+                                if (!lastUserText) return;
+                                // Pass receiver id + last user message into the chatbot.
+                                void sendChatWithReceiver(lastUserText, opt._id);
+                              }}
+                            >
+                              <View style={styles.missingInfoThumbWrap}>
+                                {photoUrl ? (
+                                  <Image source={{ uri: photoUrl }} style={styles.missingInfoThumb} />
+                                ) : (
+                                  <View style={styles.missingInfoThumbFallback}>
+                                    <Text style={styles.missingInfoThumbFallbackText}>{thumbFallbackText}</Text>
+                                  </View>
+                                )}
+                              </View>
+                              <View style={styles.missingInfoTextBlock}>
+                                <Text style={styles.missingInfoTitle}>{title}</Text>
+                                {subtitle ? <Text style={styles.missingInfoSubtitle}>{subtitle}</Text> : null}
+                              </View>
+                            </TouchableOpacity>
                           );
                         })}
                       </View>
                     );
-                  })}
-                  {isTyping && (
-                    <View style={styles.airaMessageWrap}>
-                      <Text style={styles.airaParagraph}>
-                        Aira is typing…
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </ScrollView>
-
-            {/* Bottom fixed section: suggestions + composer */}
-            <View
-              style={styles.composerWrap}
-              onLayout={(e) => {
-                setComposerHeight(e.nativeEvent.layout.height);
-              }}
-            >
-              <View style={[styles.composerRow, { paddingBottom: 12 + insets.bottom }]}>
-                <View style={styles.inputPill}>
-                  <TextInput
-                    value={message}
-                    onChangeText={setMessage}
-                    placeholder="Ask me anything..."
-                    placeholderTextColor={colors.neutral[600]}
-                    style={styles.input}
-                    returnKeyType="send"
-                    onSubmitEditing={() => handleSend(message)}
-                  />
-                </View>
-
-                <TouchableOpacity
-                  activeOpacity={hasText ? 0.85 : 1}
-                  style={hasText ? styles.sendButton : [styles.sendButton, styles.sendButtonDisabled]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Send"
-                  disabled={!hasText}
-                  onPress={() => {
-                    if (!hasText) return;
-                    handleSend(message);
-                  }}
-                >
-                  <ForwardArrowIcon
-                    size={22}
-                    color={hasText ? colors.white : colors.neutral[500]}
-                  />
-                </TouchableOpacity>
-              </View>
-
+                  default:
+                    return null;
+                }
+              })}
             </View>
-          </KeyboardAvoidingView>
+          );
+        })}
+
+        {isTyping && (
+          <View style={styles.airaMessageWrap}>
+            <Text style={styles.airaParagraph}>Aira is typing…</Text>
+          </View>
+        )}
+      </View>
+    )}
+  </ScrollView>
+
+  {/* ✅ FIXED INPUT (OUTSIDE SCROLLVIEW) */}
+  {/* <View style={styles.composerWrap}> */}
+  <View
+  style={[
+    styles.composerWrap,
+    {
+      paddingBottom: insets.bottom > 0 ? insets.bottom : 12, // 🔥 FIX
+    },
+  ]}
+>
+    <View style={[styles.composerRow, { paddingBottom: 12 }]}>
+      <View style={styles.inputPill}>
+        <TextInput
+          value={message}
+          onChangeText={setMessage}
+          placeholder="Ask me anything..."
+          placeholderTextColor={colors.neutral[600]}
+          style={[
+            styles.input,
+            { textAlignVertical: hasText ? 'top' : 'center' },
+          ]}
+          multiline
+        />
+      </View>
+
+      <TouchableOpacity
+        disabled={!hasText}
+        onPress={() => {
+          if (!hasText) return;
+          handleSend(message);
+        }}
+        style={
+          hasText
+            ? styles.sendButton
+            : [styles.sendButton, styles.sendButtonDisabled]
+        }
+      >
+        <ForwardArrowIcon
+          size={22}
+          color={hasText ? colors.white : colors.neutral[500]}
+        />
+      </TouchableOpacity>
+    </View>
+  </View>
+</View>
+
         </SafeAreaView>
       </View>
     );
@@ -439,11 +728,12 @@ export const MatchScreen = () => {
       borderRadius: 9999,
     },
     content: {
-      flexGrow: 1,
       paddingHorizontal: 16,
       paddingTop: 36,
+      flexGrow: 1,
       alignItems: 'center',
     },
+
     hero: {
       width: '100%',
       alignItems: 'center',
@@ -622,9 +912,66 @@ export const MatchScreen = () => {
       fontFamily: typography.fontFamily.regular,
       color: colors.neutral[700],
     },
+    missingInfoWrap: {
+      marginTop: 12,
+      alignSelf: 'stretch',
+      gap: 10,
+    },
+    missingInfoCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.neutral[50],
+      borderRadius: 18,
+      padding: 12,
+      gap: 12,
+    },
+    missingInfoThumbWrap: {
+      width: 52,
+      height: 52,
+      borderRadius: 16,
+      overflow: 'hidden',
+      backgroundColor: colors.neutral[200],
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    missingInfoThumb: {
+      width: '100%',
+      height: '100%',
+    },
+    missingInfoThumbFallback: {
+      width: '100%',
+      height: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    missingInfoThumbFallbackText: {
+      ...typography.h3,
+      color: colors.neutral[900],
+      fontWeight: '600',
+    },
+    missingInfoTextBlock: {
+      flex: 1,
+      flexDirection: 'column',
+      gap: 2,
+    },
+    missingInfoTitle: {
+      ...typography.bodyMedium,
+      fontWeight: '600',
+      color: colors.neutral[900],
+      lineHeight: 20,
+      letterSpacing: 0.32,
+    },
+    missingInfoSubtitle: {
+      ...typography.body,
+      fontSize: 12,
+      color: colors.neutral[700],
+      lineHeight: 18,
+      letterSpacing: 0.28,
+    },
     composerWrap: {
       backgroundColor: colors.white,
       alignSelf: 'stretch',
+      // paddingBottom: Platform.OS === 'android' ? 8 : 0,
     },
     composerRow: {
       flexDirection: 'row',
@@ -658,9 +1005,11 @@ export const MatchScreen = () => {
       flex: 1,
       borderRadius: 22,
       backgroundColor: '#F3F3F3',
-      justifyContent: 'center',
+      justifyContent: 'flex-start',
       paddingHorizontal: 16,
       minHeight: 56,
+      // Allow the composer to grow but stop it from covering too much of the screen.
+      maxHeight: 200,
     },
     input: {
       ...typography.body,
@@ -669,7 +1018,6 @@ export const MatchScreen = () => {
       lineHeight: 22,
       paddingVertical: 13,
       paddingHorizontal: 0,
-      textAlignVertical: 'center',
       includeFontPadding: false,
     },
     homeIndicatorArea: {

@@ -217,21 +217,22 @@ export const ChatScreen = () => {
     if (!menuChatId) return;
     const item = data.find((c) => c.id === menuChatId);
     const currentlyPinned = item?.pinned ?? false;
-    const apiCall = currentlyPinned ? unpinChatApi(menuChatId) : pinChatApi(menuChatId);
+    const chatIdToUpdate = menuChatId;
+    const apiCall = currentlyPinned ? unpinChatApi(chatIdToUpdate) : pinChatApi(chatIdToUpdate);
     setMenuVisible(false);
     setMenuChatId(null);
+    // Refetch so "isPinnedForMe" is authoritative and the list UI stays consistent.
     apiCall
-      .then(() => {
-        setData((prev) =>
-          prev.map((c) =>
-            c.id === menuChatId ? { ...c, pinned: !currentlyPinned } : c
-          )
-        );
+      .then(async () => {
+        const { list, hasMore: more } = await fetchPage(1);
+        setData(list);
+        setHasMore(more);
+        setNextPage(2);
       })
       .catch(() => {
         // Pin update failed
       });
-  }, [menuChatId, data]);
+  }, [menuChatId, data, fetchPage]);
 
   const handleDelete = useCallback(() => {
     if (!menuChatId) return;
@@ -445,7 +446,13 @@ export const ChatScreen = () => {
                 activeOpacity={0.7}
               >
                 <PinnedIcon size={20} color={colors.black} />
-                <Text style={styles.contextMenuLabel}>{STRINGS.CHAT.PIN_CHAT}</Text>
+                <Text style={styles.contextMenuLabel}>
+                  {menuChatId
+                    ? (data.find((c) => c.id === menuChatId)?.pinned ?? false)
+                      ? STRINGS.CHAT.UNPIN_CHAT
+                      : STRINGS.CHAT.PIN_CHAT
+                    : STRINGS.CHAT.PIN_CHAT}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.contextMenuItem}

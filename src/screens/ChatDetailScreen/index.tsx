@@ -26,8 +26,6 @@ import {
   requestCameraPermission,
   checkPhotoLibraryPermission,
   requestPhotoLibraryPermission,
-  checkMicrophonePermission,
-  requestMicrophonePermission,
 } from '../../config/permissions';
 import { BackArrowIcon } from '../../assets/icons/common/BackArrowIcon';
 import { MoreVertIcon } from '../../assets/icons/common/MoreVertIcon';
@@ -73,7 +71,7 @@ type ChatMessage =
 // const VOICE_WAVEFORM = [8, 12, 6, 14, 10, 16, 8, 14, 12, 10];
 
 const DONT_SHOW_ASK_AIRA_CONFIRM_KEY = 'dont_show_ask_aira_confirm';
-const MESSAGES_PAGE_SIZE = 5;
+const MESSAGES_PAGE_SIZE = 10;
 
 const REPORT_REASONS: { value: string; label: string }[] = [
   { value: 'inappropriate_messages', label: 'Inappropriate messages' },
@@ -303,7 +301,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   useEffect(() => {
     if (!chatId || !currentUserId || !otherUserId) return;
     setSocketConnected(socketService.isConnected());
-    console.log('[Socket] ChatDetailScreen: join + subscribe', { chatId, currentUserId, otherUserId });
     socketService.join(chatId);
     const unsubMessage = socketService.on<MessageReceivePayload>('message_send', (data) => {
       const apiMessage = (data.message ?? {}) as ChatMessageApiItem;
@@ -388,16 +385,13 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     if (typingStopRef.current) clearTimeout(typingStopRef.current);
     if (inputText.trim().length > 0) {
       typingDebounceRef.current = setTimeout(() => {
-        console.log('[Socket] ChatDetailScreen: sending typing true');
         socketService.typing(currentUserId, otherUserId, true);
         if (typingStopRef.current) clearTimeout(typingStopRef.current);
         typingStopRef.current = setTimeout(() => {
-          console.log('[Socket] ChatDetailScreen: sending typing false (idle 2s)');
           socketService.typing(currentUserId, otherUserId, false);
         }, 2000);
       }, 300);
     } else {
-      console.log('[Socket] ChatDetailScreen: sending typing false (input empty)');
       socketService.typing(currentUserId, otherUserId, false);
     }
     return () => {
@@ -498,7 +492,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   //
   //     setRecordFilePath(result);
   //   } catch (err) {
-  //     console.log('startVoiceRecording error', err);
   //     setVoiceBarVisible(false);
   //   }
   // }, []);
@@ -510,7 +503,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   //     setShowMicrophonePermissionSheet(true);
   //     return;
   //   }
-  //   console.log('handleMicPress');
   //   setVoiceBarVisible(true);
   //   setVoiceSeconds(0);
   //   setVoicePaused(false);
@@ -571,7 +563,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   //
   //     return result;
   //   } catch (e) {
-  //     console.log('stop recording error', e);
   //     return null;
   //   }
   // };
@@ -625,7 +616,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   //     setVoicePaused(false);
   //     setRecordFilePath(null);
   //   } catch (err) {
-  //     console.log('voice send error', err);
   //   } finally {
   //     setVoiceSendLoading(false);
   //   }
@@ -658,9 +648,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     if (isPickingFileRef.current) return;
     isPickingFileRef.current = true;
     try {
-      console.log('openFilePicker');
       const results = await pick({ allowMultiSelection: false, copyTo: 'cachesDirectory' } as any);
-      console.log('results', results);
       if (results?.length && results[0]) {
         const item: any = results[0];
         const uri: string | undefined = item.fileCopyUri ?? item.uri;
@@ -670,8 +658,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         }
       }
     } catch (error) {
-      console.log('openFilePicker error');
-      console.log(error);
       // User cancelled or error
     } finally {
       isPickingFileRef.current = false;
@@ -889,14 +875,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         await new Promise<void>((resolve) => setTimeout(resolve, 350));
         await openFilePicker();
       } catch (error) {
-        console.log('handleAttachmentSelect error');
-        console.log(error);
       }
     }
   };
 
   const handleMessageLongPress = (index: number) => {
-    console.log('handleMessageLongPress', index);
     setMessageContextIndex(index);
   };
 
@@ -1010,11 +993,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   );
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right', 'bottom']}>
       <KeyboardAvoidingView
         style={styles.screen}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+        // keyboardVerticalOffset={insets.top}
       >
         <StatusBar barStyle="dark-content" translucent backgroundColor={colors.white}/>
         <View style={styles.headerBar}>
@@ -1034,7 +1018,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           <TouchableOpacity
             style={styles.headerAskAiraButton}
             onPress={() => {
-              console.log('chatId', chatId, 'dontShowAskAiraPersisted', dontShowAskAiraPersisted);
               if (dontShowAskAiraPersisted && chatId) {
                 setAskAiraConfirmLoading(true);
                 getAiSuggestionsApi(chatId)
@@ -1539,11 +1522,15 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-
+      <View style={{ flex: 1 }}>
       <ScrollView
         ref={scrollViewRef}
         style={styles.screen}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={{
+          ...styles.scrollContent,
+          // Reserve space for the input area + safe area when keyboard is open.
+          paddingBottom: (styles.scrollContent?.paddingBottom ?? 16) + 150 + insets.bottom,
+        }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         onScroll={handleMessagesScroll}
@@ -1568,6 +1555,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           </>
         )}
       </ScrollView>
+      </View>
 
       {/* Voice bar UI (voice chat disabled) */}
       {/* {voiceBarVisible ? (

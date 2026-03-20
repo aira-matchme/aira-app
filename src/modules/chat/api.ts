@@ -278,7 +278,6 @@ export type ChatSuggestionsResponse = {
 
 /** Get AI chat suggestions for a chat. Endpoint: /chat/chat-suggestions */
 export async function getAiSuggestionsApi(chatId: string): Promise<ChatSuggestionsResponse> {
-  console.log('chatId', chatId);
   const { data } = await apiClient.post<ChatSuggestionsResponse>(
     endpoints.chat.getAiSuggestions,
     { chatId }
@@ -337,15 +336,25 @@ export async function uploadChatFileApi(
     : fileUri.startsWith('file://')
       ? fileUri
       : `file://${fileUri}`;
+  // IMPORTANT: For React Native, axios expects the "file" field value to be a plain
+  // { uri, type, name } object. Avoid forcing Blob typings.
   formData.append('file', {
     uri,
     type: options.mimeType,
     name: options.fileName,
-  } as unknown as Blob);
+  } as any);
 
-  const { data } = await apiClient.post<UploadChatFileResponse>(endpoints.chat.fileUpload, formData, {
-    timeout: 60000,
-  });
+  // `apiClient` defaults to JSON headers; override for multipart upload.
+  const { data } = await apiClient.post<UploadChatFileResponse>(
+    endpoints.chat.fileUpload,
+    formData,
+    {
+      timeout: 60000,
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
 
   const url = data?.url ?? data?.data?.url ?? '';
   const key = data?.key ?? data?.data?.key ?? '';

@@ -98,7 +98,6 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
   );
 
   const onSubmit = async (data: PincodeFormData) => {
-    console.log('Submitted postcode:', data.pincode);
     setIsLoading(true);
     try {
       // Normalize postcode: uppercase, remove extra spaces

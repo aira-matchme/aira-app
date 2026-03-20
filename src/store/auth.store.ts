@@ -1,5 +1,9 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useProfileStore } from './profile.store';
+import { usePreferencesStore } from './preferences.store';
+import { useOnboardingStore } from './onboarding.store';
+import { useUserStore } from './user.store';
 
 export interface User {
   id: string;
@@ -92,6 +96,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch (e) {
       // Clear failed
     }
+    useProfileStore.getState().resetProfile();
+    usePreferencesStore.getState().reset();
+    useOnboardingStore.getState().clearOnboarding();
+    useUserStore.getState().clearUser();
     set({
       accessToken: null,
       refreshToken: null,

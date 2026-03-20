@@ -417,9 +417,16 @@ export const MatchDetailsScreen: React.FC = () => {
       setLoading(true);
       const url = endpoints.matches.getMatchDetails.replace('{id}', userId);
       const { data } = await apiClient.get<MatchDetailsResponse>(url);
-      setDetails(data?.data ?? null);
+      const nextDetails = data?.data ?? null;
+      setDetails(nextDetails);
+      // Backend may send current liked status in `isLiked`.
+      // Keep UI in sync with backend on initial load.
+      const likedValue =
+        nextDetails?.isLiked ?? nextDetails?.liked ?? nextDetails?.match?.isLiked ?? false;
+      setIsLiked(Boolean(likedValue));
     } catch {
       setDetails(null);
+      setIsLiked(false);
     } finally {
       setLoading(false);
     }

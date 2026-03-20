@@ -72,7 +72,7 @@ class SocketService {
    * - Client emit: join({ chatId } | { userId }) | typing({ sender, receiver, isTyping }) | message_send({ sender, receiver, message }) | message_delete({ sender, receiver, messageId })
    * - Server emit: join_success (presence/online), typing({ sender, receiver, isTyping }), message_send/message_receive({ sender, receiver, message?, messageId?, timestamp? }), message_delete
    */
-  private static readonly SOCKET_URL = 'http://13.42.70.111:12345';
+  private static readonly SOCKET_URL = 'wss://dev-socket.airamatchme.com';
 
   private getBearerToken() {
     if (!this.token) return null;
@@ -112,7 +112,6 @@ class SocketService {
     this.token = token;
     const bearer = this.getBearerToken();
 
-    console.log('[Socket] connect (socket.io)', { url: SocketService.SOCKET_URL });
 
     this.socket = io(SocketService.SOCKET_URL, {
       transports: ['websocket'],
@@ -129,34 +128,27 @@ class SocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('[Socket] connected', { id: this.socket?.id });
       this.notifyConnectionState(true);
       const payload = this.userId ? { userId: this.userId } : {};
-      if (this.userId) console.log('[Socket] sending join for presence on connect', { userId: this.userId });
       this.send('join', payload);
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('[Socket] disconnected', { reason });
       this.notifyConnectionState(false);
     });
 
     this.socket.on('connect_error', (err) => {
-      console.log('[Socket] connect_error', { message: err?.message });
     });
 
     this.socket.onAny((event, ...args) => {
-      console.log('[Socket] onAny', { event, argsPreview: args?.[0] });
     });
 
     // Incoming events from backend
     this.socket.on('join', (data: unknown) => {
-      console.log('[Socket] handled: join', data);
       this.emit('join', data);
     });
 
     this.socket.on('join_success', (data: unknown) => {
-      console.log('[Socket] handled: join_success', data);
       this.emit('join_success', data);
     });
 
@@ -166,14 +158,12 @@ class SocketService {
       let receiver = String(d.receiver ?? d.targetUserId ?? d.receiverId ?? '');
       if (!receiver && this.userId) receiver = this.userId;
       const isTyping = d.isTyping !== false && d.typing !== false;
-      console.log('[Socket] handled: typing', { sender, receiver, isTyping });
       this.emit('typing', { sender, receiver, isTyping });
     });
 
     // Some backends emit `message_receive`, others emit `message_send` for incoming messages.
     const handleIncomingMessage = (data: unknown) => {
       const raw = (data ?? {}) as Record<string, unknown>;
-      console.log('[Socket] message_receive raw payload', raw);
       const msg = (raw.message ?? {}) as Record<string, unknown>;
       let sender = String(msg.sender ?? raw.sender ?? raw.senderId ?? '');
       let receiver = String(msg.receiver ?? raw.receiver ?? raw.receiverId ?? '');
@@ -202,7 +192,6 @@ class SocketService {
       let receiver = String(d.receiver ?? d.receiverId ?? '');
       if (!receiver && this.userId) receiver = this.userId;
       const messageId = String(d.messageId ?? d.message_id ?? d.id ?? d._id ?? '');
-      console.log('[Socket] handled: message_delete', { sender, receiver, messageId });
       this.emit('message_delete', { sender, receiver, messageId });
     };
     this.socket.on('message_delete', handleMessageDelete);
@@ -232,24 +221,20 @@ class SocketService {
   /** Send socket.io event. Always attaches bearer token to payload. */
   send(event: string, payload: Record<string, unknown> = {}) {
     if (!this.socket?.connected) {
-      console.log('[Socket] send skipped (not connected)', { event, connected: this.socket?.connected });
       return;
     }
 
     const body = this.withAuthorization(payload);
-    console.log('[Socket] emit', { event, message: body, sender: body.sender, receiver: body.receiver });
     this.socket.emit(event, body);
   }
 
   /** Join a chat room. Call when user opens a chat. */
   join(chatId: string) {
-    console.log('[Socket] join(chatId)', chatId);
     this.send('join', { chatId });
   }
 
   /** Send typing indicator: sender (current user id), receiver (other user id), isTyping (true/false). */
   typing(sender: string, receiver: string, isTyping: boolean) {
-    console.log('[Socket] typing', { sender, receiver, isTyping });
     this.send('typing', { sender, receiver, isTyping });
   }
 
@@ -268,7 +253,6 @@ class SocketService {
 
   /** Send message delete: sender, receiver, messageId. Sends both snake and camel keys for backend compatibility. */
   messageDelete(sender: string, receiver: string, messageId: string) {
-    console.log('[Socket] messageDelete', { sender, receiver, messageId });
     this.send('message_delete', {
       sender,
       receiver,
@@ -281,9 +265,7 @@ class SocketService {
   /** Set current user for presence; will emit join when possible, server replies with join_success. */
   setCurrentUser(userId: string) {
     this.userId = userId;
-    console.log('[Socket] setCurrentUser', { userId });
     if (this.socket?.connected) {
-      console.log('[Socket] sending join (socket already open)', { userId });
       this.send('join', { userId });
     }
   }
@@ -296,7 +278,6 @@ class SocketService {
   }
 
   disconnect() {
-    console.log('[Socket] disconnect');
     this.socket?.removeAllListeners();
     this.socket?.disconnect();
     this.socket = null;

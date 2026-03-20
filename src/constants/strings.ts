@@ -427,6 +427,7 @@ export const STRINGS = {
     JUST_NOW: 'Just Now',
     YESTERDAY: 'Yesterday',
     PIN_CHAT: 'Pin Chat',
+    UNPIN_CHAT: 'Unpin Chat',
     REPLY: 'Reply',
     REPLYING_TO: 'Replying to',
     YOU: 'You',

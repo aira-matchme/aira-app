@@ -101,10 +101,10 @@ export const BasicDetailsInterestsScreen: React.FC = () => {
     if (fromEditProfile) {
       try {
         setIsSaving(true);
+        console.log('Saving interests:', selected);
         await apiClient.patch(endpoints.user.editProfile, {
-          interests: selected,
+          hobbies: selected,
         });
-
         const profile = await getProfileApi();
         if ((profile as any)?.data) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any

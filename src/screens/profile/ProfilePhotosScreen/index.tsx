@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -81,6 +81,7 @@ export const ProfilePhotosScreen: React.FC = () => {
   const [showGalleryPermissionSheet, setShowGalleryPermissionSheet] = useState(false);
   const [pendingGalleryIndex, setPendingGalleryIndex] = useState<number | null>(null);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  const isPickingGalleryRef = useRef(false);
   const [uploadingSlots, setUploadingSlots] = useState<Set<number>>(new Set());
   const [uploadedSlots, setUploadedSlots] = useState<Set<number>>(new Set());
 
@@ -187,10 +188,13 @@ export const ProfilePhotosScreen: React.FC = () => {
   };
 
   const openGalleryForSlot = (index: number) => {
-    launchImageLibrary(
-      { mediaType: 'photo', quality: 0.8 },
-      (response) => handlePickerResponse(response, index)
-    );
+    // Prevent overlapping native pickers (can cause iOS picker issues)
+    if (isPickingGalleryRef.current) return;
+    isPickingGalleryRef.current = true;
+    launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, (response) => {
+      isPickingGalleryRef.current = false;
+      handlePickerResponse(response, index);
+    });
   };
 
   const handleGallery = async () => {
@@ -202,6 +206,7 @@ export const ProfilePhotosScreen: React.FC = () => {
     const hasAccess = status === 'granted' || status === 'limited';
 
     if (hasAccess) {
+      setPendingGalleryIndex(null);
       openGalleryForSlot(index);
       return;
     }

@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Image, StatusBar, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { BellIcon } from '../../assets/icons/common/BellIcon';
@@ -12,22 +11,14 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
+import { useFocusEffect } from '@react-navigation/native';
 
 type LikedProfile = {
   id: string;
   name: string;
   distance?: string;
-  image: any;
+  image?: { uri: string };
 };
-
-const IMAGES = [
-  require('../../assets/images/Profile1.png'),
-  require('../../assets/images/Profile2.png'),
-  require('../../assets/images/Profile3.png'),
-  require('../../assets/images/Profile4.png'),
-  require('../../assets/images/Profile5.png'),
-  require('../../assets/images/Frame500.png'),
-];
 
 // Tab bar content height + padding (match TabNavigator) so last row can scroll into view
 const TAB_BAR_VISIBLE_HEIGHT = 56 + 24;
@@ -38,56 +29,56 @@ export const LikesScreen = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<LikedProfile[]>([]);
 
-  useEffect(() => {
-    let isMounted = true;
+  const fetchLikes = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data: response } = await apiClient.post<any>(endpoints.matches.getLikes);
+      const items = response?.data?.items ?? [];
 
-    const fetchLikes = async () => {
-      try {
-        const { data: response } = await apiClient.post<any>(endpoints.matches.getLikes);
-        const items = response?.data?.items ?? [];
+      const mapped: LikedProfile[] = items.map((item: any, index: number) => {
+        const user = item.user ?? {};
+        const profile = item.userMatchProfile ?? {};
+        const galleryPhotos = profile.galleryPhotos ?? [];
 
-        if (!isMounted) {
-          return;
-        }
-
-        const mapped: LikedProfile[] = items.map((item: any, index: number) => {
-          const user = item.user ?? {};
-          const profile = item.userMatchProfile ?? {};
-          const galleryPhotos = profile.galleryPhotos ?? [];
-
-          const imageSource =
-            galleryPhotos.length > 0
-              ? { uri: galleryPhotos[0].url }
-              : user.profilePhoto?.url?.medium
+        const imageSource =
+          galleryPhotos.length > 0
+            ? { uri: galleryPhotos[0].url }
+            : user.profilePhoto?.url?.medium
               ? { uri: user.profilePhoto.url.medium }
-              : IMAGES[index % IMAGES.length];
+              : undefined;
 
-          return {
-            id: user._id ?? item.likedUserId ?? item.id ?? String(index),
-            name: user.nickName ?? user.name ?? 'Aira match',
-            // Distance is not included in the sample response; omit for now
-            distance: undefined,
-            image: imageSource,
-          };
-        });
+        return {
+          id: user._id ?? item.likedUserId ?? item.id ?? String(index),
+          name: user.nickName ?? user.name ?? 'Aira match',
+          // Distance is not included in the sample response; omit for now
+          distance: undefined,
+          image: imageSource,
+        };
+      });
 
-        setData(mapped);
-      } catch (e) {
-        if (!isMounted) return;
-        setData([]);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchLikes();
-
-    return () => {
-      isMounted = false;
-    };
+      setData(mapped);
+    } catch {
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      // Wrap so we can cancel state updates on focus loss
+      (async () => {
+        await fetchLikes();
+        if (!isActive) return;
+      })();
+
+      return () => {
+        isActive = false;
+      };
+    }, [fetchLikes])
+  );
 
   return (
     <View style={styles.screen}>
@@ -163,7 +154,9 @@ export const LikesScreen = () => {
               const isLeft = index % 2 === 0;
               return (
                 <View style={[styles.card, isLeft && styles.cardLeft]}>
-                  <Image source={item.image} style={styles.image} resizeMode="cover" />
+                  {item.image ? (
+                    <Image source={item.image} style={styles.image} resizeMode="cover" />
+                  ) : null}
                   <View style={styles.overlay}>
                     <Text style={styles.name} numberOfLines={1}>
                       {item.name}
