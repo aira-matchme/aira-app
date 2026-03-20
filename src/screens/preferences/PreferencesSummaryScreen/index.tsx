@@ -79,14 +79,13 @@ function getEducationDisplay(value: EducationOption | null): string {
 
 function getEmploymentDisplay(value: EmploymentOption[]): string {
   if (!value.length) return '—';
-  const map: Record<string, keyof typeof STRINGS.PREFERENCES_EMPLOYMENT> = {
+  const map: Record<EmploymentOption, keyof typeof STRINGS.PREFERENCES_EMPLOYMENT> = {
     employed: 'EMPLOYED',
     self_employed: 'SELF_EMPLOYED',
     student: 'STUDENT',
     unemployed: 'UNEMPLOYED',
-    prefer_not_to_say: 'PREFER_NOT_TO_SAY',
   };
-  const labels = value.map((v) => STRINGS.PREFERENCES_EMPLOYMENT[map[v] ?? 'PREFER_NOT_TO_SAY'] ?? '—');
+  const labels = value.map((v) => STRINGS.PREFERENCES_EMPLOYMENT[map[v]] ?? '—');
   return labels.join(', ');
 }
 

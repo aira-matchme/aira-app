@@ -23,7 +23,7 @@ export async function getReferenceNextApi(): Promise<ReferenceNextData> {
 
 export async function postReferenceImageAnswerApi(params: {
   field: string;
-  value: string;
+  value: Array<Record<string, number>>;
 }): Promise<{ statusCode?: number; message?: string; data?: unknown }> {
   const { data } = await apiClient.post(endpoints.question.postReferenceImages, {
     field: params.field,

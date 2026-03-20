@@ -44,6 +44,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Aira needs access to your camera to verify your identity for face verification.</string>
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>This app needs your location to provide location based services.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Aira needs microphone access to record and send voice messages in chat.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

@@ -308,7 +308,7 @@ describe('Preferences buildAddPreferencePayload', () => {
     expect(payload.lookingForGender).toBe('female');
     expect(payload.preferredRadiusKm).toBe(Math.round(20 * 1.60934));
     expect(payload.preferredEducationLevels).toBe('other');
-    expect(payload.preferredEmploymentStatuses).toEqual(['prefer_not_to_say']);
+    expect(payload.preferredEmploymentStatuses).toEqual([]);
     expect(payload.preferredIncomeRanges).toBe('prefer_not_to_say');
     expect(payload.preferredMinAge).toBe(18);
     expect(payload.preferredMaxAge).toBe(30);

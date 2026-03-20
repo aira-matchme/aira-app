@@ -22,7 +22,10 @@ import { Button } from '../../../components/Button';
 import FrameIcon from '../../../assets/icons/common/FrameIcon';
 import { ReusableBottomSheet } from '../../../components/BottomSheet';
 import { STRINGS } from '../../../constants/strings';
-import { requestCameraPermission } from '../../../config/permissions';
+import {
+  checkCameraPermission,
+  requestCameraPermission,
+} from '../../../config/permissions';
 import { submitLivenessApi } from '../../../modules/auth/api';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { colors } from '../../../theme';
@@ -163,6 +166,21 @@ export const VideoVerificationScreen: React.FC = () => {
     // Close sheet
   };
 
+  const handleStartVerification = async () => {
+    setIsRequesting(true);
+    try {
+      const existing = await checkCameraPermission();
+      if (existing === 'granted') {
+        setShowCamera(true);
+        StatusBar.setHidden(true);
+        return;
+      }
+      setShowPermissionSheet(true);
+    } finally {
+      setIsRequesting(false);
+    }
+  };
+
   /* ------------------------------------------------------------------ */
   /* -------------------------- CAMERA SCREEN -------------------------- */
   /* ------------------------------------------------------------------ */
@@ -267,9 +285,9 @@ export const VideoVerificationScreen: React.FC = () => {
                   {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.BULLET_2}
                 </Text>
               </View>
-              <View style={styles.bulletPoint}>
+              {/* <View style={styles.bulletPoint}>
                 <Text style={styles.bulletDot}>•</Text>
-              </View>
+              </View> */}
             </View>
           </View>
         </ScrollView>
@@ -277,7 +295,7 @@ export const VideoVerificationScreen: React.FC = () => {
         <View style={styles.buttonContainer}>
           <Button
             title={STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.BUTTON}
-            onPress={() => setShowPermissionSheet(true)}
+            onPress={handleStartVerification}
             variant="primary"
             disabled={isRequesting}
             loading={isRequesting}

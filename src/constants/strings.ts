@@ -138,7 +138,7 @@ export const STRINGS = {
         UNEMPLOYED: 'Unemployed',
         STUDENT: 'Student',
      NOT_WORKING: 'Not currently working',
-     PREFER_NOT_TO_SAY: 'Prefer not to say',
+     ANY_INCOME: 'Any income',
       },
     },
     FINAL: {
@@ -150,7 +150,7 @@ export const STRINGS = {
         BETWEEN_30000_AND_40000: '$30k - $40k',
         BETWEEN_40000_AND_50000: '$40k - $50k',
         OVER_50000: '$50k+',
-        PREFER_NOT_TO_SAY: 'Prefer not to say',
+        ANY_INCOME: 'Any income',
       },
       PLACEHOLDER: 'Enter your income range',
     },
@@ -201,7 +201,7 @@ export const STRINGS = {
       BULLET_1: 'Your verification video is securely stored',
       BULLET_2: "It's never shared with other users",
       BUTTON: 'Start Verification',
-      PERMISSION_TITLE: '"Aira" Would Like to Access Your Camera',
+      PERMISSION_TITLE: 'Aira Would Like to Access Your Camera',
       PERMISSION_DESCRIPTION: 'Aira uses your camera to verify your identity with a short video. Your video is only used for verification and is never shared.',
     },
     SELFIE_CAMERA: {
@@ -411,6 +411,9 @@ export const STRINGS = {
   LIKES: {
     TITLE: 'Liked Profiles',
     SUBTITLE: "Profiles you've saved to explore when the moment feels right",
+    EMPTY_TITLE: 'Nobody here yet',
+    EMPTY_DESCRIPTION:
+      'Your liked profiles live here. Time to head back and find someone interesting.',
   },
   CHAT: {
     TITLE: 'Messages',

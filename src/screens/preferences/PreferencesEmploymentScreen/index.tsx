@@ -17,16 +17,12 @@ import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { InterestChipCheckIcon } from '../../../assets/icons/common/InterestChipCheckIcon';
 import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
-import { usePreferencesStore } from '../../../store/preferences.store';
+import {
+  usePreferencesStore,
+  type EmploymentOption,
+} from '../../../store/preferences.store';
 import { buildAddPreferencePayload, patchEditPreference } from '../../../modules/preferences/api';
 import { styles } from './styles';
-
-export type EmploymentOption =
-  | 'employed'
-  | 'self_employed'
-  | 'student'
-  | 'unemployed'
-  | 'prefer_not_to_say';
 
 const EMPLOYMENT_OPTIONS: {
   value: EmploymentOption;
@@ -36,7 +32,6 @@ const EMPLOYMENT_OPTIONS: {
   { value: 'self_employed', labelKey: 'SELF_EMPLOYED' },
   { value: 'student', labelKey: 'STUDENT' },
   { value: 'unemployed', labelKey: 'UNEMPLOYED' },
-  { value: 'prefer_not_to_say', labelKey: 'PREFER_NOT_TO_SAY' },
 ];
 
 type PreferencesEmploymentNavigationProp = NativeStackNavigationProp<

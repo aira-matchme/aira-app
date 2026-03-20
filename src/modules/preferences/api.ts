@@ -81,6 +81,18 @@ function educationFromRank(rank: number): EducationOption {
   return 'other';
 }
 
+const PREFERRED_EMPLOYMENT_VALUES: readonly EmploymentOption[] = [
+  'employed',
+  'self_employed',
+  'student',
+  'unemployed',
+];
+
+function normalizeEmploymentFromApi(statuses: string[]): EmploymentOption[] {
+  const allowed = new Set<string>(PREFERRED_EMPLOYMENT_VALUES);
+  return statuses.filter((s): s is EmploymentOption => allowed.has(s));
+}
+
 function incomeFromOrder(order: number): IncomeOption {
   // Backend order:
   // eur_50k_plus: 4, eur_40k_50k: 3, eur_30k_40k: 2, eur_20k_30k: 1, prefer_not_to_say: 0
@@ -88,7 +100,7 @@ function incomeFromOrder(order: number): IncomeOption {
   if (order === 3) return 'eur_40k_50k';
   if (order === 2) return 'eur_30k_40k';
   if (order === 1) return 'eur_20k_30k';
-  return 'prefer_not_to_say';
+  return 'any_income';
 }
 
 function hydratePreferencesStoreFromApi(raw: unknown): void {
@@ -127,7 +139,9 @@ function hydratePreferencesStoreFromApi(raw: unknown): void {
   }
 
   if (Array.isArray(data.preferredEmploymentStatuses)) {
-    usePreferencesStore.getState().setPreferredEmployment(data.preferredEmploymentStatuses as EmploymentOption[]);
+    usePreferencesStore
+      .getState()
+      .setPreferredEmployment(normalizeEmploymentFromApi(data.preferredEmploymentStatuses));
   }
 
   if (typeof data.preferredIncomeRanges === 'string') {
@@ -190,9 +204,7 @@ export function buildAddPreferencePayload(
     ? mapEducationToApi(state.preferredEducation)
     : 'other';
   const preferredEmploymentStatuses =
-    state.preferredEmployment.length > 0
-      ? state.preferredEmployment
-      : ['prefer_not_to_say'];
+    state.preferredEmployment.length > 0 ? state.preferredEmployment : [];
   const preferredIncomeRanges = state.preferredIncome
     ? mapIncomeToApi(state.preferredIncome)
     : 'prefer_not_to_say';

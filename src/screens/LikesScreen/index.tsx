@@ -5,6 +5,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { BellIcon } from '../../assets/icons/common/BellIcon';
+import { LikesEmptyIllustrationIcon } from '../../assets/icons/common/LikesEmptyIllustrationIcon';
 import { LocationPinIcon } from '../../assets/icons/common/LocationPinIcon';
 import { STRINGS } from '../../constants/strings';
 import { colors } from '../../theme';
@@ -127,11 +128,23 @@ export const LikesScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.subtitle}>{STRINGS.LIKES.SUBTITLE}</Text>
+        {data.length > 0 ? (
+          <Text style={styles.subtitle}>{STRINGS.LIKES.SUBTITLE}</Text>
+        ) : null}
 
         {loading ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator size="large" color={colors.primary.purple} />
+          </View>
+        ) : data.length === 0 ? (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIconWrap}>
+              <LikesEmptyIllustrationIcon size={72} color={colors.black} />
+            </View>
+            <View style={styles.emptyTextBlock}>
+              <Text style={styles.emptyTitle}>{STRINGS.LIKES.EMPTY_TITLE}</Text>
+              <Text style={styles.emptyDescription}>{STRINGS.LIKES.EMPTY_DESCRIPTION}</Text>
+            </View>
           </View>
         ) : (
           <FlatList

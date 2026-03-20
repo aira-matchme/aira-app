@@ -89,6 +89,9 @@ export const uploadSelfieApi = async (
       formData,
       {
         timeout: 60000,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       },
     );
     return data;
@@ -116,10 +119,11 @@ export interface UploadProfilePhotoResponse {
 /** Upload a profile/reference image with order (1-based: 1st slot = 1, 6th slot = 6) */
 export const uploadProfilePhotoApi = async (
   photoUri: string,
-  order: number
+  order: number,
+  isBlurred = false,
 ): Promise<UploadProfilePhotoResponse> => {
   const formData = new FormData();
-  formData.append('file', {
+  formData.append('photo', {
     uri: photoUri.startsWith('ph://')
       ? photoUri
       : photoUri.startsWith('file://')
@@ -129,12 +133,16 @@ export const uploadProfilePhotoApi = async (
     name: `profile_photo_${order}_${Date.now()}.jpg`,
   } as any);
   formData.append('order', String(order));
+  formData.append('isBlurred', String(isBlurred));
 
   const { data } = await apiClient.post<UploadProfilePhotoResponse>(
     endpoints.user.uploadPhotos,
     formData,
     {
       timeout: 60000,
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     }
   );
   return data;

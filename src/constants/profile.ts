@@ -57,7 +57,6 @@ export const EMPLOYMENT_OPTIONS: { key: string; label: string }[] = [
   { key: 'self_employed', label: STRINGS.PROFILE_SETUP.EMPLOYMENT.OPTIONS.SELF_EMPLOYED },
   { key: 'student', label: STRINGS.PROFILE_SETUP.EMPLOYMENT.OPTIONS.STUDENT },
   { key: 'unemployed', label: STRINGS.PROFILE_SETUP.EMPLOYMENT.OPTIONS.NOT_WORKING },
-  { key: 'prefer_not_to_say', label: STRINGS.PROFILE_SETUP.EMPLOYMENT.OPTIONS.PREFER_NOT_TO_SAY },
 ];
 
 // ─── Income (keys are backend values) ───
@@ -66,7 +65,7 @@ export const INCOME_OPTIONS: { key: string; label: string }[] = [
   { key: 'eur_30k_40k', label: STRINGS.PROFILE_SETUP.FINAL.OPTIONS.BETWEEN_30000_AND_40000 },
   { key: 'eur_40k_50k', label: STRINGS.PROFILE_SETUP.FINAL.OPTIONS.BETWEEN_40000_AND_50000 },
   { key: 'eur_50k_plus', label: STRINGS.PROFILE_SETUP.FINAL.OPTIONS.OVER_50000 },
-  { key: 'prefer_not_to_say', label: STRINGS.PROFILE_SETUP.EMPLOYMENT.OPTIONS.PREFER_NOT_TO_SAY },
+  { key: 'any_income', label: STRINGS.PROFILE_SETUP.EMPLOYMENT.OPTIONS.ANY_INCOME },
 ];
 
 // ─── DOB picker ───

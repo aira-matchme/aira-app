@@ -9,11 +9,13 @@ import { Button } from '../../../components/Button';
 import FrameIcon from '../../../assets/icons/common/FrameIcon';
 import { ReusableBottomSheet } from '../../../components/BottomSheet';
 import { STRINGS } from '../../../constants/strings';
-import { requestCameraPermission } from '../../../config/permissions';
+import {
+  checkCameraPermission,
+  requestCameraPermission,
+} from '../../../config/permissions';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './styles';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
-import { set } from 'zod';
 
 type NavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -25,8 +27,18 @@ export const FaceVerificationScreen: React.FC = () => {
   const [showPermissionSheet, setShowPermissionSheet] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
 
-  const handleStartVerification = () => {
-    setShowPermissionSheet(true);
+  const handleStartVerification = async () => {
+    setIsRequesting(true);
+    try {
+      const existing = await checkCameraPermission();
+      if (existing === 'granted') {
+        navigation.navigate('SelfieCamera');
+        return;
+      }
+      setShowPermissionSheet(true);
+    } finally {
+      setIsRequesting(false);
+    }
   };
 
   const handleAllow = async () => {
@@ -100,10 +112,10 @@ export const FaceVerificationScreen: React.FC = () => {
                   {STRINGS.PROFILE_SETUP.FACE_VERIFICATION.BULLET_2}
                 </Text>
               </View>
-              <View style={styles.bulletPoint}>
+              {/* <View style={styles.bulletPoint}>
                 <Text style={styles.bulletDot}>•</Text>
 
-              </View>
+              </View> */}
             </View>
           </View>
         </ScrollView>

@@ -162,7 +162,9 @@ export const ReferenceImagePreferenceScreen: React.FC = () => {
 
       await postReferenceImageAnswerApi({
         field,
-        value: finalWinner,
+        value: Object.entries(newVotes)
+          .sort((a, b) => b[1] - a[1])
+          .map(([key, count]) => ({ [key]: count })),
       });
 
       await loadStep();

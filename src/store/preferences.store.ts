@@ -12,14 +12,13 @@ export type EmploymentOption =
   | 'employed'
   | 'self_employed'
   | 'student'
-  | 'unemployed'
-  | 'prefer_not_to_say';
+  | 'unemployed';
 export type IncomeOption =
   | 'eur_20k_30k'
   | 'eur_30k_40k'
   | 'eur_40k_50k'
   | 'eur_50k_plus'
-  | 'prefer_not_to_say';
+  | 'any_income';
 export type MaritalStatusOption =
   | 'never_married'
   | 'divorced'

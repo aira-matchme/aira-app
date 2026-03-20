@@ -17,7 +17,7 @@ export const endpoints = {
     addprofile: '/auth/profile/add',
     update: '/user/update',
     editProfile: '/auth/profile',
-    self: '/auth/self',
+    seflf: '/auth/self',
     selfie: '/auth/selfie',
     uploadPhotos: '/auth/gallery',
     deletePhoto: '/auth/gallery/{id}',

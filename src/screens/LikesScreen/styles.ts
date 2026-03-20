@@ -139,5 +139,38 @@ export const styles = StyleSheet.create({
   contentPaddingBottom: {
     paddingBottom: 0, // keep cards partially under floating tab bar like Figma
   },
+
+  /** Figma 3005:6020 — Likes empty state */
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 34,
+    marginTop: 8,
+  },
+  emptyIconWrap: {
+    marginBottom: 16,
+  },
+  emptyTextBlock: {
+    alignItems: 'center',
+    gap: 8,
+    maxWidth: 307,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '500',
+    lineHeight: 24,
+    letterSpacing: 0.36,
+    color: colors.black,
+    textAlign: 'center',
+  },
+  emptyDescription: {
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
+    letterSpacing: 0.28,
+    color: colors.neutral[600],
+    textAlign: 'center',
+  },
 });
 
