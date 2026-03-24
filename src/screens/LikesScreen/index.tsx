@@ -11,7 +11,9 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../navigation/types';
 
 type LikedProfile = {
   id: string;
@@ -24,6 +26,7 @@ type LikedProfile = {
 const TAB_BAR_VISIBLE_HEIGHT = 56 + 24;
 
 export const LikesScreen = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const listBottomPadding = TAB_BAR_VISIBLE_HEIGHT + insets.bottom;
   const [loading, setLoading] = useState(true);
@@ -153,7 +156,11 @@ export const LikesScreen = () => {
             renderItem={({ item, index }) => {
               const isLeft = index % 2 === 0;
               return (
-                <View style={[styles.card, isLeft && styles.cardLeft]}>
+                <TouchableOpacity
+                  style={[styles.card, isLeft && styles.cardLeft]}
+                  activeOpacity={0.9}
+                  onPress={() => navigation.navigate('MatchDetails', { userId: item.id })}
+                >
                   {item.image ? (
                     <Image source={item.image} style={styles.image} resizeMode="cover" />
                   ) : null}
@@ -168,7 +175,7 @@ export const LikesScreen = () => {
                       </View>
                     ) : null}
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             }}
           />

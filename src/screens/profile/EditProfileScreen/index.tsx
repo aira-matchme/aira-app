@@ -78,6 +78,9 @@ type DetailKey =
   | 'children'
   | 'interests';
 
+/** Shown on the list but not navigable (same policy as preferences summary gender). */
+const READ_ONLY_DETAIL_KEYS = new Set<DetailKey>(['name', 'gender']);
+
 const DETAIL_ROWS: Array<{ key: DetailKey; label: string }> = [
   { key: 'name', label: 'Name' },
   { key: 'gender', label: 'Gender' },
@@ -511,54 +514,75 @@ export const EditProfileScreen: React.FC = () => {
           </View>
 
           <View style={styles.detailsCard}>
-            {detailRows.map((row, i) => (
-              <React.Fragment key={row.key}>
-                <TouchableOpacity
-                  style={styles.detailRow}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    switch (row.key) {
-                      case 'height':
-                        navigation.navigate('BasicDetailsHeight', { fromEditProfile: true });
-                        break;
-                      case 'education':
-                        navigation.navigate('BasicDetailsEducation', { fromEditProfile: true });
-                        break;
-                      case 'employment':
-                        navigation.navigate('BasicDetailsEmployment', { fromEditProfile: true });
-                        break;
-                      case 'income':
-                        navigation.navigate('BasicDetailsIncome', { fromEditProfile: true });
-                        break;
-                      case 'religion':
-                        navigation.navigate('BasicDetailsReligion', { fromEditProfile: true });
-                        break;
-                      case 'marital':
-                        navigation.navigate('BasicDetailsMaritalStatus', { fromEditProfile: true });
-                        break;
-                      case 'children':
-                        navigation.navigate('BasicDetailsChildren', { fromEditProfile: true });
-                        break;
-                      case 'interests':
-                        navigation.navigate('BasicDetailsInterests', { fromEditProfile: true });
-                        break;
-                      default:
-                        break;
-                    }
-                  }}
-                >
+            {detailRows.map((row, i) => {
+              const isEditable = !READ_ONLY_DETAIL_KEYS.has(row.key);
+              const rowInner = (
+                <>
                   <View style={styles.detailLeft}>
                     <Text style={styles.detailLabel}>{row.label}</Text>
                     <Text style={styles.detailValue} numberOfLines={1}>
                       {row.value}
-                     
                     </Text>
                   </View>
-                  <ProfileChevronRightIcon width={24} height={24} color={colors.neutral[400]} />
-                </TouchableOpacity>
-                {i < detailRows.length - 1 ? <View style={styles.separator} /> : null}
-              </React.Fragment>
-            ))}
+                  {isEditable ? (
+                    <ProfileChevronRightIcon width={24} height={24} color={colors.neutral[400]} />
+                  ) : (
+                    <View style={{ width: 24 }} />
+                  )}
+                </>
+              );
+              return (
+                <React.Fragment key={row.key}>
+                  {isEditable ? (
+                    <TouchableOpacity
+                      style={styles.detailRow}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        switch (row.key) {
+                          case 'height':
+                            navigation.navigate('BasicDetailsHeight', { fromEditProfile: true });
+                            break;
+                          case 'education':
+                            navigation.navigate('BasicDetailsEducation', { fromEditProfile: true });
+                            break;
+                          case 'employment':
+                            navigation.navigate('BasicDetailsEmployment', { fromEditProfile: true });
+                            break;
+                          case 'income':
+                            navigation.navigate('BasicDetailsIncome', { fromEditProfile: true });
+                            break;
+                          case 'religion':
+                            navigation.navigate('BasicDetailsReligion', { fromEditProfile: true });
+                            break;
+                          case 'marital':
+                            navigation.navigate('BasicDetailsMaritalStatus', { fromEditProfile: true });
+                            break;
+                          case 'children':
+                            navigation.navigate('BasicDetailsChildren', { fromEditProfile: true });
+                            break;
+                          case 'interests':
+                            navigation.navigate('BasicDetailsInterests', { fromEditProfile: true });
+                            break;
+                          default:
+                            break;
+                        }
+                      }}
+                    >
+                      {rowInner}
+                    </TouchableOpacity>
+                  ) : (
+                    <View
+                      style={styles.detailRow}
+                      accessibilityLabel={`${row.label}: ${row.value}`}
+                      accessibilityRole="text"
+                    >
+                      {rowInner}
+                    </View>
+                  )}
+                  {i < detailRows.length - 1 ? <View style={styles.separator} /> : null}
+                </React.Fragment>
+              );
+            })}
           </View>
         </ScrollView>
       </SafeAreaView>

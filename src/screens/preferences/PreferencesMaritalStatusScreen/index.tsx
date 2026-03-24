@@ -56,17 +56,22 @@ export const PreferencesMaritalStatusScreen: React.FC = () => {
   const setOpenedEditFromSummary = usePreferencesStore((s) => s.setOpenedEditFromSummary);
 
   const normalizePreferred = (raw: unknown): MaritalStatusOption[] => {
+    const allowed = new Set<MaritalStatusOption>([
+      'never_married',
+      'divorced',
+      'widowed',
+      'separated',
+    ]);
+    const isOption = (v: unknown): v is MaritalStatusOption =>
+      typeof v === 'string' && allowed.has(v as MaritalStatusOption);
+
+    // Store currently hydrates as a single string in many flows.
+    if (isOption(raw)) return [raw];
+
     if (!Array.isArray(raw)) return [];
     // API may send [["never_married"]] or ["never_married"]
-    const first = raw[0];
-    if (Array.isArray(first)) {
-      return (first as unknown[]).filter(
-        (v): v is MaritalStatusOption => typeof v === 'string'
-      );
-    }
-    return (raw as unknown[]).filter(
-      (v): v is MaritalStatusOption => typeof v === 'string'
-    );
+    const source = Array.isArray(raw[0]) ? (raw[0] as unknown[]) : (raw as unknown[]);
+    return source.filter(isOption);
   };
 
   const [selected, setSelected] = useState<MaritalStatusOption[]>(() =>

@@ -65,9 +65,37 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
   isOpen,
   onClose,
 }) => {
+  const [localOpen, setLocalOpen] = React.useState(isOpen);
+  const isClosingRef = React.useRef(false);
   const navigation = useNavigation<LoginOptionsNavigationProp>();
   const socialLoginMutation = useSocialLogin();
   const { setTokens, setUser, setShouldShowEnableNotifications } = useAuthStore();
+
+  React.useEffect(() => {
+    if (isOpen) {
+      isClosingRef.current = false;
+      setLocalOpen(true);
+      return;
+    }
+    setLocalOpen(false);
+  }, [isOpen]);
+
+  const requestClose = React.useCallback(() => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+    setLocalOpen(false);
+    // Notify parent immediately to avoid reopen/close race conditions.
+    onClose();
+  }, [onClose]);
+
+  const fetchLatestProfile = async () => {
+    try {
+      const profileRes = await apiClient.get(endpoints.user.profile);
+      return profileRes?.data?.data ?? profileRes?.data ?? null;
+    } catch {
+      return null;
+    }
+  };
 
   const resolvePostLoginScreen = async (
     user: { isProfileComplete?: boolean; profilePhoto?: unknown; livenessCheck?: boolean; galleryPhotosUploaded?: boolean; questionnaireCompleted?: boolean } | null
@@ -85,6 +113,8 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
   };
 
   const handleGoogleLogin = async () => {
+  // Close sheet immediately so user gets instant feedback.
+  requestClose();
   try {
     const { GoogleSignin } = require('@react-native-google-signin/google-signin');
     GoogleSignin.configure({
@@ -116,16 +146,15 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
     const authData = response.data?.data ?? response.data;
     if (authData?.accessToken && authData?.refreshToken) {
       await setTokens(authData.accessToken, authData.refreshToken);
-      if (authData?.user) {
-        setUser(authData.user);
-        const screen = await resolvePostLoginScreen(authData.user);
-        onClose();
-        navigation.navigate('AuthStack', { screen } as any);
-        return;
+      const latestUser = (await fetchLatestProfile()) ?? authData?.user ?? null;
+      if (latestUser) {
+        setUser(latestUser);
       }
+      const screen = await resolvePostLoginScreen(latestUser);
+      navigation.navigate('AuthStack', { screen } as any);
+      return;
     }
 
-    onClose();
     navigation.navigate('AuthStack', { screen: 'EnableNotifications' });
   } catch (error: any) {
     // Google login error
@@ -134,6 +163,8 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
 
 
   async function handleAppleLogin() {
+    // Close sheet immediately so user gets instant feedback.
+    requestClose();
     try {
       const isSupported = appleAuth.isSupported;
       if (!isSupported) {
@@ -165,16 +196,15 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
       const authData = response.data?.data ?? response.data;
       if (authData?.accessToken && authData?.refreshToken) {
         await setTokens(authData.accessToken, authData.refreshToken);
-        if (authData?.user) {
-          setUser(authData.user);
-          const screen = await resolvePostLoginScreen(authData.user);
-          onClose();
-          navigation.navigate('AuthStack', { screen } as any);
-          return;
+        const latestUser = (await fetchLatestProfile()) ?? authData?.user ?? null;
+        if (latestUser) {
+          setUser(latestUser);
         }
+        const screen = await resolvePostLoginScreen(latestUser);
+        navigation.navigate('AuthStack', { screen } as any);
+        return;
       }
 
-      onClose();
       navigation.navigate('AuthStack', { screen: 'EnableNotifications' });
     } catch (error: any) {
       if (error.code !== appleAuth.Error.CANCELED) {
@@ -184,12 +214,12 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
   }
 
   const handleEmailLogin = () => {
-    onClose();
+    requestClose();
     navigation.navigate('EmailLogin');
   };
 
   // Don't render anything if not open
-  if (!isOpen) {
+  if (!isOpen && !localOpen) {
     return null;
   }
 
@@ -198,8 +228,8 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
 
   return (
       <ReusableBottomSheet
-        isOpen={isOpen}
-        onClose={onClose}
+        isOpen={localOpen}
+        onClose={requestClose}
         snapPoints={snapPoints}
         showDragHandle={true}
         showCloseButton={true}

@@ -272,7 +272,14 @@ export type PostAIMessagesParams = {
 export type ChatSuggestionsResponse = {
   statusCode?: number;
   message?: string;
-  data?: { success?: boolean; suggestions?: string[]; limitUsed?: number; limitLeft?: number; totalMessageLimit?: number };
+  data?: {
+    success?: boolean;
+    suggestions?: string[];
+    limitUsed?: number;
+    limitLeft?: number;
+    totalMessageLimit?: number;
+    timeLeft?: string;
+  };
   suggestions?: string[];
 };
 

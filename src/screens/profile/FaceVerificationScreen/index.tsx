@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, StatusBar, TouchableOpacity, ScrollView, Platform, Linking } from 'react-native';
+import {
+  View,
+  Text,
+  StatusBar,
+  TouchableOpacity,
+  ScrollView,
+  Platform,
+  InteractionManager,
+  Alert,
+  Linking,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -27,12 +37,26 @@ export const FaceVerificationScreen: React.FC = () => {
   const [showPermissionSheet, setShowPermissionSheet] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
 
+  const showCameraDeniedSettingsAlert = () => {
+    const s = STRINGS.PROFILE_SETUP.FACE_VERIFICATION;
+    Alert.alert(s.CAMERA_DENIED_TITLE, s.CAMERA_DENIED_MESSAGE, [
+      { text: s.CAMERA_DENIED_CANCEL, style: 'cancel' },
+      { text: s.OPEN_SETTINGS, onPress: () => void Linking.openSettings() },
+    ]);
+  };
+
   const handleStartVerification = async () => {
     setIsRequesting(true);
     try {
       const existing = await checkCameraPermission();
       if (existing === 'granted') {
         navigation.navigate('SelfieCamera');
+        return;
+      }
+      // iOS: if the user already denied (or restricted) camera, the system will not show the
+      // prompt again — only Settings can fix it. Our custom sheet cannot change that.
+      if (Platform.OS === 'ios' && existing === 'denied') {
+        showCameraDeniedSettingsAlert();
         return;
       }
       setShowPermissionSheet(true);
@@ -42,21 +66,25 @@ export const FaceVerificationScreen: React.FC = () => {
   };
 
   const handleAllow = async () => {
-    // navigation.navigate('OnboardingIntro');
     setIsRequesting(true);
+    // iOS will often not present the system camera alert while a RN Modal (this sheet) is visible.
+    setShowPermissionSheet(false);
     try {
-      const status = await requestCameraPermission();
-
-      if (status === 'granted') {
-        setShowPermissionSheet(false);
-        navigation.navigate('SelfieCamera');
-      } else if (status === 'denied') {
-        setShowPermissionSheet(false);
-      } else if (status === 'notDetermined') {
-        setShowPermissionSheet(false);
+      if (Platform.OS === 'ios') {
+        await new Promise<void>((resolve) => {
+          InteractionManager.runAfterInteractions(() => {
+            setTimeout(resolve, 200);
+          });
+        });
       }
-    } catch (error) {
-      setShowPermissionSheet(false);
+      const status = await requestCameraPermission();
+      if (status === 'granted') {
+        navigation.navigate('SelfieCamera');
+      } else if (status === 'denied' && Platform.OS === 'ios') {
+        showCameraDeniedSettingsAlert();
+      }
+    } catch {
+      // Sheet already closed
     } finally {
       setIsRequesting(false);
     }
@@ -112,10 +140,6 @@ export const FaceVerificationScreen: React.FC = () => {
                   {STRINGS.PROFILE_SETUP.FACE_VERIFICATION.BULLET_2}
                 </Text>
               </View>
-              {/* <View style={styles.bulletPoint}>
-                <Text style={styles.bulletDot}>•</Text>
-
-              </View> */}
             </View>
           </View>
         </ScrollView>

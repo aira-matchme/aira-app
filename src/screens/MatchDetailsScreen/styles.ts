@@ -35,11 +35,15 @@ export const styles = StyleSheet.create({
     transform: [{ rotate: '180deg' }],
   },
 
+  scrollBody: {
+    flex: 1,
+  },
+
   content: {
     flexGrow: 1,
     paddingHorizontal: spacing.md,
-    // Extra bottom padding so bottom CTA doesn't overlap content
-    paddingBottom: spacing.xxl * 2,
+    // Extra bottom padding: report link + room above floating chat/like overlay (~80px) + safe inset handled in overlay
+    paddingBottom: spacing.xxl * 2 + 100,
   },
 
   // Name + distance
@@ -333,9 +337,12 @@ export const styles = StyleSheet.create({
     color: colors.black,
   },
 
-  // Bottom navigation
+  // Bottom navigation (overlay — must not live inside ScrollView or it changes content height and flickers)
   bottomNavWrapper: {
-    marginTop: spacing.lg,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
   },
   bottomNav: {

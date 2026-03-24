@@ -215,12 +215,15 @@ export const PreferencesSummaryScreen: React.FC = () => {
       value: string;
       screen: PreferenceEditScreen;
       required: boolean;
+      /** When false, row is shown read-only (no navigation to edit screen). */
+      editable?: boolean;
     }[] => [
       {
         label: STRINGS.PREFERENCES_SUMMARY.LABEL_GENDER,
         value: getGenderDisplay(lookingForGender),
         screen: 'PreferencesMatch',
         required: false,
+        editable: false,
       },
       {
         label: STRINGS.PREFERENCES_SUMMARY.LABEL_AGE,
@@ -370,18 +373,10 @@ export const PreferencesSummaryScreen: React.FC = () => {
           </Text>
 
           <View style={styles.listContainer}>
-            {rows.map((row, index) => (
-              <React.Fragment key={row.label}>
-                <TouchableOpacity
-                  style={styles.row}
-                  onPress={() => {
-                    setOpenedEditFromSummary(true);
-                    navigation.push(row.screen, { returnToSummary: true });
-                  }}
-                  activeOpacity={0.7}
-                  accessibilityLabel={`Edit ${row.label}`}
-                  accessibilityRole="button"
-                >
+            {rows.map((row, index) => {
+              const isEditable = row.editable !== false;
+              const rowContent = (
+                <>
                   <View style={styles.rowLabel}>
                     <View style={styles.rowLabelTop}>
                       <Text style={styles.rowLabelText}>{row.label}</Text>
@@ -389,36 +384,61 @@ export const PreferencesSummaryScreen: React.FC = () => {
                     <Text
                       style={[
                         styles.rowValue,
-                        row.required && row.value === '—' && styles.rowValueMissing
+                        row.required && row.value === '—' && styles.rowValueMissing,
                       ]}
                     >
                       {row.value}
                     </Text>
                   </View>
-                  {/* <View style={styles.chevron}>
-                    <Text style={styles.chevronText}>›</Text>
-                  </View> */}
-                  <ProfileChevronRightIcon width={24} height={24} color={colors.neutral[400]} />
-                </TouchableOpacity>
-                {index < rows.length - 1 && <View style={styles.separator} />}
-              </React.Fragment>
-            ))}
+                  {isEditable ? (
+                    <ProfileChevronRightIcon width={24} height={24} color={colors.neutral[400]} />
+                  ) : (
+                    <View style={{ width: 24 }} />
+                  )}
+                </>
+              );
+              return (
+                <React.Fragment key={row.label}>
+                  {isEditable ? (
+                    <TouchableOpacity
+                      style={styles.row}
+                      onPress={() => {
+                        setOpenedEditFromSummary(true);
+                        navigation.push(row.screen, { returnToSummary: true });
+                      }}
+                      activeOpacity={0.7}
+                      accessibilityLabel={`Edit ${row.label}`}
+                      accessibilityRole="button"
+                    >
+                      {rowContent}
+                    </TouchableOpacity>
+                  ) : (
+                    <View
+                      style={styles.row}
+                      accessibilityLabel={row.label}
+                      accessibilityRole="text"
+                    >
+                      {rowContent}
+                    </View>
+                  )}
+                  {index < rows.length - 1 && <View style={styles.separator} />}
+                </React.Fragment>
+              );
+            })}
           </View>
         </ScrollView>
 
-        <View style={styles.actions}>
-          <Button
-            title={
-              isEditMode
-                ? 'Update preferences'
-                : STRINGS.PREFERENCES_SUMMARY.GET_STARTED
-            }
-            onPress={handleGetStarted}
-            variant="primary"
-            style={styles.primaryButton}
-            disabled={loading || !allRequiredFilled}
-          />
-        </View>
+        {!isEditMode && (
+          <View style={styles.actions}>
+            <Button
+              title={STRINGS.PREFERENCES_SUMMARY.GET_STARTED}
+              onPress={handleGetStarted}
+              variant="primary"
+              style={styles.primaryButton}
+              disabled={loading || !allRequiredFilled}
+            />
+          </View>
+        )}
       </SafeAreaView>
     </View>
   );

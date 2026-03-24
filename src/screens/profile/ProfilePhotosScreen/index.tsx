@@ -236,7 +236,8 @@ export const ProfilePhotosScreen: React.FC = () => {
   };
 
   const successfulUploadCount = uploadedSlots.size;
-  const canContinue = successfulUploadCount >= MIN_PHOTOS_REQUIRED;
+  const hasUploadInProgress = uploadingSlots.size > 0;
+  const canContinue = successfulUploadCount >= MIN_PHOTOS_REQUIRED && !hasUploadInProgress;
 
   const handleContinue = () => {
     if (!canContinue) return;

@@ -194,6 +194,11 @@ export const STRINGS = {
       BUTTON: 'Start Verification',
       PERMISSION_TITLE: 'Aira Would Like to Access Your Camera',
       PERMISSION_DESCRIPTION: 'Aira uses your camera to verify your identity and ensure account security. Your selfie is only used for verification and is never shared.',
+      CAMERA_DENIED_TITLE: 'Camera access is turned off',
+      CAMERA_DENIED_MESSAGE:
+        'To continue, allow camera access for Aira in Settings. You can turn it on and return here.',
+      OPEN_SETTINGS: 'Open Settings',
+      CAMERA_DENIED_CANCEL: 'Not now',
     },
     VIDEO_VERIFICATION: {
       TITLE: 'Quick video\nverification',

@@ -148,9 +148,16 @@ class SocketService {
       this.emit('join', data);
     });
 
-    this.socket.on('join_success', (data: unknown) => {
+    const handlePresence = (data: unknown) => {
       this.emit('join_success', data);
-    });
+    };
+    this.socket.on('join_success', handlePresence);
+    // Different backend deployments may use different event names for presence updates.
+    this.socket.on('online_users', handlePresence);
+    this.socket.on('online_user_ids', handlePresence);
+    this.socket.on('presence_update', handlePresence);
+    this.socket.on('user_online', handlePresence);
+    this.socket.on('user_offline', handlePresence);
 
     this.socket.on('typing', (data: unknown) => {
       const d = (data ?? {}) as Record<string, unknown>;

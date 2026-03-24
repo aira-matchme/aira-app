@@ -14,6 +14,7 @@ import {
   Linking,
   StatusBar,
   ActivityIndicator,
+  LayoutChangeEvent,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -34,9 +35,6 @@ import { ReportIcon } from '../../assets/icons/common/ReportIcon';
 import { InterestChipCheckIcon } from '../../assets/icons/common/InterestChipCheckIcon';
 import { PlusIcon } from '../../assets/icons/common/PlusIcon';
 import { ForwardArrowIcon } from '../../assets/icons/common/ForwardArrowIcon';
-// import { MicIcon } from '../../assets/icons/common/MicIcon';
-// import { PlayIcon } from '../../assets/icons/common/PlayIcon';
-// import { PauseIcon } from '../../assets/icons/common/PauseIcon';
 import { DeleteIcon } from '../../assets/icons/common/DeleteIcon';
 import { ReplyIcon } from '../../assets/icons/common/ReplyIcon';
 import { AskAiraIcon } from '../../assets/icons/common/AskAiraIcon';
@@ -54,7 +52,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { setChatRequestActionApi, blockUserApi, reportUserApi, getChatMessagesApi, mapApiMessageToChatMessage, markChatSeenApi, sendMessageApi, uploadChatFileApi, postAIMessagesApi, getAiSuggestionsApi, deleteMessageApi, type ChatMessageApiItem } from '../../modules/chat/api';
 import { useAuthStore } from '../../store/auth.store';
-import socketService, { type MessageReceivePayload, type MessageDeletePayload, type TypingPayload } from '../../services/socket/socketService';
+import socketService, { type MessageReceivePayload, type MessageDeletePayload, type TypingPayload } from '../../services/socket/socketService';   
 import { styles, H_PADDING } from './styles';
 import { TabAICenterIcon } from '../../assets/icons/tabs/TabAICenterIcon';
 import { apiClient } from '../../services/api/client';
@@ -106,6 +104,38 @@ function getTimeUntilMidnight(): { hours: number; minutes: number; seconds: numb
   return { hours, minutes, seconds };
 }
 
+function parseAiraTimeLeft(
+  value: string | null | undefined
+): { hours: number; minutes: number; seconds: number } | null {
+  if (!value) return null;
+  const match = value.trim().match(/^(\d{1,2}):(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = Number(match[3]);
+  if (
+    Number.isNaN(hours) ||
+    Number.isNaN(minutes) ||
+    Number.isNaN(seconds) ||
+    minutes > 59 ||
+    seconds > 59
+  ) {
+    return null;
+  }
+  return { hours, minutes, seconds };
+}
+
+function decrementCountdown(prev: { hours: number; minutes: number; seconds: number }) {
+  const total = prev.hours * 3600 + prev.minutes * 60 + prev.seconds;
+  if (total <= 0) return prev;
+  const next = total - 1;
+  return {
+    hours: Math.floor(next / 3600),
+    minutes: Math.floor((next % 3600) / 60),
+    seconds: next % 60,
+  };
+}
+
 /** Format timestamp from socket (ISO string or ms number) for display; fallback to now(). */
 function formatMessageTimestamp(value: string | number | undefined): string {
   if (value == null) return now();
@@ -121,6 +151,7 @@ function formatMessageTimestamp(value: string | number | undefined): string {
 export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const { name, avatar, chatId: initialChatId, isRequest, otherUserId } = route.params;
   const insets = useSafeAreaInsets();
+  const bottomSafeInset = Platform.OS === 'ios' ? insets.bottom : 0;
   const currentUserId = useAuthStore((s) => s.user?.id);
   const [chatId, setChatId] = useState<string | null>(initialChatId ?? null);
   const [requestActionLoading, setRequestActionLoading] = useState<'accept' | 'decline' | 'block' | null>(null);
@@ -171,11 +202,64 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [otherUserTyping, setOtherUserTyping] = useState(false);
   const [otherUserOnline, setOtherUserOnline] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
-  const generatedRepliesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [composerHeight, setComposerHeight] = useState(120);
+  const aiSuggestionsRequestIdRef = useRef(0);
   const typingStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+  const handleComposerLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = Math.round(event.nativeEvent.layout.height);
+    if (nextHeight > 0 && nextHeight !== composerHeight) {
+      setComposerHeight(nextHeight);
+    }
+  }, [composerHeight]);
+
+
+  const isOtherUserOnlineFromPayload = useCallback(
+    (payload: unknown): boolean | null => {
+      if (!payload || !otherUserId) return null;
+      const data = payload as Record<string, unknown>;
+
+      const directUserId = String(
+        data.userId ?? data.user_id ?? data.id ?? data.memberId ?? data.member_id ?? ''
+      );
+      const directOnline = data.online ?? data.isOnline ?? data.status;
+      if (directUserId === otherUserId && directOnline != null) {
+        if (typeof directOnline === 'string') {
+          const normalized = directOnline.toLowerCase();
+          return normalized === 'online' || normalized === 'true' || normalized === '1';
+        }
+        return Boolean(directOnline);
+      }
+
+      const rawOnlineList =
+        data.users ??
+        data.onlineUserIds ??
+        data.onlineUsers ??
+        data.online_users ??
+        data.userIds ??
+        data.user_ids;
+      if (Array.isArray(rawOnlineList)) {
+        const onlineIds = rawOnlineList
+          .map((entry) => {
+            if (typeof entry === 'string' || typeof entry === 'number') return String(entry);
+            if (entry && typeof entry === 'object') {
+              const obj = entry as Record<string, unknown>;
+              return String(
+                obj.userId ?? obj.user_id ?? obj.id ?? obj._id ?? obj.memberId ?? obj.member_id ?? ''
+              );
+            }
+            return '';
+          })
+          .filter(Boolean);
+        return onlineIds.includes(otherUserId);
+      }
+      return null;
+    },
+    [otherUserId]
+  );
+
 
   const getMessageTypeFromAttachment = (
     att: { type: 'image'; uri: string } | { type: 'file'; uri: string; name: string }
@@ -230,24 +314,13 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   //   };
   // }, [voiceBarVisible, voicePaused]);
 
-  // Simulate "replies generated" after a short delay when Ask AIRA is active
+  // Turn off "thinking" once API response resolves (or is handled as limit reached).
   useEffect(() => {
     if (!askAiraGenerating) return;
-    if (generatedRepliesTimeoutRef.current) clearTimeout(generatedRepliesTimeoutRef.current);
-    generatedRepliesTimeoutRef.current = setTimeout(() => {
+    if (generatedReplies != null || airaLimitReachedVisible) {
       setAskAiraGenerating(false);
-      setGeneratedReplies([
-        'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.',
-        'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.',
-        'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.',
-      ]);
-      setSelectedReplyIndex(0);
-      generatedRepliesTimeoutRef.current = null;
-    }, 2500);
-    return () => {
-      if (generatedRepliesTimeoutRef.current) clearTimeout(generatedRepliesTimeoutRef.current);
-    };
-  }, [askAiraGenerating]);
+    }
+  }, [askAiraGenerating, generatedReplies, airaLimitReachedVisible]);
 
   useEffect(() => {
     if (!chatId) return;
@@ -339,16 +412,17 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         (data.receiver === currentUserId || !data.receiver);
       if (applies) setOtherUserTyping(data.isTyping);
     });
-    const unsubJoinSuccess = socketService.on<{ users?: string[]; onlineUserIds?: string[]; userId?: string; online?: boolean }>('join_success', (data) => {
-      const onlineIds = data?.users ?? data?.onlineUserIds;
-      if (Array.isArray(onlineIds)) {
-        setOtherUserOnline(onlineIds.includes(otherUserId));
-      } else if (data?.userId === otherUserId && data?.online != null) {
-        setOtherUserOnline(data.online);
+    const unsubJoinSuccess = socketService.on<unknown>('join_success', (data) => {
+      const presence = isOtherUserOnlineFromPayload(data);
+      if (presence !== null) {
+        setOtherUserOnline(presence);
       }
     });
     const unsubConnection = socketService.onConnectionChange((connected) => {
       setSocketConnected(connected);
+      if (!connected) {
+        setOtherUserOnline(false);
+      }
       if (connected) {
         // Ensure we (re)join the chat room after reconnect so
         // incoming messages are received reliably (especially on iOS).
@@ -377,7 +451,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       unsubJoinSuccess();
       unsubConnection();
     };
-  }, [chatId, currentUserId, otherUserId]);
+  }, [chatId, currentUserId, otherUserId, isOtherUserOnlineFromPayload]);
 
   useEffect(() => {
     if (!chatId || !currentUserId || !otherUserId) return;
@@ -450,12 +524,96 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
   useEffect(() => {
     if (!airaLimitReachedVisible) return;
-    setAiraLimitCountdown(getTimeUntilMidnight());
     const id = setInterval(() => {
-      setAiraLimitCountdown(getTimeUntilMidnight());
+      setAiraLimitCountdown((prev) => decrementCountdown(prev));
     }, 1000);
     return () => clearInterval(id);
   }, [airaLimitReachedVisible]);
+
+  const applyAiSuggestionsResponse = useCallback(
+    (
+      res: Awaited<ReturnType<typeof getAiSuggestionsApi>>,
+      opts?: { closeConfirmSheet?: boolean }
+    ) => {
+      const list =
+        res?.data?.suggestions ??
+        (res?.data as { data?: { suggestions?: string[] } } | undefined)?.data?.suggestions ??
+        res?.suggestions;
+      const meta = res?.data as
+        | {
+            limitLeft?: number | null;
+            totalMessageLimit?: number | null;
+            timeLeft?: string | null;
+          }
+        | undefined;
+      const limitLeft = meta?.limitLeft ?? null;
+      const totalLimit = meta?.totalMessageLimit ?? null;
+      const hasSuggestions = Array.isArray(list) && list.length > 0;
+      const isLimitReached = limitLeft != null && limitLeft <= 0;
+
+      setAiraSuggestionsLimitLeft(limitLeft);
+      setAiraSuggestionsTotalLimit(totalLimit);
+
+      if (hasSuggestions) {
+        setGeneratedReplies(list);
+        setSelectedReplyIndex(0);
+        setAiraLimitReachedVisible(false);
+        if (opts?.closeConfirmSheet) setAskAiraConfirmVisible(false);
+        return;
+      }
+
+      if (isLimitReached) {
+        const countdownFromApi =
+          parseAiraTimeLeft(meta?.timeLeft ?? null) ?? getTimeUntilMidnight();
+        setAiraLimitCountdown(countdownFromApi);
+        setGeneratedReplies(null);
+        setAskAiraConfirmVisible(false);
+        setAiraLimitReachedVisible(true);
+        return;
+      }
+      // API can return success with empty suggestions in non-limit cases.
+      setGeneratedReplies(null);
+    },
+    []
+  );
+
+  const requestAiSuggestions = useCallback(
+    (opts?: { closeConfirmSheetOnStart?: boolean }) => {
+      if (!chatId) return;
+      const requestId = ++aiSuggestionsRequestIdRef.current;
+      setAskAiraConfirmLoading(true);
+      setAskAiraGenerating(true);
+      if (opts?.closeConfirmSheetOnStart) {
+        setAskAiraConfirmVisible(false);
+      }
+      getAiSuggestionsApi(chatId)
+        .then((res) => {
+          if (requestId !== aiSuggestionsRequestIdRef.current) return;
+          applyAiSuggestionsResponse(res, { closeConfirmSheet: true });
+        })
+        .catch((err) => {
+          if (requestId !== aiSuggestionsRequestIdRef.current) return;
+          if (isAiraLimitError(err)) {
+            setAskAiraConfirmVisible(false);
+            setAiraLimitCountdown(getTimeUntilMidnight());
+            setAiraLimitReachedVisible(true);
+          }
+        })
+        .finally(() => {
+          if (requestId !== aiSuggestionsRequestIdRef.current) return;
+          setAskAiraConfirmLoading(false);
+          setAskAiraGenerating(false);
+        });
+    },
+    [applyAiSuggestionsResponse, chatId]
+  );
+
+  const handleCancelAiSuggestions = useCallback(() => {
+    // Ignore any in-flight response after user cancels this loading sheet.
+    aiSuggestionsRequestIdRef.current += 1;
+    setAskAiraGenerating(false);
+    setAskAiraConfirmLoading(false);
+  }, []);
 
   const handleInsertReply = () => {
     if (!generatedReplies?.length || selectedReplyIndex >= generatedReplies.length) return;
@@ -992,11 +1150,24 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     [loadMoreMessages],
   );
 
+  const openMatchDetails = useCallback(() => {
+    if (!otherUserId) return;
+    const parentNav = (navigation.getParent?.() ?? null) as
+      | { navigate?: (name: string, params?: Record<string, unknown>) => void }
+      | null;
+    if (parentNav?.navigate) {
+      parentNav.navigate('MatchDetails', { userId: otherUserId });
+      return;
+    }
+    (navigation as unknown as { navigate: (name: string, params?: Record<string, unknown>) => void })
+      .navigate('MatchDetails', { userId: otherUserId });
+  }, [navigation, otherUserId]);
+
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
         style={styles.screen}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         // keyboardVerticalOffset={insets.top}
       >
@@ -1005,39 +1176,23 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <BackArrowIcon size={48} />
           </TouchableOpacity>
-        {avatar != null ? (
-          <Image source={avatar} style={styles.headerAvatar} resizeMode="cover" />
-        ) : (
-          <View style={styles.headerAvatar} />
-        )}
-        <View style={styles.headerNameWrap}>
+        <TouchableOpacity activeOpacity={0.8} onPress={openMatchDetails}>
+          {avatar != null ? (
+            <Image source={avatar} style={styles.headerAvatar} resizeMode="cover" />
+          ) : (
+            <View style={styles.headerAvatar} />
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.headerNameWrap} activeOpacity={0.8} onPress={openMatchDetails}>
           <Text style={styles.headerName} numberOfLines={1}>{name}</Text>
           {otherUserOnline && <Text style={styles.headerOnline}>Online</Text>}
-        </View>
+        </TouchableOpacity>
         {!askAiraGenerating && generatedReplies == null && (
           <TouchableOpacity
             style={styles.headerAskAiraButton}
             onPress={() => {
               if (dontShowAskAiraPersisted && chatId) {
-                setAskAiraConfirmLoading(true);
-                getAiSuggestionsApi(chatId)
-                  .then((res) => {
-                    const list =
-                      res?.data?.suggestions ??
-                      (res?.data as { data?: { suggestions?: string[] } } | undefined)?.data?.suggestions ??
-                      res?.suggestions;
-                    const meta = res?.data as { limitLeft?: number | null; totalMessageLimit?: number | null } | undefined;
-                    setAiraSuggestionsLimitLeft(meta?.limitLeft ?? null);
-                    setAiraSuggestionsTotalLimit(meta?.totalMessageLimit ?? null);
-                    if (Array.isArray(list) && list.length > 0) {
-                      setGeneratedReplies(list);
-                      setSelectedReplyIndex(0);
-                    }
-                  })
-                  .catch((err) => {
-                    if (isAiraLimitError(err)) setAiraLimitReachedVisible(true);
-                  })
-                  .finally(() => setAskAiraConfirmLoading(false));
+                requestAiSuggestions();
               } else {
                 setAskAiraConfirmVisible(true);
               }
@@ -1200,18 +1355,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                         setDontShowAskAiraPersisted(true);
                       });
                     }
-                    postAIMessagesApi({ chatId })
-                      .then(() => {
-                        setAskAiraConfirmVisible(false);
-                        setAskAiraGenerating(true);
-                      })
-                      .catch((err) => {
-                        if (isAiraLimitError(err)) {
-                          setAskAiraConfirmVisible(false);
-                          setAiraLimitReachedVisible(true);
-                        }
-                      })
-                      .finally(() => setAskAiraConfirmLoading(false));
+                    requestAiSuggestions({ closeConfirmSheetOnStart: true });
                   }}
                   activeOpacity={0.8}
                   disabled={askAiraConfirmLoading || !chatId}
@@ -1251,7 +1395,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         visible={askAiraGenerating}
         transparent
         animationType="slide"
-        onRequestClose={() => {}}
+        onRequestClose={handleCancelAiSuggestions}
       >
         <View style={styles.airaThinkingBackdrop}>
           <View style={styles.airaThinkingSheet}>
@@ -1283,6 +1427,13 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 <View style={[styles.airaThinkingSkeleton, { width: '100%' }]} />
               </View>
             </View>
+            <TouchableOpacity
+              style={styles.airaThinkingCancelButton}
+              onPress={handleCancelAiSuggestions}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.airaThinkingCancelLabel}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1385,7 +1536,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 <View style={styles.airaLimitContent}>
                   <Text style={styles.airaLimitTitle}>You're out of Aira suggestions</Text>
                   <Text style={styles.airaLimitDescription}>
-                    You've used all 3 for today. Come back in
+                    You've used all {airaSuggestionsTotalLimit ?? 3} for today. Come back in
                   </Text>
                 </View>
                 <View style={styles.airaLimitCountdownRow}>
@@ -1528,8 +1679,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         style={styles.screen}
         contentContainerStyle={{
           ...styles.scrollContent,
-          // Reserve space for the input area + safe area when keyboard is open.
-          paddingBottom: (styles.scrollContent?.paddingBottom ?? 16) + 150 + insets.bottom,
+          // Keep last message visible above dynamic bottom composer height.
+          paddingBottom: (styles.scrollContent?.paddingBottom ?? 16) + composerHeight + 12,
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -1557,13 +1708,14 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       </ScrollView>
       </View>
 
+      <View style={styles.bottomComposerContainer} onLayout={handleComposerLayout}>
       {/* Voice bar UI (voice chat disabled) */}
       {/* {voiceBarVisible ? (
         <View style={[styles.voiceBar, { paddingBottom: 12 + insets.bottom }]}>
           ...
         </View>
       ) :  */}{isRequest ? (
-        <View style={[styles.requestActionBar, { paddingBottom: 24 + insets.bottom }]}>
+        <View style={[styles.requestActionBar, { paddingBottom: 24 + bottomSafeInset }]}>
           <View style={styles.requestActionRow}>
             <TouchableOpacity
               style={styles.requestDeclineButton}
@@ -1708,7 +1860,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             )}
           </TouchableOpacity>
           </View> */}
-                    <View style={[styles.inputBar, { paddingBottom: 12 + insets.bottom }]}>
+                    <View style={[styles.inputBar, { paddingBottom: 12 + bottomSafeInset }]}>
             <View style={styles.inputWrap}>
             {pendingAttachments.length > 0 && (
               <View style={styles.attachmentsInsidePill}>
@@ -1768,6 +1920,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           </View>
         </View>
       )}
+      </View>
 
       <AttachmentOptionsBottomSheet
         isOpen={attachmentSheetOpen}

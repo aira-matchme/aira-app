@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { View, Text, StatusBar, ActivityIndicator, ScrollView, Image, TouchableOpacity, Platform, StyleSheet, Modal, TouchableWithoutFeedback, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -404,6 +404,7 @@ export const MatchDetailsScreen: React.FC = () => {
   const [details, setDetails] = useState<any | null>(null);
   const [activeTab, setActiveTab] = useState<'basics' | 'insights'>('basics');
   const [isAtBottom, setIsAtBottom] = useState(false);
+  const isAtBottomRef = useRef(false);
   const [isLiked, setIsLiked] = useState(false);
   const [showFirstMovePopup, setShowFirstMovePopup] = useState(false);
   const [firstMoveStep, setFirstMoveStep] = useState<'choose' | 'sent'>('choose');
@@ -618,6 +619,7 @@ export const MatchDetailsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.scrollBody}>
         <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
@@ -625,11 +627,17 @@ export const MatchDetailsScreen: React.FC = () => {
           scrollEventThrottle={16}
           onScroll={(event) => {
             const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
-            const paddingToBottom = 40;
-            const atBottom =
-              contentOffset.y + layoutMeasurement.height >= contentSize.height - paddingToBottom;
-            if (atBottom !== isAtBottom) {
-              setIsAtBottom(atBottom);
+            const distanceFromBottom =
+              contentSize.height - (contentOffset.y + layoutMeasurement.height);
+            // Hysteresis: avoids flicker when the user scrolls near the end zone.
+            const showThreshold = 56;
+            const hideThreshold = 112;
+            const next = isAtBottomRef.current
+              ? distanceFromBottom <= hideThreshold
+              : distanceFromBottom <= showThreshold;
+            if (next !== isAtBottomRef.current) {
+              isAtBottomRef.current = next;
+              setIsAtBottom(next);
             }
           }}
         >
@@ -826,47 +834,6 @@ export const MatchDetailsScreen: React.FC = () => {
             </View>
           )}
 
-          {isAtBottom && (
-            <View style={styles.bottomNavWrapper}>
-              <View style={styles.bottomNav}>
-                <TouchableOpacity
-                  style={styles.bottomChatButton}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    setFirstMoveStep('choose');
-                    setShowFirstMovePopup(true);
-                  }}
-                >
-                  <LinearGradient
-                    colors={colors.gradients.primary.colors as any}
-                    start={colors.gradients.primary.start}
-                    end={colors.gradients.primary.end}
-                    style={StyleSheet.absoluteFill}
-                  />
-                  <ToggleChatHeartIcon size={28} color={colors.white} />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.bottomLikeButton}
-                  activeOpacity={0.8}
-                  onPress={() => (isLiked ? handleUnlike() : handleLike())}
-                >
-                  <View
-                    style={[
-                      StyleSheet.absoluteFill,
-                      { backgroundColor: isLiked ? 'rgba(0,0,0,0.2)' : 'white', borderRadius: 32 },
-                    ]}
-                  />
-                  {isLiked ? (
-                    <CloseIcon size={24} color={colors.white} />
-                  ) : (
-                    <ToggleHeartIcon size={28} color={colors.primary.purple} />
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
           <TouchableOpacity
             style={styles.reportContainer}
             activeOpacity={0.8}
@@ -884,6 +851,54 @@ export const MatchDetailsScreen: React.FC = () => {
             <Text style={styles.reportText}>Report &amp; Block</Text>
           </TouchableOpacity>
         </ScrollView>
+
+        {isAtBottom && (
+          <View
+            pointerEvents="box-none"
+            style={[
+              styles.bottomNavWrapper,
+              { paddingBottom: insets.bottom + 12 },
+            ]}
+          >
+            <View style={styles.bottomNav}>
+              <TouchableOpacity
+                style={styles.bottomChatButton}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setFirstMoveStep('choose');
+                  setShowFirstMovePopup(true);
+                }}
+              >
+                <LinearGradient
+                  colors={colors.gradients.primary.colors as any}
+                  start={colors.gradients.primary.start}
+                  end={colors.gradients.primary.end}
+                  style={StyleSheet.absoluteFill}
+                />
+                <ToggleChatHeartIcon size={28} color={colors.white} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.bottomLikeButton}
+                activeOpacity={0.8}
+                onPress={() => (isLiked ? handleUnlike() : handleLike())}
+              >
+                <View
+                  style={[
+                    StyleSheet.absoluteFill,
+                    { backgroundColor: isLiked ? 'rgba(0,0,0,0.2)' : 'white', borderRadius: 32 },
+                  ]}
+                />
+                {isLiked ? (
+                  <CloseIcon size={24} color={colors.white} />
+                ) : (
+                  <ToggleHeartIcon size={28} color={colors.primary.purple} />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        </View>
       </SafeAreaView>
 
       <Modal

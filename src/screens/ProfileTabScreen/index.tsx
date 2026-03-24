@@ -36,6 +36,7 @@ import { getProfileApi } from '../../modules/auth/api';
 
 import { styles } from './styles';
 import { HomeFilterIcon } from '../../assets/icons/home/HomeFilterIcon';
+import { GENDER_OPTIONS } from '../../constants/profile';
 
 const AIRA_PLUS_CARD_IMAGE = require('../../assets/images/AiraPlusCardBackground.png');
 const PRIVACY_POLICY_URL = 'https://airamatchme.com/privacy';
@@ -132,6 +133,13 @@ export const ProfileTabScreen = () => {
     (user as any)?.nickname ??
     user?.name ??
     'Guest';
+
+  const genderKey = (user as any)?.gender;
+  const genderDisplay =
+    typeof genderKey === 'string' && genderKey.length > 0
+      ? GENDER_OPTIONS.find((o) => o.key === genderKey)?.label ?? genderKey
+      : '';
+
   const profilePercent = Math.round((galleryCount / PHOTO_SLOTS) * 100);
 
   const onEditProfile = () => {
@@ -184,9 +192,14 @@ export const ProfileTabScreen = () => {
                 <Text style={styles.progressBadgeText}>{profilePercent}%</Text>
               </View>
             </View>
-            <View style={styles.nameRow}>
-              <Text style={styles.name}>{displayName}</Text>
-              {/* <VerifiedIcon size={24} color={colors.neutral[500]} /> */}
+            <View style={styles.nameBlock}>
+              <View style={styles.nameRow}>
+                <Text style={styles.name}>{displayName}</Text>
+                {/* <VerifiedIcon size={24} color={colors.neutral[500]} /> */}
+              </View>
+              {genderDisplay ? (
+                <Text style={styles.genderReadOnly}>{genderDisplay}</Text>
+              ) : null}
             </View>
             <TouchableOpacity style={styles.editButton} onPress={onEditProfile} activeOpacity={0.8}>
               <Text style={styles.editButtonText}>Edit Profile</Text>
@@ -253,8 +266,15 @@ export const ProfileTabScreen = () => {
               <LogoWordmarkGradient width={116} height={56} />
             </View>
             <Text style={styles.version}>Version 2026.0.1-123</Text>
-            <TouchableOpacity style={styles.logoutButton} onPress={logout} activeOpacity={0.9}>
-             x
+          <TouchableOpacity style={styles.logoutButton} onPress={logout} activeOpacity={0.9}>
+              <LinearGradient
+                colors={[colors.secondary.lavender, colors.primary.purple] as [string, string]}
+                start={{ x: 0.2, y: 0 }}
+                end={{ x: 0.9, y: 1 }}
+                style={styles.logoutGradient}
+              >
+                <Text style={styles.logoutText}>Logout</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </ScrollView>

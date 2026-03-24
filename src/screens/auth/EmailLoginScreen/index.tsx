@@ -22,6 +22,7 @@ type EmailLoginNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'E
 
 export const EmailLoginScreen: React.FC = () => {
   const navigation = useNavigation<EmailLoginNavigationProp>();
+  const [isSheetOpen, setIsSheetOpen] = useState(true);
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string | undefined>();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -93,10 +94,11 @@ export const EmailLoginScreen: React.FC = () => {
   };
 
   const handleClose = () => {
-    // Just navigate back to Welcome; this is always a valid route
-    // on the auth stack and avoids RESET warnings when no navigator
-    // handles the action.
-    navigation.navigate('Welcome');
+    // Close first so the sheet can animate out, then navigate.
+    setIsSheetOpen(false);
+    // setTimeout(() => {
+    //   navigation.navigate('Welcome');
+    // }, 300);
   };
 
   const handleLostAccess = () => {
@@ -131,9 +133,10 @@ export const EmailLoginScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <ReusableBottomSheet
-        isOpen={true}
+        isOpen={isSheetOpen}
         onClose={handleClose}
         snapPoints={['60%']}
+        scrollEnabled={false}
         showDragHandle={true}
         showCloseButton={true}
         enablePanDownToClose={true}

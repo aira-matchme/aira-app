@@ -442,7 +442,7 @@ export const styles = StyleSheet.create({
     borderTopRightRadius: 32,
     paddingHorizontal: 16,
     paddingTop: 24,
-    paddingBottom: 24,
+    paddingBottom: 16,
     marginHorizontal: 8,
     marginBottom: 8,
   },
@@ -491,6 +491,7 @@ export const styles = StyleSheet.create({
   },
   airaThinkingSkeletons: {
     gap: 8,
+    marginBottom: 16,
   },
   airaThinkingSkeletonRow: {
     borderWidth: 1,
@@ -503,6 +504,30 @@ export const styles = StyleSheet.create({
     height: 16,
     borderRadius: 10,
     backgroundColor: colors.neutral[50],
+  },
+  airaThinkingCancelButton: {
+    alignSelf: 'center',
+    minWidth: 116,
+    height: 52,
+    borderRadius: 100,
+    paddingHorizontal: 32,
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.02,
+    shadowRadius: 14,
+    elevation: 1,
+  },
+  airaThinkingCancelLabel: {
+    ...typography.bodyMedium,
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.black,
+    letterSpacing: 0.32,
   },
   // Suggestions from Aira (Figma 2636-13524)
   airaSuggestionsBackdrop: {
@@ -611,9 +636,10 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
+    minHeight: 332,
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 24,
+    paddingBottom: 32,
     marginHorizontal: 8,
     marginBottom: 8,
   },
@@ -627,8 +653,9 @@ export const styles = StyleSheet.create({
   },
   airaLimitContent: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 28,
     gap: 4,
+    paddingHorizontal: 8,
   },
   airaLimitTitle: {
     ...typography.bodyMedium,
@@ -1037,6 +1064,14 @@ export const styles = StyleSheet.create({
   },
   inputArea: {
     backgroundColor: colors.white,
+  },
+  bottomComposerContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.white,
+    zIndex: 10,
   },
   replyToBar: {
     flexDirection: 'row',

@@ -56,12 +56,21 @@ export const styles = StyleSheet.create({
     color: colors.white,
     letterSpacing: 0.48,
   },
+  nameBlock: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginBottom: 8,
+  },
+  genderReadOnly: {
+    ...typography.small,
+    marginTop: 4,
+    color: colors.neutral[600],
+    letterSpacing: 0.48,
   },
   name: {
     ...typography.bodyMedium,

@@ -5,7 +5,6 @@ import { Thumb, Rail, RailSelected, Label } from './RangeSliderParts';
 
 const SLIDER_HEIGHT = 60;
 const SECTION_MIN_HEIGHT = 340;
-const LABEL_OFFSET = 10;
 const SLIDER_MARGIN_TOP = 40;
 const LABEL_BELOW_TOP = SLIDER_MARGIN_TOP + SLIDER_HEIGHT; // exactly below the range rail
 
@@ -37,16 +36,42 @@ export const RangeSliderWithLabels: React.FC<RangeSliderWithLabelsProps> = ({
   renderRail,
   renderRailSelected,
 }) => {
-  const lowPercent = ((low - min) / (max - min)) * 100;
-  const highPercent = ((high - min) / (max - min)) * 100;
+  const [wrapperWidth, setWrapperWidth] = React.useState(0);
+  const [lowLabelWidth, setLowLabelWidth] = React.useState(0);
+  const [highLabelWidth, setHighLabelWidth] = React.useState(0);
+  const range = Math.max(max - min, 1);
+  const lowRatio = (low - min) / range;
+  const highRatio = (high - min) / range;
+
+  const getClampedLeft = React.useCallback(
+    (ratio: number, labelWidth: number) => {
+      if (wrapperWidth <= 0 || labelWidth <= 0) return 0;
+      const centerX = ratio * wrapperWidth;
+      const rawLeft = centerX - labelWidth / 2;
+      return Math.min(Math.max(rawLeft, 0), wrapperWidth - labelWidth);
+    },
+    [wrapperWidth]
+  );
+
+  const lowLeft = getClampedLeft(lowRatio, lowLabelWidth);
+  const highLeft = getClampedLeft(highRatio, highLabelWidth);
 
   return (
-    <View style={styles.wrapper}>
+    <View
+      style={styles.wrapper}
+      onLayout={(event) => {
+        setWrapperWidth(event.nativeEvent.layout.width);
+      }}
+    >
       <View
         style={[
           styles.labelAbove,
-          { left: `${lowPercent}%`, marginLeft: -LABEL_OFFSET },
+          { left: lowLeft },
         ]}
+        onLayout={(event) => {
+          const nextWidth = event.nativeEvent.layout.width;
+          if (nextWidth !== lowLabelWidth) setLowLabelWidth(nextWidth);
+        }}
       >
         <Label text={formatLabel(low)} pointerDirection="down" />
       </View>
@@ -68,8 +93,12 @@ export const RangeSliderWithLabels: React.FC<RangeSliderWithLabelsProps> = ({
       <View
         style={[
           styles.labelBelow,
-          { left: `${highPercent}%`, marginLeft: -LABEL_OFFSET },
+          { left: highLeft },
         ]}
+        onLayout={(event) => {
+          const nextWidth = event.nativeEvent.layout.width;
+          if (nextWidth !== highLabelWidth) setHighLabelWidth(nextWidth);
+        }}
       >
         <Label text={formatLabel(high)} pointerDirection="up" />
       </View>

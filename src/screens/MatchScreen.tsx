@@ -10,6 +10,7 @@ import {
   Keyboard,
   Platform,
   TextInput,
+  LayoutChangeEvent,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -57,6 +58,8 @@ export const MatchScreen = () => {
   const lastUserMessageRef = React.useRef<string>('');
   const [isTyping, setIsTyping] = React.useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = React.useState(false);
+  const [composerHeight, setComposerHeight] = React.useState(120);
+  const bottomSafeInset = Platform.OS === 'ios' ? insets.bottom : 0;
 
   const hasText = message.trim().length > 0;
   const hasChat = chatItems.length > 0;
@@ -439,15 +442,33 @@ export const MatchScreen = () => {
   // after show/hide. Re-sync to bottom with multiple attempts.
   React.useEffect(() => {
     if (Platform.OS !== 'android') return;
-  
+
     const sub = Keyboard.addListener('keyboardDidHide', () => {
       scrollRef.current?.scrollToEnd({ animated: false });
     });
-  
+
     return () => sub.remove();
   }, []);
 
-    return (
+  const handleComposerLayout = React.useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = Math.round(event.nativeEvent.layout.height);
+    if (nextHeight > 0 && nextHeight !== composerHeight) {
+      setComposerHeight(nextHeight);
+    }
+  }, [composerHeight]);
+
+  // Keep the thread scrolled when the keyboard opens (pairs with KeyboardAvoidingView on iOS).
+  React.useEffect(() => {
+    const eventName = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const sub = Keyboard.addListener(eventName, () => {
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      });
+    });
+    return () => sub.remove();
+  }, []);
+
+  return (
       <View style={styles.screen}>
               <ProfileScreenGradient />
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -468,223 +489,221 @@ export const MatchScreen = () => {
           >
             <BackArrowIcon size={48} backgroundColor="rgba(255,255,255,0.5)" strokeColor={colors.black} />
           </TouchableOpacity>
-          {/* <KeyboardAvoidingView
-  style={styles.flex}
-  behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-  keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
-> */}
-<View style={styles.flex}>
-  {/* CHAT */}
-  <ScrollView
-    ref={scrollRef}
-    style={styles.flex}
-    contentContainerStyle={{
-      flexGrow: 1,
-      paddingHorizontal: 16,
-      paddingTop: 36,
-      paddingBottom: 150, // 🔥 IMPORTANT (space for input)
-    }}
-    keyboardShouldPersistTaps="handled"
-    keyboardDismissMode="on-drag"
-    showsVerticalScrollIndicator={false}
-  >
-    {!hasChat && !isLoadingHistory ? (
-      <View style={styles.hero}>
-        <View style={styles.aiBadgeShadow} pointerEvents="none" />
-        <View style={styles.aiBadge}>
-          <TabAICenterIcon width={138} height={138} />
-        </View>
-
-        <View style={styles.heroText}>
-          <View style={{ alignItems: 'center' }}>
-            <GradientText
-              style={{
-                fontSize: typography.h2.fontSize,
-                fontWeight: typography.h2.fontWeight,
-                fontFamily: typography.h2.fontFamily,
+          <KeyboardAvoidingView
+            style={styles.flex}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 8}
+          >
+            <ScrollView
+              ref={scrollRef}
+              style={styles.flex}
+              contentContainerStyle={{
+                flexGrow: 1,
+                paddingHorizontal: 16,
+                paddingTop: 36,
+                // Keep last message visible above dynamic composer height.
+                paddingBottom: composerHeight + 12,
               }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              showsVerticalScrollIndicator={false}
             >
-              Hi , I’m Aira.
-            </GradientText>
-          </View>
-          <Text style={styles.subtitle}>
-            Your dating wingman - here to help you connect better.
-          </Text>
-        </View>
-      </View>
-    ) : (
-      <View style={styles.thread}>
-        {chatItems.map((item) => {
-          if (item.from === 'user') {
-            return (
-              <View key={item.id} style={styles.userMessageRow}>
-                <View style={styles.userBubble}>
-                  <Text style={styles.userBubbleText}>{item.text}</Text>
-                </View>
-              </View>
-            );
-          }
+              {!hasChat && !isLoadingHistory ? (
+                <View style={styles.hero}>
+                  <View style={styles.aiBadgeShadow} pointerEvents="none" />
+                  <View style={styles.aiBadge}>
+                    <TabAICenterIcon width={138} height={138} />
+                  </View>
 
-          return (
-            <View key={item.id} style={styles.airaMessageWrap}>
-              {item.blocks.map((b, idx) => {
-                switch (b.type) {
-                  case 'heading':
-                    return (
-                      <Text key={idx} style={styles.airaHeading}>
-                        {b.text}
-                      </Text>
-                    );
-                  case 'paragraph':
-                    return (
-                      <Text key={idx} style={styles.airaParagraph}>
-                        {b.text}
-                      </Text>
-                    );
-                  case 'divider':
-                    return <View key={idx} style={styles.airaDivider} />;
-                  case 'ordered':
-                    return (
-                      <View key={idx} style={styles.airaListRow}>
-                        <Text style={styles.airaOrderedIndex}>{b.index}.</Text>
-                        <Text style={styles.airaOrderedText}>{b.text}</Text>
-                      </View>
-                    );
-                  case 'bullet':
-                    return (
-                      <View
-                        key={idx}
-                        style={[styles.airaListRow, b.indent === 1 ? styles.airaListRowIndented : null]}
+                  <View style={styles.heroText}>
+                    <View style={{ alignItems: 'center' }}>
+                      <GradientText
+                        style={{
+                          fontSize: typography.h2.fontSize,
+                          fontWeight: typography.h2.fontWeight,
+                          fontFamily: typography.h2.fontFamily,
+                        }}
                       >
-                        <Text style={styles.airaBullet}>•</Text>
-                        <Text style={styles.airaBulletText}>{b.text}</Text>
-                      </View>
-                    );
-                  case 'bullet_item':
-                    return (
-                      <View key={idx} style={styles.airaListRow}>
-                        <Text style={styles.airaBullet}>•</Text>
-                        <View style={{ flex: 1 }}>
-                          {b.title ? <Text style={styles.airaBulletItemTitle}>{b.title}</Text> : null}
-                          {b.description ? (
-                            <Text style={styles.airaBulletItemText}>{b.description}</Text>
-                          ) : null}
+                        Hi , I’m Aira.
+                      </GradientText>
+                    </View>
+                    <Text style={styles.subtitle}>
+                      Your dating wingman - here to help you connect better.
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.thread}>
+                  {chatItems.map((item) => {
+                    if (item.from === 'user') {
+                      return (
+                        <View key={item.id} style={styles.userMessageRow}>
+                          <View style={styles.userBubble}>
+                            <Text style={styles.userBubbleText}>{item.text}</Text>
+                          </View>
                         </View>
-                      </View>
-                    );
-                  case 'follow_up':
-                    return (
-                      <View key={idx} style={styles.followUpCard}>
-                        <Text style={styles.followUpLabel}>Next</Text>
-                        <Text style={styles.followUpText}>{b.text}</Text>
-                      </View>
-                    );
-                  case 'missing_info_list':
-                    return (
-                      <View key={idx} style={styles.missingInfoWrap}>
-                        {b.options.map((opt) => {
-                          const sortedPhotos = Array.isArray(opt.photos)
-                            ? [...opt.photos].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-                            : [];
-                          const photoUrl = sortedPhotos[0]?.url;
-                          const thumbFallbackText =
-                            (opt.nickName ?? opt.name ?? '?').toString().trim().slice(0, 1) || '?';
+                      );
+                    }
 
-                          const title = opt.nickName ?? opt.name ?? 'Profile';
-                          const subtitle = opt.name && opt.nickName && opt.name !== opt.nickName ? opt.name : opt.nickName;
-
-                          return (
-                            <TouchableOpacity
-                              key={opt._id}
-                              style={styles.missingInfoCard}
-                              activeOpacity={0.85}
-                              disabled={!lastUserText || isTyping}
-                              onPress={() => {
-                                if (!lastUserText) return;
-                                // Pass receiver id + last user message into the chatbot.
-                                void sendChatWithReceiver(lastUserText, opt._id);
-                              }}
-                            >
-                              <View style={styles.missingInfoThumbWrap}>
-                                {photoUrl ? (
-                                  <Image source={{ uri: photoUrl }} style={styles.missingInfoThumb} />
-                                ) : (
-                                  <View style={styles.missingInfoThumbFallback}>
-                                    <Text style={styles.missingInfoThumbFallbackText}>{thumbFallbackText}</Text>
+                    return (
+                      <View key={item.id} style={styles.airaMessageWrap}>
+                        {item.blocks.map((b, idx) => {
+                          switch (b.type) {
+                            case 'heading':
+                              return (
+                                <Text key={idx} style={styles.airaHeading}>
+                                  {b.text}
+                                </Text>
+                              );
+                            case 'paragraph':
+                              return (
+                                <Text key={idx} style={styles.airaParagraph}>
+                                  {b.text}
+                                </Text>
+                              );
+                            case 'divider':
+                              return <View key={idx} style={styles.airaDivider} />;
+                            case 'ordered':
+                              return (
+                                <View key={idx} style={styles.airaListRow}>
+                                  <Text style={styles.airaOrderedIndex}>{b.index}.</Text>
+                                  <Text style={styles.airaOrderedText}>{b.text}</Text>
+                                </View>
+                              );
+                            case 'bullet':
+                              return (
+                                <View
+                                  key={idx}
+                                  style={[styles.airaListRow, b.indent === 1 ? styles.airaListRowIndented : null]}
+                                >
+                                  <Text style={styles.airaBullet}>•</Text>
+                                  <Text style={styles.airaBulletText}>{b.text}</Text>
+                                </View>
+                              );
+                            case 'bullet_item':
+                              return (
+                                <View key={idx} style={styles.airaListRow}>
+                                  <Text style={styles.airaBullet}>•</Text>
+                                  <View style={{ flex: 1 }}>
+                                    {b.title ? <Text style={styles.airaBulletItemTitle}>{b.title}</Text> : null}
+                                    {b.description ? (
+                                      <Text style={styles.airaBulletItemText}>{b.description}</Text>
+                                    ) : null}
                                   </View>
-                                )}
-                              </View>
-                              <View style={styles.missingInfoTextBlock}>
-                                <Text style={styles.missingInfoTitle}>{title}</Text>
-                                {subtitle ? <Text style={styles.missingInfoSubtitle}>{subtitle}</Text> : null}
-                              </View>
-                            </TouchableOpacity>
-                          );
+                                </View>
+                              );
+                            case 'follow_up':
+                              return (
+                                <View key={idx} style={styles.followUpCard}>
+                                  <Text style={styles.followUpLabel}>Next</Text>
+                                  <Text style={styles.followUpText}>{b.text}</Text>
+                                </View>
+                              );
+                            case 'missing_info_list':
+                              return (
+                                <View key={idx} style={styles.missingInfoWrap}>
+                                  {b.options.map((opt) => {
+                                    const sortedPhotos = Array.isArray(opt.photos)
+                                      ? [...opt.photos].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+                                      : [];
+                                    const photoUrl = sortedPhotos[0]?.url;
+                                    const thumbFallbackText =
+                                      (opt.nickName ?? opt.name ?? '?').toString().trim().slice(0, 1) || '?';
+
+                                    const title = opt.nickName ?? opt.name ?? 'Profile';
+                                    const subtitle = opt.name && opt.nickName && opt.name !== opt.nickName ? opt.name : opt.nickName;
+
+                                    return (
+                                      <TouchableOpacity
+                                        key={opt._id}
+                                        style={styles.missingInfoCard}
+                                        activeOpacity={0.85}
+                                        disabled={!lastUserText || isTyping}
+                                        onPress={() => {
+                                          if (!lastUserText) return;
+                                          // Pass receiver id + last user message into the chatbot.
+                                          void sendChatWithReceiver(lastUserText, opt._id);
+                                        }}
+                                      >
+                                        <View style={styles.missingInfoThumbWrap}>
+                                          {photoUrl ? (
+                                            <Image source={{ uri: photoUrl }} style={styles.missingInfoThumb} />
+                                          ) : (
+                                            <View style={styles.missingInfoThumbFallback}>
+                                              <Text style={styles.missingInfoThumbFallbackText}>{thumbFallbackText}</Text>
+                                            </View>
+                                          )}
+                                        </View>
+                                        <View style={styles.missingInfoTextBlock}>
+                                          <Text style={styles.missingInfoTitle}>{title}</Text>
+                                          {subtitle ? <Text style={styles.missingInfoSubtitle}>{subtitle}</Text> : null}
+                                        </View>
+                                      </TouchableOpacity>
+                                    );
+                                  })}
+                                </View>
+                              );
+                            default:
+                              return null;
+                          }
                         })}
                       </View>
                     );
-                  default:
-                    return null;
-                }
-              })}
+                  })}
+
+                  {isTyping && (
+                    <View style={styles.airaMessageWrap}>
+                      <Text style={styles.airaParagraph}>Aira is typing…</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </ScrollView>
+
+            <View
+              onLayout={handleComposerLayout}
+              style={[
+                styles.composerWrapFixed,
+                {
+                  paddingBottom: 12 + bottomSafeInset,
+                },
+              ]}
+            >
+              <View style={[styles.composerRow, { paddingBottom: 12 }]}>
+                <View style={styles.inputPill}>
+                  <TextInput
+                    value={message}
+                    onChangeText={setMessage}
+                    placeholder="Ask me anything..."
+                    placeholderTextColor={colors.neutral[600]}
+                    style={[
+                      styles.input,
+                      { textAlignVertical: hasText ? 'top' : 'center' },
+                    ]}
+                    multiline
+                  />
+                </View>
+
+                <TouchableOpacity
+                  disabled={!hasText}
+                  onPress={() => {
+                    if (!hasText) return;
+                    handleSend(message);
+                  }}
+                  style={
+                    hasText
+                      ? styles.sendButton
+                      : [styles.sendButton, styles.sendButtonDisabled]
+                  }
+                >
+                  <ForwardArrowIcon
+                    size={22}
+                    color={hasText ? colors.white : colors.neutral[500]}
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
-          );
-        })}
-
-        {isTyping && (
-          <View style={styles.airaMessageWrap}>
-            <Text style={styles.airaParagraph}>Aira is typing…</Text>
-          </View>
-        )}
-      </View>
-    )}
-  </ScrollView>
-
-  {/* ✅ FIXED INPUT (OUTSIDE SCROLLVIEW) */}
-  {/* <View style={styles.composerWrap}> */}
-  <View
-  style={[
-    styles.composerWrap,
-    {
-      paddingBottom: insets.bottom > 0 ? insets.bottom : 12, // 🔥 FIX
-    },
-  ]}
->
-    <View style={[styles.composerRow, { paddingBottom: 12 }]}>
-      <View style={styles.inputPill}>
-        <TextInput
-          value={message}
-          onChangeText={setMessage}
-          placeholder="Ask me anything..."
-          placeholderTextColor={colors.neutral[600]}
-          style={[
-            styles.input,
-            { textAlignVertical: hasText ? 'top' : 'center' },
-          ]}
-          multiline
-        />
-      </View>
-
-      <TouchableOpacity
-        disabled={!hasText}
-        onPress={() => {
-          if (!hasText) return;
-          handleSend(message);
-        }}
-        style={
-          hasText
-            ? styles.sendButton
-            : [styles.sendButton, styles.sendButtonDisabled]
-        }
-      >
-        <ForwardArrowIcon
-          size={22}
-          color={hasText ? colors.white : colors.neutral[500]}
-        />
-      </TouchableOpacity>
-    </View>
-  </View>
-</View>
+          </KeyboardAvoidingView>
 
         </SafeAreaView>
       </View>
@@ -971,7 +990,16 @@ export const MatchScreen = () => {
     composerWrap: {
       backgroundColor: colors.white,
       alignSelf: 'stretch',
-      // paddingBottom: Platform.OS === 'android' ? 8 : 0,
+      zIndex: 5,
+    },
+    composerWrapFixed: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: colors.white,
+      alignSelf: 'stretch',
+      zIndex: 5,
     },
     composerRow: {
       flexDirection: 'row',
