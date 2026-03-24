@@ -214,14 +214,14 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
   }
 
   const handleEmailLogin = () => {
-    requestClose();
+    // requestClose();
     navigation.navigate('EmailLogin');
   };
 
   // Don't render anything if not open
-  if (!isOpen && !localOpen) {
-    return null;
-  }
+  // if (!isOpen && !localOpen) {
+  //   return null;
+  // }
 
   const hasApple = Platform.OS === 'ios';
   const snapPoints = hasApple ? ['60%'] : ['48%'];

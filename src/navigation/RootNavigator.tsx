@@ -7,7 +7,6 @@ import { AuthNavigator } from './AuthNavigator';
 import { TabNavigator } from './TabNavigator';
 import { SplashScreen } from '../screens/SplashScreen';
 import { MatchDetailsScreen } from '../screens/MatchDetailsScreen';
-import { EmailLoginScreen } from '../screens/auth/EmailLoginScreen';
 import { LostAccessEmailScreen } from '../screens/auth/LostAccessEmailScreen';
 import { OTPVerificationScreen } from '../screens/auth/OTPVerificationScreen';
 import { useAuthStore } from '../store/auth.store';
@@ -60,11 +59,6 @@ export const RootNavigator = () => {
             ) : (
               <RootStack.Screen name="AuthStack" component={AuthNavigator} />
             )}
-            <RootStack.Screen
-              name="EmailLogin"
-              component={EmailLoginScreen}
-              options={{ presentation: 'transparentModal' }}
-            />
             <RootStack.Screen
               name="LostAccessEmail"
               component={LostAccessEmailScreen}

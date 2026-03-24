@@ -22,11 +22,11 @@ type EmailLoginNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'E
 
 export const EmailLoginScreen: React.FC = () => {
   const navigation = useNavigation<EmailLoginNavigationProp>();
-  const [isSheetOpen, setIsSheetOpen] = useState(true);
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string | undefined>();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isClosingRef = useRef(false);
   
   const sendOtpMutation = useSendOtp();
 
@@ -94,11 +94,9 @@ export const EmailLoginScreen: React.FC = () => {
   };
 
   const handleClose = () => {
-    // Close first so the sheet can animate out, then navigate.
-    setIsSheetOpen(false);
-    // setTimeout(() => {
-    //   navigation.navigate('Welcome');
-    // }, 300);
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+    navigation.goBack();
   };
 
   const handleLostAccess = () => {
@@ -133,7 +131,7 @@ export const EmailLoginScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <ReusableBottomSheet
-        isOpen={isSheetOpen}
+        isOpen={true}
         onClose={handleClose}
         snapPoints={['60%']}
         scrollEnabled={false}
