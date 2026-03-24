@@ -45,7 +45,7 @@ export const BasicDetailsWeightScreen: React.FC = () => {
     if (selectedGender) {
       setGender(selectedGender);
       setCurrentStep(CURRENT_STEP + 1);
-      navigation.navigate('BasicDetailsBodyType');
+      navigation.navigate('BasicDetailsHeight');
     }
   };
 

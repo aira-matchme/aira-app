@@ -241,7 +241,10 @@ export const ProfilePhotosScreen: React.FC = () => {
 
   const handleContinue = () => {
     if (!canContinue) return;
-    navigation.navigate('OnboardingIntro');
+    navigation.navigate('BasicDetailsBodyType', {
+      fromEditProfile: true,
+      continueToOnboarding: true,
+    });
   };
 
   return (

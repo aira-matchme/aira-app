@@ -27,7 +27,9 @@ export type AuthStackParamList = {
   BasicDetailsName: { fromEditProfile?: boolean } | undefined;
   BasicDetailsDob: { fromEditProfile?: boolean } | undefined;
   BasicDetailsWeight: { fromEditProfile?: boolean } | undefined;
-  BasicDetailsBodyType: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsBodyType:
+    | { fromEditProfile?: boolean; continueToOnboarding?: boolean }
+    | undefined;
   BasicDetailsHeight: { fromEditProfile?: boolean } | undefined;
   BasicDetailsEducation: { fromEditProfile?: boolean } | undefined;
   BasicDetailsEmployment: { fromEditProfile?: boolean } | undefined;
@@ -107,7 +109,9 @@ export type ProfileStackParamList = {
   BasicDetailsName: { fromEditProfile?: boolean } | undefined;
   BasicDetailsDob: { fromEditProfile?: boolean } | undefined;
   BasicDetailsWeight: { fromEditProfile?: boolean } | undefined;
-  BasicDetailsBodyType: { fromEditProfile?: boolean } | undefined;
+  BasicDetailsBodyType:
+    | { fromEditProfile?: boolean; continueToOnboarding?: boolean }
+    | undefined;
   BasicDetailsHeight: { fromEditProfile?: boolean } | undefined;
   BasicDetailsEducation: { fromEditProfile?: boolean } | undefined;
   BasicDetailsEmployment: { fromEditProfile?: boolean } | undefined;

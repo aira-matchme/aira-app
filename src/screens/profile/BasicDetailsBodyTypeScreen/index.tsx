@@ -9,7 +9,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { Button } from '../../../components/Button';
@@ -19,6 +19,10 @@ import { InterestChipCheckIcon } from '../../../assets/icons/common/InterestChip
 import { STRINGS } from '../../../constants/strings';
 import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
+import { apiClient } from '../../../services/api/client';
+import { endpoints } from '../../../services/api/endpoints';
+import { getProfileApi } from '../../../modules/auth/api';
+import { useAuthStore } from '../../../store/auth.store';
 import { styles } from './styles';
 
 export type BodyTypeId =
@@ -59,7 +63,12 @@ const CURRENT_STEP = 4;
 
 export const BasicDetailsBodyTypeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<any>();
+  const fromEditProfile = route.params?.fromEditProfile === true;
+  const continueToOnboarding = route.params?.continueToOnboarding === true;
   const { gender, bodyType, setBodyType, setCurrentStep } = useProfileStore();
+  const setUser = useAuthStore((s) => s.setUser);
+  const [isSaving, setIsSaving] = useState(false);
   const normalizedGender = gender?.toLowerCase() ?? null;
   const bodyTypeOptions =
     normalizedGender === 'male' || normalizedGender === 'man'
@@ -73,9 +82,35 @@ export const BasicDetailsBodyTypeScreen: React.FC = () => {
     navigation.goBack();
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (selectedId) {
       setBodyType(selectedId);
+      if (fromEditProfile) {
+        try {
+          setIsSaving(true);
+          await apiClient.patch(endpoints.user.editProfile, {
+            bodyType: selectedId,
+          });
+
+          const profile = await getProfileApi();
+          if ((profile as any)?.data) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setUser((profile as any).data);
+          }
+
+          if (continueToOnboarding) {
+            navigation.navigate('OnboardingIntro');
+          } else {
+            navigation.goBack();
+          }
+        } catch (error: any) {
+          // Error handled silently
+        } finally {
+          setIsSaving(false);
+        }
+        return;
+      }
+
       setCurrentStep(CURRENT_STEP + 1);
       navigation.navigate('BasicDetailsHeight');
     }
@@ -141,11 +176,12 @@ export const BasicDetailsBodyTypeScreen: React.FC = () => {
 
         <View style={styles.actions}>
           <Button
-            title={STRINGS.PROFILE_SETUP.COMMON.CONTINUE}
+            title={fromEditProfile ? STRINGS.PREFERENCES.SAVE : STRINGS.PROFILE_SETUP.COMMON.CONTINUE}
             onPress={handleContinue}
             variant="primary"
             style={styles.primaryButton}
-            disabled={!selectedId}
+            loading={isSaving && fromEditProfile}
+            disabled={!selectedId || (isSaving && fromEditProfile)}
           />
         </View>
       </SafeAreaView>

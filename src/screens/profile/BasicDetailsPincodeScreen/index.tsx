@@ -135,7 +135,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
         nickName: name ?? '',
         dob: formatDob(),
         gender: gender ?? '',
-        bodyType: bodyType ?? undefined,
+        bodyType: bodyType ?? 'medium_build',
         heightFeet:
           height?.feet != null
             ? String(height.feet)
