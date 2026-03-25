@@ -45,10 +45,11 @@ export const GENDER_OPTIONS: { key: GenderApiValue; label: string }[] = [
 // ─── Education (keys are backend values) ───
 export const EDUCATION_OPTIONS: { key: string; label: string }[] = [
   { key: 'phd_dr', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.PHD },
-  { key: 'masters_or_equivalent', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.MASTER },
-  { key: 'degree_or_equivalent', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.A_LEVEL },
-  { key: 'gcse_or_equivalent', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.GCSE },
-  { key: 'other', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.OTHER },
+  { key: 'masters_or_above', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.MASTER },
+  { key: 'degree_or_above', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.DEGREE },
+  { key: 'a_level_or_above', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.A_LEVEL },
+  { key: 'gcse_or_above', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.GCSE },
+  { key: 'any', label: STRINGS.PROFILE_SETUP.EDUCATION.OPTIONS.ANY },
 ];
 
 // ─── Employment (keys are backend values) ───
@@ -61,11 +62,11 @@ export const EMPLOYMENT_OPTIONS: { key: string; label: string }[] = [
 
 // ─── Income (keys are backend values) ───
 export const INCOME_OPTIONS: { key: string; label: string }[] = [
+  { key: 'eur_0k_20k', label: STRINGS.PROFILE_SETUP.FINAL.OPTIONS.RANGE_0_20 },
   { key: 'eur_20k_30k', label: STRINGS.PROFILE_SETUP.FINAL.OPTIONS.BETWEEN_20000_AND_30000 },
   { key: 'eur_30k_40k', label: STRINGS.PROFILE_SETUP.FINAL.OPTIONS.BETWEEN_30000_AND_40000 },
   { key: 'eur_40k_50k', label: STRINGS.PROFILE_SETUP.FINAL.OPTIONS.BETWEEN_40000_AND_50000 },
   { key: 'eur_50k_plus', label: STRINGS.PROFILE_SETUP.FINAL.OPTIONS.OVER_50000 },
-  { key: 'any_income', label: STRINGS.PROFILE_SETUP.EMPLOYMENT.OPTIONS.ANY_INCOME },
 ];
 
 // ─── DOB picker ───

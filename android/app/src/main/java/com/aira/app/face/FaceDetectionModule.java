@@ -76,6 +76,9 @@ public class FaceDetectionModule extends ReactContextBaseJavaModule {
                 activity.getWindow().setStatusBarColor(Color.TRANSPARENT);
             }
             previewView = new PreviewView(activity);
+            // TextureView compositing: default SurfaceView often stays black when drawn under RN views.
+            previewView.setImplementationMode(PreviewView.ImplementationMode.COMPATIBLE);
+            previewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);
             previewView.setLayoutParams(
                     new FrameLayout.LayoutParams(
                             FrameLayout.LayoutParams.MATCH_PARENT,

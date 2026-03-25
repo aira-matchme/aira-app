@@ -85,7 +85,7 @@ export const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: HORIZONTAL_PADDING,
-    paddingBottom: spacing.xl * 2,
+    paddingBottom: spacing.lg,
   },
   grid: {
     flexDirection: 'row',

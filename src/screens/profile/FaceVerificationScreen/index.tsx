@@ -25,6 +25,7 @@ import {
 } from '../../../config/permissions';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './styles';
+import { PROFILE_SCREEN_EDGES } from '../profileScreenLayout';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
 
 type NavigationProp = NativeStackNavigationProp<
@@ -106,10 +107,11 @@ export const FaceVerificationScreen: React.FC = () => {
       <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+      <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>
        
 
         <ScrollView
+          style={styles.scrollView}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >

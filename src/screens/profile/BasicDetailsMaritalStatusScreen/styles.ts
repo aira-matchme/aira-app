@@ -18,6 +18,7 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    minHeight: 0,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm * 2,
   },
@@ -73,7 +74,7 @@ export const styles = StyleSheet.create({
   buttonContainer: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: spacing.xl * 1.5,
+    paddingBottom: spacing.sm,
   },
   button: {
     width: '100%',

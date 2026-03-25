@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -26,6 +25,7 @@ import { getProfileApi } from '../../../modules/auth/api';
 import { useAuthStore } from '../../../store/auth.store';
 import { styles } from './styles';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
+import { PROFILE_SCREEN_EDGES } from '../profileScreenLayout';
 
 type NavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -108,12 +108,12 @@ export const BasicDetailsNameScreen: React.FC = () => {
     <KeyboardAvoidingView
       style={styles.wrapper}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+      keyboardVerticalOffset={0}
     >
       <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>
         <View style={styles.headerContainer}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
@@ -125,42 +125,49 @@ export const BasicDetailsNameScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.content}>
-          <Text style={styles.title}>
-            {STRINGS.PROFILE_SETUP.NAME.TITLE}
-          </Text>
-          <Text style={styles.subtitle}>
-            {STRINGS.PROFILE_SETUP.NAME.SUBTITLE}
-          </Text>
+        <View style={styles.mainColumn}>
+          <View style={styles.formSection}>
+            <Text style={styles.title}>
+              {STRINGS.PROFILE_SETUP.NAME.TITLE}
+            </Text>
+            <Text style={styles.subtitle}>
+              {STRINGS.PROFILE_SETUP.NAME.SUBTITLE}
+            </Text>
 
-          <View style={styles.inputWrapper}>
-            <Controller
-              control={control}
-              name="name"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  value={value}
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  placeholder={STRINGS.PROFILE_SETUP.NAME.PLACEHOLDER}
-                  autoFocus
-                  error={errors.name?.message || ''}
-                  style={styles.input}
-                />
-              )}
+            <View
+              style={[
+                styles.inputWrapper,
+                errors.name?.message ? styles.inputWrapperWithError : null,
+              ]}
+            >
+              <Controller
+                control={control}
+                name="name"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <TextInput
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    placeholder={STRINGS.PROFILE_SETUP.NAME.PLACEHOLDER}
+                    autoFocus
+                    error={errors.name?.message || ''}
+                    style={styles.input}
+                  />
+                )}
+              />
+            </View>
+          </View>
+
+          <View style={styles.buttonContainer}>
+            <Button
+              title={fromEditProfile ? STRINGS.PREFERENCES.SAVE : STRINGS.PROFILE_SETUP.COMMON.CONTINUE}
+              onPress={handleSubmit(onSubmit)}
+              disabled={!isValid || isSaving}
+              variant="primary"
+              loading={isSaving && fromEditProfile}
+              style={styles.button}
             />
           </View>
-        </View>
-        <View style={Platform.OS === 'ios' ? styles.buttonContainer : styles.buttonContainerAndroid}>
-          <Button
-            title={fromEditProfile ? STRINGS.PREFERENCES.SAVE : STRINGS.PROFILE_SETUP.COMMON.CONTINUE}
-            onPress={handleSubmit(onSubmit)}
-            disabled={!isValid || isSaving}
-            variant="primary"
-            loading={isSaving && fromEditProfile}
-            style={styles.button}
-
-          />
         </View>
       </SafeAreaView>
     </KeyboardAvoidingView>

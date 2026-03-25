@@ -1,4 +1,4 @@
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../../theme';
 
 export const styles = StyleSheet.create({
@@ -26,7 +26,15 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    minHeight: 0,
     paddingHorizontal: spacing.md,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: spacing.lg,
   },
   title: {
     fontSize: 32,
@@ -59,17 +67,15 @@ export const styles = StyleSheet.create({
     letterSpacing: 0.48,
     color: colors.secondary[900],
   },
-  optionsContainer: {
-    flexGrow: 0,
-  },
-  optionsContent: {
+  optionsList: {
     gap: spacing.sm,
-    paddingBottom: 100,
+    paddingTop: spacing.md,
   },
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 80,
+    minHeight: 80,
+    paddingVertical: 12,
     borderRadius: 24,
     paddingLeft: 24,
     paddingRight: 24,
@@ -93,6 +99,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    flexShrink: 0,
   },
   rowImageImg: {
     width: '100%',
@@ -103,6 +110,7 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '500',
     flex: 1,
+    flexShrink: 1,
     color: colors.black,
   },
   optionTextSelected: {
@@ -116,6 +124,8 @@ export const styles = StyleSheet.create({
     borderColor: colors.neutral[200],
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+    marginLeft: spacing.sm,
   },
   checkboxSelected: {
     borderColor: colors.primary.purple,
@@ -128,14 +138,10 @@ export const styles = StyleSheet.create({
     color: colors.white,
   },
   actions: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     width: '100%',
     paddingHorizontal: spacing.md,
-    paddingBottom: Platform.OS === 'ios' ? spacing.xl * 2 : spacing.xl,
-    paddingTop: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
     backgroundColor: colors.white,
   },
   primaryButton: {

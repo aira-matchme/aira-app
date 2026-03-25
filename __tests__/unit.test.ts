@@ -282,7 +282,7 @@ describe('Preferences buildAddPreferencePayload', () => {
       preferredMaxAge: 30,
       preferredMinHeightcm: 155,
       preferredMaxHeightcm: 170,
-      distanceMilesLow: 10,
+      distanceMilesLow: 0,
       distanceMilesHigh: 20,
       preferredEducation: null,
       preferredEmployment: [],
@@ -307,7 +307,7 @@ describe('Preferences buildAddPreferencePayload', () => {
     const payload = buildAddPreferencePayload(state);
     expect(payload.lookingForGender).toBe('female');
     expect(payload.preferredRadiusKm).toBe(Math.round(20 * 1.60934));
-    expect(payload.preferredEducationLevels).toBe('other');
+    expect(payload.preferredEducationLevels).toBe('any');
     expect(payload.preferredEmploymentStatuses).toEqual([]);
     expect(payload.preferredIncomeRanges).toBe('prefer_not_to_say');
     expect(payload.preferredMinAge).toBe(18);
@@ -325,7 +325,7 @@ describe('Preferences buildAddPreferencePayload', () => {
       preferredMaxHeightcm: 180,
       distanceMilesLow: 10,
       distanceMilesHigh: 25,
-      preferredEducation: 'degree_or_equivalent' as const,
+      preferredEducation: 'degree_or_above' as const,
       preferredEmployment: ['employed'],
       preferredIncome: 'eur_30k_40k' as const,
       preferredMaritalStatus: 'never_married' as const,
@@ -347,7 +347,7 @@ describe('Preferences buildAddPreferencePayload', () => {
     } as PreferencesState;
     const payload = buildAddPreferencePayload(state);
     expect(payload.lookingForGender).toBe('male');
-    expect(payload.preferredEducationLevels).toBe('degree_or_equivalent');
+    expect(payload.preferredEducationLevels).toBe('degree_or_above');
     expect(payload.preferredEmploymentStatuses).toEqual(['employed']);
     expect(payload.preferredIncomeRanges).toBe('eur_30k_40k');
     expect(payload.preferredMaritalStatus).toEqual(['never_married']);

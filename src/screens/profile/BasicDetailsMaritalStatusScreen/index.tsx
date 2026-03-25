@@ -24,6 +24,7 @@ import { endpoints } from '../../../services/api/endpoints';
 import { getProfileApi } from '../../../modules/auth/api';
 import { useAuthStore } from '../../../store/auth.store';
 import { styles } from './styles';
+import { PROFILE_SCREEN_EDGES } from '../profileScreenLayout';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
 
 type NavigationProp = NativeStackNavigationProp<
@@ -106,7 +107,7 @@ export const BasicDetailsMaritalStatusScreen: React.FC = () => {
       <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+      <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>
         <View style={styles.content}>
         <View style={{ paddingBottom: 16}}>
           <TouchableOpacity onPress={() => navigation.goBack()}>

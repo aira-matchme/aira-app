@@ -6,7 +6,7 @@ import {
   Image,
   ScrollView,
   TextInput,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Modal,
   TouchableWithoutFeedback,
@@ -15,8 +15,11 @@ import {
   StatusBar,
   ActivityIndicator,
   LayoutChangeEvent,
+  useWindowDimensions,
+  type KeyboardEvent,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { pick } from '@react-native-documents/picker';
@@ -148,10 +151,36 @@ function formatMessageTimestamp(value: string | number | undefined): string {
   return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
 }
 
+/** Keyboard overlap with the app window (aligned with MatchScreen). */
+function keyboardOverlapFromEvent(windowHeight: number, e: KeyboardEvent): number {
+  const ec = e.endCoordinates;
+  if (!ec || windowHeight <= 0) return 0;
+
+  if (Platform.OS === 'ios') {
+    const screenY = typeof ec.screenY === 'number' ? ec.screenY : windowHeight;
+    return Math.max(0, Math.min(windowHeight, windowHeight - screenY));
+  }
+
+  let h = typeof ec.height === 'number' && ec.height > 0 ? ec.height : 0;
+  if (typeof ec.screenY === 'number') {
+    const fromScreenY = Math.max(0, windowHeight - ec.screenY);
+    if (h <= 0) {
+      h = fromScreenY;
+    } else if (fromScreenY > 0) {
+      const delta = Math.abs(h - fromScreenY);
+      if (delta > 80) {
+        h = Math.max(h, fromScreenY);
+      }
+    }
+  }
+  return Math.max(0, h);
+}
+
 export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const { name, avatar, chatId: initialChatId, isRequest, otherUserId } = route.params;
+  const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const bottomSafeInset = Platform.OS === 'ios' ? insets.bottom : 0;
+  const bottomSafeInset = insets.bottom;
   const currentUserId = useAuthStore((s) => s.user?.id);
   const [chatId, setChatId] = useState<string | null>(initialChatId ?? null);
   const [requestActionLoading, setRequestActionLoading] = useState<'accept' | 'decline' | 'block' | null>(null);
@@ -203,6 +232,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [otherUserOnline, setOtherUserOnline] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
   const [composerHeight, setComposerHeight] = useState(120);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const aiSuggestionsRequestIdRef = useRef(0);
   const typingStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -210,10 +240,57 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const scrollViewRef = useRef<ScrollView>(null);
   const handleComposerLayout = useCallback((event: LayoutChangeEvent) => {
     const nextHeight = Math.round(event.nativeEvent.layout.height);
-    if (nextHeight > 0 && nextHeight !== composerHeight) {
-      setComposerHeight(nextHeight);
+    if (nextHeight > 0) {
+      setComposerHeight((prev) => (prev === nextHeight ? prev : nextHeight));
     }
-  }, [composerHeight]);
+  }, []);
+
+  const scrollToEndAfterKeyboard = useCallback((animated: boolean) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollToEnd({ animated });
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    const applyOverlap = (e: KeyboardEvent) => {
+      const overlap = keyboardOverlapFromEvent(windowHeight, e);
+      setKeyboardHeight(overlap);
+      scrollToEndAfterKeyboard(true);
+    };
+
+    if (Platform.OS === 'ios') {
+      const frameSub = Keyboard.addListener('keyboardWillChangeFrame', applyOverlap);
+      const hideSub = Keyboard.addListener('keyboardWillHide', () => {
+        setKeyboardHeight(0);
+        scrollToEndAfterKeyboard(true);
+      });
+      return () => {
+        frameSub.remove();
+        hideSub.remove();
+      };
+    }
+
+    const showSub = Keyboard.addListener('keyboardDidShow', applyOverlap);
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+      scrollToEndAfterKeyboard(false);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [windowHeight, scrollToEndAfterKeyboard]);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        setKeyboardHeight(0);
+        Keyboard.dismiss();
+      };
+    }, [])
+  );
 
 
   const isOtherUserOnlineFromPayload = useCallback(
@@ -1165,12 +1242,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-      <KeyboardAvoidingView
-        style={styles.screen}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
-        // keyboardVerticalOffset={insets.top}
-      >
+      <View style={styles.screen}>
         <StatusBar barStyle="dark-content" translucent backgroundColor={colors.white}/>
         <View style={styles.headerBar}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -1679,8 +1751,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         style={styles.screen}
         contentContainerStyle={{
           ...styles.scrollContent,
-          // Keep last message visible above dynamic bottom composer height.
-          paddingBottom: (styles.scrollContent?.paddingBottom ?? 16) + composerHeight + 12,
+          // Composer is fixed to bottom; pad for its height + keyboard so messages stay scrollable.
+          paddingBottom:
+            (styles.scrollContent?.paddingBottom ?? 16) + composerHeight + 12 + keyboardHeight,
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -1708,7 +1781,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       </ScrollView>
       </View>
 
-      <View style={styles.bottomComposerContainer} onLayout={handleComposerLayout}>
+      <View
+        style={[styles.bottomComposerContainer, { bottom: keyboardHeight }]}
+        onLayout={handleComposerLayout}
+      >
       {/* Voice bar UI (voice chat disabled) */}
       {/* {voiceBarVisible ? (
         <View style={[styles.voiceBar, { paddingBottom: 12 + insets.bottom }]}>
@@ -2198,7 +2274,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           </View>
         </View>
       </ReusableBottomSheet>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 };

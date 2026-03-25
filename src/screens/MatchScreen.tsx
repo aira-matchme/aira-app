@@ -6,15 +6,18 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
-  KeyboardAvoidingView,
   Keyboard,
   Platform,
   TextInput,
   LayoutChangeEvent,
+  useWindowDimensions,
+  type KeyboardEvent,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { TabStackParamList } from '../navigation/types';
 
 import { BackArrowIcon } from '../assets/icons/common/BackArrowIcon';
 import { TabAICenterIcon } from '../assets/icons/tabs/TabAICenterIcon';
@@ -49,8 +52,34 @@ type ChatItem =
   | { id: string; from: 'user'; text: string }
   | { id: string; from: 'aira'; blocks: AiraBlock[] };
 
+/** Keyboard overlap with the app window — works across iOS/Android OEM quirks. */
+function keyboardOverlapFromEvent(windowHeight: number, e: KeyboardEvent): number {
+  const ec = e.endCoordinates;
+  if (!ec || windowHeight <= 0) return 0;
+
+  if (Platform.OS === 'ios') {
+    const screenY = typeof ec.screenY === 'number' ? ec.screenY : windowHeight;
+    return Math.max(0, Math.min(windowHeight, windowHeight - screenY));
+  }
+
+  let h = typeof ec.height === 'number' && ec.height > 0 ? ec.height : 0;
+  if (typeof ec.screenY === 'number') {
+    const fromScreenY = Math.max(0, windowHeight - ec.screenY);
+    if (h <= 0) {
+      h = fromScreenY;
+    } else if (fromScreenY > 0) {
+      const delta = Math.abs(h - fromScreenY);
+      if (delta > 80) {
+        h = Math.max(h, fromScreenY);
+      }
+    }
+  }
+  return Math.max(0, h);
+}
+
 export const MatchScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<BottomTabNavigationProp<TabStackParamList, 'Match'>>();
+  const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [message, setMessage] = React.useState('');
   const [chatItems, setChatItems] = React.useState<ChatItem[]>([]);
@@ -58,8 +87,9 @@ export const MatchScreen = () => {
   const lastUserMessageRef = React.useRef<string>('');
   const [isTyping, setIsTyping] = React.useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = React.useState(false);
-  const [composerHeight, setComposerHeight] = React.useState(120);
-  const bottomSafeInset = Platform.OS === 'ios' ? insets.bottom : 0;
+  const [composerHeight, setComposerHeight] = React.useState(100);
+  const [keyboardHeight, setKeyboardHeight] = React.useState(0);
+  const bottomSafeInset = insets.bottom;
 
   const hasText = message.trim().length > 0;
   const hasChat = chatItems.length > 0;
@@ -427,6 +457,10 @@ export const MatchScreen = () => {
   useFocusEffect(
     React.useCallback(() => {
       loadChatHistory();
+      return () => {
+        setKeyboardHeight(0);
+        Keyboard.dismiss();
+      };
     }, [loadChatHistory])
   );
 
@@ -438,35 +472,51 @@ export const MatchScreen = () => {
     return () => clearTimeout(id);
   }, [hasChat, chatItems.length]);
 
-  // Android keyboard transitions can leave ScrollView in an incorrect position
-  // after show/hide. Re-sync to bottom with multiple attempts.
-  React.useEffect(() => {
-    if (Platform.OS !== 'android') return;
-
-    const sub = Keyboard.addListener('keyboardDidHide', () => {
-      scrollRef.current?.scrollToEnd({ animated: false });
-    });
-
-    return () => sub.remove();
-  }, []);
-
   const handleComposerLayout = React.useCallback((event: LayoutChangeEvent) => {
     const nextHeight = Math.round(event.nativeEvent.layout.height);
-    if (nextHeight > 0 && nextHeight !== composerHeight) {
-      setComposerHeight(nextHeight);
+    if (nextHeight > 0) {
+      setComposerHeight((prev) => (prev === nextHeight ? prev : nextHeight));
     }
-  }, [composerHeight]);
+  }, []);
 
-  // Keep the thread scrolled when the keyboard opens (pairs with KeyboardAvoidingView on iOS).
-  React.useEffect(() => {
-    const eventName = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const sub = Keyboard.addListener(eventName, () => {
+  const scrollToEndAfterKeyboard = React.useCallback((animated: boolean) => {
+    requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        scrollRef.current?.scrollToEnd({ animated: true });
+        scrollRef.current?.scrollToEnd({ animated });
       });
     });
-    return () => sub.remove();
   }, []);
+
+  React.useEffect(() => {
+    const applyOverlap = (e: KeyboardEvent) => {
+      const overlap = keyboardOverlapFromEvent(windowHeight, e);
+      setKeyboardHeight(overlap);
+      scrollToEndAfterKeyboard(true);
+    };
+
+    if (Platform.OS === 'ios') {
+      // Single source of truth on iOS (show/hide/undock/floating): more reliable than willShow alone.
+      const frameSub = Keyboard.addListener('keyboardWillChangeFrame', applyOverlap);
+      const hideSub = Keyboard.addListener('keyboardWillHide', () => {
+        setKeyboardHeight(0);
+        scrollToEndAfterKeyboard(true);
+      });
+      return () => {
+        frameSub.remove();
+        hideSub.remove();
+      };
+    }
+
+    const showSub = Keyboard.addListener('keyboardDidShow', applyOverlap);
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+      scrollToEndAfterKeyboard(false);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [windowHeight, scrollToEndAfterKeyboard]);
 
   return (
       <View style={styles.screen}>
@@ -474,26 +524,16 @@ export const MatchScreen = () => {
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
           <TouchableOpacity
             onPress={() => {
-              // When opened from a tab press, there may be no back stack.
-              // In that case, go back to Home tab.
-              if ((navigation as { canGoBack?: () => boolean }).canGoBack?.()) {
-                (navigation as { goBack: () => void }).goBack();
-              } else {
-                (navigation as { navigate: (name: string) => void }).navigate('Home');
-              }
+              navigation.navigate('Chat', { screen: 'ChatList' });
             }}
             activeOpacity={0.7}
             style={styles.backButton}
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel="Open chat list"
           >
             <BackArrowIcon size={48} backgroundColor="rgba(255,255,255,0.5)" strokeColor={colors.black} />
           </TouchableOpacity>
-          <KeyboardAvoidingView
-            style={styles.flex}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 8}
-          >
+          <View style={styles.flex}>
             <ScrollView
               ref={scrollRef}
               style={styles.flex}
@@ -501,8 +541,8 @@ export const MatchScreen = () => {
                 flexGrow: 1,
                 paddingHorizontal: 16,
                 paddingTop: 36,
-                // Keep last message visible above dynamic composer height.
-                paddingBottom: composerHeight + 12,
+                // Inset for fixed bottom composer + keyboard so messages stay scrollable above both.
+                paddingBottom: composerHeight + 12 + keyboardHeight,
               }}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
@@ -663,8 +703,9 @@ export const MatchScreen = () => {
             <View
               onLayout={handleComposerLayout}
               style={[
-                styles.composerWrapFixed,
+                styles.composerBottomFixed,
                 {
+                  bottom: keyboardHeight,
                   paddingBottom: 12 + bottomSafeInset,
                 },
               ]}
@@ -703,7 +744,7 @@ export const MatchScreen = () => {
                 </TouchableOpacity>
               </View>
             </View>
-          </KeyboardAvoidingView>
+          </View>
 
         </SafeAreaView>
       </View>
@@ -987,19 +1028,15 @@ export const MatchScreen = () => {
       lineHeight: 18,
       letterSpacing: 0.28,
     },
-    composerWrap: {
-      backgroundColor: colors.white,
-      alignSelf: 'stretch',
-      zIndex: 5,
-    },
-    composerWrapFixed: {
+    composerBottomFixed: {
       position: 'absolute',
       left: 0,
       right: 0,
       bottom: 0,
       backgroundColor: colors.white,
-      alignSelf: 'stretch',
       zIndex: 5,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.neutral[200],
     },
     composerRow: {
       flexDirection: 'row',

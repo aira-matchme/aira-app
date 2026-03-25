@@ -24,6 +24,7 @@ import { getProfileApi } from '../../../modules/auth/api';
 import { useAuthStore } from '../../../store/auth.store';
 import { styles } from './styles';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
+import { PROFILE_SCREEN_EDGES } from '../profileScreenLayout';
 
 type BasicDetailsHeightNavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -149,7 +150,7 @@ export const BasicDetailsHeightScreen: React.FC = () => {
     >
       <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>
         <View style={styles.headerContainer}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}

@@ -47,6 +47,7 @@ import type { ProfileStackParamList } from '../../../navigation/types';
 import { getProfileApi, uploadProfilePhotoApi, deleteProfilePhotoApi } from '../../../modules/auth/api';
 import { useAuthStore } from '../../../store/auth.store';
 import { styles } from './styles';
+import { PROFILE_SCREEN_EDGES } from '../profileScreenLayout';
 
 /** Extract display URL from API gallery image photo (object or string). */
 function getGalleryImageUrl(photo: unknown): string | null {
@@ -435,7 +436,7 @@ export const EditProfileScreen: React.FC = () => {
       <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+      <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>
       <View style={styles.headerContainer}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <BackArrowIcon size={48} />

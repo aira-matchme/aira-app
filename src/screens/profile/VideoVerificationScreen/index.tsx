@@ -30,12 +30,50 @@ import { submitLivenessApi } from '../../../modules/auth/api';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { colors } from '../../../theme';
 import { styles } from './styles';
+import { PROFILE_SCREEN_EDGES } from '../profileScreenLayout';
 import { useAuthStore } from '../../../store/auth.store';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
 
 const { FaceDetection } = NativeModules;
 
-const cameraStyles = StyleSheet.create({ root: { flex: 1, backgroundColor: '#000' }, header: { position: 'absolute', top: 120, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14, }, title: { color: '#fff', fontSize: 16, fontWeight: '600', }, progressContainer: { position: 'absolute', bottom: 110, flexDirection: 'row', alignSelf: 'center', }, progressDot: { width: 18, height: 6, borderRadius: 4, backgroundColor: '#555', marginHorizontal: 6, }, progressDone: { backgroundColor: '#34C759' }, successOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', }, successText: { color: '#34C759', fontSize: 22, fontWeight: '700', }, errorText: { color: '#E50000', fontSize: 16, }, });
+const cameraStyles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: Platform.OS === 'android' ? 'transparent' : '#000',
+  },
+  header: {
+    position: 'absolute',
+    top: 120,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  title: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  progressContainer: {
+    position: 'absolute',
+    bottom: 110,
+    flexDirection: 'row',
+    alignSelf: 'center',
+  },
+  progressDot: {
+    width: 18,
+    height: 6,
+    borderRadius: 4,
+    backgroundColor: '#555',
+    marginHorizontal: 6,
+  },
+  progressDone: { backgroundColor: '#34C759' },
+  successOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successText: { color: '#34C759', fontSize: 22, fontWeight: '700' },
+  errorText: { color: '#E50000', fontSize: 16 },
+});
 
 let FaceDetectionView: any = null;
 
@@ -65,6 +103,15 @@ const LIVENESS_STEP_INDEX: Record<LivenessStep, number> = {
   TURN_RIGHT: 3,
   VERIFIED: 4,
 };
+
+/** User-facing instruction for the current native step. Android: swap left/right so copy matches mirrored front-camera + native head-pose checks. */
+function getLivenessInstructionLabel(step: LivenessStep): string {
+  if (Platform.OS === 'android') {
+    if (step === 'TURN_LEFT') return LIVENESS_STEP_TEXT.TURN_RIGHT;
+    if (step === 'TURN_RIGHT') return LIVENESS_STEP_TEXT.TURN_LEFT;
+  }
+  return LIVENESS_STEP_TEXT[step];
+}
 
 export const VideoVerificationScreen: React.FC = () => {
   const navigation =
@@ -204,7 +251,7 @@ export const VideoVerificationScreen: React.FC = () => {
         {/* Header */}
         <View style={cameraStyles.header}>
           <Text style={cameraStyles.title}>
-            {LIVENESS_STEP_TEXT[livenessStep]}
+            {getLivenessInstructionLabel(livenessStep)}
           </Text>
         </View>
 
@@ -252,9 +299,10 @@ export const VideoVerificationScreen: React.FC = () => {
       <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+      <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>
 
         <ScrollView
+          style={styles.scrollView}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >

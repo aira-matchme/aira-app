@@ -23,6 +23,7 @@ import { useProfileStore } from '../../../store/profile.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { spacing } from '../../../theme';
 import { styles } from './styles';
+import { PROFILE_SCREEN_EDGES } from '../profileScreenLayout';
 
 type BasicDetailsDobNavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -139,7 +140,7 @@ export const BasicDetailsDobScreen: React.FC = () => {
 
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+      <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>
         <View style={{ paddingTop: 16, paddingHorizontal: 20 }}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <BackArrowIcon size={48} />

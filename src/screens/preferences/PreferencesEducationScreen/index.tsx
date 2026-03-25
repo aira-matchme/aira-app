@@ -16,23 +16,18 @@ import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient
 import { BackArrowIcon } from '../../../assets/icons/common/BackArrowIcon';
 import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
+import type { EducationOption } from '../../../store/preferences.store';
 import { usePreferencesStore } from '../../../store/preferences.store';
 import { buildAddPreferencePayload, patchEditPreference } from '../../../modules/preferences/api';
 import { styles } from './styles';
 
-export type EducationOption =
-  | 'phd_dr'
-  | 'masters_or_equivalent'
-  | 'degree_or_equivalent'
-  | 'gcse_or_equivalent'
-  | 'other';
-
 const EDUCATION_OPTIONS: { value: EducationOption; labelKey: keyof typeof STRINGS.PREFERENCES_EDUCATION }[] = [
   { value: 'phd_dr', labelKey: 'PHD_DR' },
-  { value: 'masters_or_equivalent', labelKey: 'MASTER' },
-  { value: 'degree_or_equivalent', labelKey: 'A_LEVEL' },
-  { value: 'gcse_or_equivalent', labelKey: 'GCSE' },
-  { value: 'other', labelKey: 'OTHER' },
+  { value: 'masters_or_above', labelKey: 'MASTER' },
+  { value: 'degree_or_above', labelKey: 'DEGREE_OR_ABOVE' },
+  { value: 'a_level_or_above', labelKey: 'A_LEVEL_OR_ABOVE' },
+  { value: 'gcse_or_above', labelKey: 'GCSE_OR_ABOVE' },
+  { value: 'any', labelKey: 'ANY' },
 ];
 
 type PreferencesEducationNavigationProp = NativeStackNavigationProp<
@@ -87,7 +82,7 @@ export const PreferencesEducationScreen: React.FC = () => {
     <View style={styles.wrapper}>
       <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top', 'bottom']}>
         <View style={styles.headerContainer}>
           <TouchableOpacity
             onPress={handleBack}

@@ -39,10 +39,14 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.white,
   },
-  content: {
+  mainColumn: {
     flex: 1,
+    minHeight: 0,
+    justifyContent: 'space-between',
+  },
+  formSection: {
+    flexShrink: 0,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg
   },
   title: {
     fontSize: 34,
@@ -61,10 +65,13 @@ export const styles = StyleSheet.create({
   },
   inputWrapper: {
     marginTop: spacing.xl * 2,
-    marginBottom: spacing.lg, // add space below input + error to avoid overlap with button
     alignSelf: 'center',
     width: '100%',
     maxWidth: 343,
+    marginBottom: spacing.sm,
+  },
+  inputWrapperWithError: {
+    marginBottom: spacing.xl,
   },
   inputGradient: {
     padding: 1,
@@ -83,13 +90,10 @@ export const styles = StyleSheet.create({
     elevation: 3,
   },
   buttonContainer: {
+    flexShrink: 0,
     paddingHorizontal: spacing.lg,
-    // paddingVertical: spacing.md,
-    // paddingBottom: spacing.sm * 1.5,
-  },
-  buttonContainerAndroid: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm * 1.5,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
   },
   button: {
     height: 56,

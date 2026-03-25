@@ -4,10 +4,11 @@ export type GenderOption = 'man' | 'woman';
 // These keys MUST match backend enums (same as `src/constants/profile.ts`)
 export type EducationOption =
   | 'phd_dr'
-  | 'masters_or_equivalent'
-  | 'degree_or_equivalent'
-  | 'gcse_or_equivalent'
-  | 'other';
+  | 'masters_or_above'
+  | 'degree_or_above'
+  | 'a_level_or_above'
+  | 'gcse_or_above'
+  | 'any';
 export type EmploymentOption =
   | 'employed'
   | 'self_employed'
@@ -18,7 +19,7 @@ export type IncomeOption =
   | 'eur_30k_40k'
   | 'eur_40k_50k'
   | 'eur_50k_plus'
-  | 'any_income';
+  | 'eur_0k_20k';
 export type MaritalStatusOption =
   | 'never_married'
   | 'divorced'
@@ -65,7 +66,7 @@ const defaultState = {
   preferredMaxAge: 30,
   preferredMinHeightcm: 155,
   preferredMaxHeightcm: 170,
-  distanceMilesLow: 10,
+  distanceMilesLow: 0,
   distanceMilesHigh: 20,
   preferredEducation: null as EducationOption | null,
   preferredEmployment: [] as EmploymentOption[],

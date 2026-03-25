@@ -1,4 +1,4 @@
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../../theme';
 
 export const styles = StyleSheet.create({
@@ -116,9 +116,7 @@ export const styles = StyleSheet.create({
   actions: {
     width: '100%',
     paddingHorizontal: spacing.md,
-    
-    // paddingVertical: spacing.md,
-    // paddingBottom: Platform.OS === 'ios' ? spacing.xl * 2 : spacing.xl,
+    paddingBottom: spacing.lg,
   },
   primaryButton: {
     width: '100%',

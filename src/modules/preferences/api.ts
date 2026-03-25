@@ -22,7 +22,21 @@ function mapGenderToApi(gender: GenderOption): string {
 }
 
 function mapEducationToApi(value: EducationOption): string {
-  return value ?? 'other';
+  return value ?? 'any';
+}
+
+function normalizeEducationFromApi(raw: string): EducationOption {
+  if (raw === 'other') return 'any';
+  const allowed: EducationOption[] = [
+    'phd_dr',
+    'masters_or_above',
+    'degree_or_above',
+    'a_level_or_above',
+    'gcse_or_above',
+    'any',
+  ];
+  if ((allowed as string[]).includes(raw)) return raw as EducationOption;
+  return 'any';
 }
 
 function mapIncomeToApi(value: IncomeOption): string {
@@ -70,15 +84,14 @@ type GetPreferencesResponse = Partial<{
 
 function educationFromRank(rank: number): EducationOption {
   // Backend ranks:
-  // phd_dr: 5, masters_or_equivalent: 4, degree_or_equivalent: 3,
-  // a_level_or_equivalent: 2, gcse_or_equivalent: 1, other: 0
-  // Our app currently models "A level or equivalent" as `degree_or_equivalent` in preferences.
+  // phd_dr: 5, masters_or_above: 4, degree_or_above: 3,
+  // a_level_or_above: 2, gcse_or_above: 1, any: 0
   if (rank >= 5) return 'phd_dr';
-  if (rank === 4) return 'masters_or_equivalent';
-  if (rank === 3) return 'degree_or_equivalent';
-  if (rank === 2) return 'degree_or_equivalent';
-  if (rank === 1) return 'gcse_or_equivalent';
-  return 'other';
+  if (rank === 4) return 'masters_or_above';
+  if (rank === 3) return 'degree_or_above';
+  if (rank === 2) return 'a_level_or_above';
+  if (rank === 1) return 'gcse_or_above';
+  return 'any';
 }
 
 const PREFERRED_EMPLOYMENT_VALUES: readonly EmploymentOption[] = [
@@ -100,7 +113,7 @@ function incomeFromOrder(order: number): IncomeOption {
   if (order === 3) return 'eur_40k_50k';
   if (order === 2) return 'eur_30k_40k';
   if (order === 1) return 'eur_20k_30k';
-  return 'any_income';
+  return 'eur_0k_20k';
 }
 
 function hydratePreferencesStoreFromApi(raw: unknown): void {
@@ -129,11 +142,13 @@ function hydratePreferencesStoreFromApi(raw: unknown): void {
   if (typeof data.preferredRadiusKm === 'number') {
     // Distance screen enforces minRange=1, so ensure high >= 2 when hydrating.
     const highMiles = Math.max(2, Math.min(100, Math.round(data.preferredRadiusKm * KM_TO_MILES)));
-    usePreferencesStore.getState().setDistanceMiles(1, highMiles);
+    usePreferencesStore.getState().setDistanceMiles(0, highMiles);
   }
 
   if (typeof data.preferredEducationLevels === 'string') {
-    usePreferencesStore.getState().setPreferredEducation(data.preferredEducationLevels as EducationOption);
+    usePreferencesStore
+      .getState()
+      .setPreferredEducation(normalizeEducationFromApi(data.preferredEducationLevels));
   } else if (typeof data.preferrededucationlevelrank === 'number') {
     usePreferencesStore.getState().setPreferredEducation(educationFromRank(data.preferrededucationlevelrank));
   }
@@ -202,7 +217,7 @@ export function buildAddPreferencePayload(
   );
   const preferredEducationLevels = state.preferredEducation
     ? mapEducationToApi(state.preferredEducation)
-    : 'other';
+    : 'any';
   const preferredEmploymentStatuses =
     state.preferredEmployment.length > 0 ? state.preferredEmployment : [];
   const preferredIncomeRanges = state.preferredIncome

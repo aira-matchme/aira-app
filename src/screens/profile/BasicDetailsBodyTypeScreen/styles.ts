@@ -1,4 +1,4 @@
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../../theme';
 
 export const styles = StyleSheet.create({
@@ -26,6 +26,7 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    minHeight: 0,
     paddingHorizontal: spacing.md,
   },
   title: {
@@ -45,7 +46,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   listContent: {
-    paddingBottom: 100,
+    paddingBottom: spacing.md,
     gap: 8,
   },
   row: {
@@ -96,14 +97,10 @@ export const styles = StyleSheet.create({
     borderColor: colors.secondary[500],
   },
   actions: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     width: '100%',
     paddingHorizontal: spacing.md,
-    paddingBottom: Platform.OS === 'ios' ? spacing.xl * 2 : spacing.xl,
-    paddingTop: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
     backgroundColor: colors.white,
   },
   primaryButton: {

@@ -31,6 +31,16 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     alignSelf: 'stretch',
   },
+  similarImagesHint: {
+    ...typography.body,
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.neutral[600],
+    textAlign: 'center',
+    marginBottom: 16,
+    paddingHorizontal: spacing.md,
+    alignSelf: 'stretch',
+  },
   card: {
     height: 220,
     borderRadius: 16,

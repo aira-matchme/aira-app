@@ -79,7 +79,9 @@ export const TextInput: React.FC<TextInputProps> = ({
         onChangeText={handleChangeText}
         {...rest}
       />
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : null}
     </View>
   );
 };
@@ -105,13 +107,15 @@ const styles = StyleSheet.create({
     borderColor: colors.semantic.error, // Error red from Figma
   },
   errorText: {
-    marginTop: spacing.xs, // 4px
-    marginLeft: spacing.lg + 4, // 20px - align with input padding
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+    marginLeft: spacing.lg + 4,
     fontSize: 14,
     lineHeight: 20,
     letterSpacing: 0.28,
-    color: colors.semantic.error, // Error red from Figma
+    color: colors.semantic.error,
     fontFamily: typography.fontFamily.regular,
+    maxWidth: '100%',
   },
 });
 

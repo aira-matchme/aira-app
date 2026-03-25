@@ -30,6 +30,6 @@ export const AGE_MAX = 80;
 export const HEIGHT_MIN = 140;
 export const HEIGHT_MAX = 220;
 
-// Distance range: 1–100 miles
-export const DISTANCE_MIN = 1;
+// Distance range: 0–100 miles (low end of preference slider)
+export const DISTANCE_MIN = 0;
 export const DISTANCE_MAX = 100;

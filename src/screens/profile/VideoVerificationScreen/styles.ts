@@ -9,6 +9,10 @@ export const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  scrollView: {
+    flex: 1,
+    minHeight: 0,
+  },
   backgroundGlow: {
     position: 'absolute',
     top: 0,
@@ -81,7 +85,7 @@ export const styles = StyleSheet.create({
   buttonContainer: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: spacing.xl * 1.5,
+    paddingBottom: spacing.sm,
   },
   button: {
     width: '100%',

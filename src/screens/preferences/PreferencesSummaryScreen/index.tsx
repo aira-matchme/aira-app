@@ -69,12 +69,14 @@ function getEducationDisplay(value: EducationOption | null): string {
   if (!value) return '—';
   const map: Record<string, keyof typeof STRINGS.PREFERENCES_EDUCATION> = {
     phd_dr: 'PHD_DR',
-    masters_or_equivalent: 'MASTER',
-    degree_or_equivalent: 'A_LEVEL',
-    gcse_or_equivalent: 'GCSE',
-    other: 'OTHER',
+    masters_or_above: 'MASTER',
+    degree_or_above: 'DEGREE_OR_ABOVE',
+    a_level_or_above: 'A_LEVEL_OR_ABOVE',
+    gcse_or_above: 'GCSE_OR_ABOVE',
+    any: 'ANY',
+    other: 'ANY',
   };
-  return STRINGS.PREFERENCES_EDUCATION[map[value] ?? 'OTHER'] ?? '—';
+  return STRINGS.PREFERENCES_EDUCATION[map[value] ?? 'ANY'] ?? '—';
 }
 
 function getEmploymentDisplay(value: EmploymentOption[]): string {
@@ -94,13 +96,13 @@ function getIncomeDisplay(
 ): string {
   if (!value) return '—';
   const map: Record<string, keyof typeof STRINGS.PREFERENCES_INCOME> = {
+    eur_0k_20k: 'RANGE_0_20',
     eur_20k_30k: 'RANGE_20_30',
     eur_30k_40k: 'RANGE_30_40',
     eur_40k_50k: 'RANGE_40_50',
     eur_50k_plus: 'ABOVE_50',
-    any_income: 'ANY_INCOME',
   };
-  return STRINGS.PREFERENCES_INCOME[map[value] ?? 'ANY_INCOME'] ?? '—';
+  return STRINGS.PREFERENCES_INCOME[map[value] ?? 'RANGE_0_20'] ?? '—';
 }
 
 function getReligionDisplay(

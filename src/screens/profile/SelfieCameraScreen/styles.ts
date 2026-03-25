@@ -145,7 +145,7 @@ export const styles = StyleSheet.create({
   // Circular capture button (Figma: white inner, dark outer ring)
   captureButtonContainer: {
     alignItems: 'center',
-    paddingBottom: spacing.xl * 1.5,
+    paddingBottom: spacing.sm,
   },
   captureButtonOuter: {
     width: 72,
@@ -169,7 +169,7 @@ export const styles = StyleSheet.create({
   buttonContainer: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: spacing.xl * 1.5,
+    paddingBottom: spacing.sm,
   },
   button: {
     width: '100%',
@@ -208,7 +208,7 @@ export const styles = StyleSheet.create({
   },
   verifyingButtonContainer: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl * 1.5,
+    paddingBottom: spacing.sm,
   },
   verifyingButton: {
     flexDirection: 'row',

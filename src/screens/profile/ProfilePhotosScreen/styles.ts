@@ -18,6 +18,10 @@ export const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  scrollView: {
+    flex: 1,
+    minHeight: 0,
+  },
   headerContainer: {
   // Align back arrow with other profile screens
   paddingTop: 16,
@@ -37,7 +41,27 @@ export const styles = StyleSheet.create({
     letterSpacing: 0,
     marginBottom: spacing.xl,
   },
-  // Grid and photoCard are computed dynamically in component for 3-column layout
+  photoGrid: {
+    width: '100%',
+    marginBottom: 24,
+    flexDirection: 'column',
+    gap: 12,
+  },
+  photoGridRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  photoCard: {
+    flex: 1,
+    aspectRatio: 1,
+    minWidth: 0,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.neutral[200],
+    backgroundColor: colors.white,
+  },
   photoImage: {
     width: '100%',
     height: '100%',
@@ -62,7 +86,7 @@ export const styles = StyleSheet.create({
   bottomContainer: {
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingTop: spacing.md,
-    paddingBottom: spacing.xl * 1.5,
+    paddingBottom: spacing.sm,
     gap: spacing.md,
   },
   button: {

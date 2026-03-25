@@ -15,7 +15,7 @@ import { usePreferencesStore } from '../../../store/preferences.store';
 import { buildAddPreferencePayload, patchEditPreference } from '../../../modules/preferences/api';
 import { styles } from './styles';
 
-const DISTANCE_MIN_MILES = 1;
+const DISTANCE_MIN_MILES = 0;
 const DISTANCE_MAX_MILES = 100;
 const DISTANCE_STEP = 1;
 const MIN_RANGE_MILES = 1;
@@ -70,7 +70,7 @@ export const PreferencesDistanceScreen: React.FC = () => {
     <View style={styles.wrapper}>
       <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top', 'bottom']}>
         <View style={styles.headerContainer}>
           <TouchableOpacity
             onPress={handleBack}

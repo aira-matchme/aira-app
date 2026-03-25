@@ -26,17 +26,17 @@ export type IncomeOption =
   | 'eur_30k_40k'
   | 'eur_40k_50k'
   | 'eur_50k_plus'
-  | 'any_income';
+  | 'eur_0k_20k';
 
 const INCOME_OPTIONS: {
   value: IncomeOption;
   labelKey: keyof typeof STRINGS.PREFERENCES_INCOME;
 }[] = [
+  { value: 'eur_0k_20k', labelKey: 'RANGE_0_20' },
   { value: 'eur_20k_30k', labelKey: 'RANGE_20_30' },
   { value: 'eur_30k_40k', labelKey: 'RANGE_30_40' },
   { value: 'eur_40k_50k', labelKey: 'RANGE_40_50' },
   { value: 'eur_50k_plus', labelKey: 'ABOVE_50' },
-  { value: 'any_income', labelKey: 'ANY_INCOME' },
 ];
 
 type PreferencesIncomeNavigationProp = NativeStackNavigationProp<
@@ -108,7 +108,7 @@ export const PreferencesIncomeScreen: React.FC = () => {
     <View style={styles.wrapper}>
       <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right','top']}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top', 'bottom']}>
         <View style={styles.headerContainer}>
           <TouchableOpacity
             onPress={handleBack}
@@ -147,7 +147,6 @@ export const PreferencesIncomeScreen: React.FC = () => {
                     styles.optionText,
                     selected === value && styles.optionTextSelected,
                   ]}
-                  numberOfLines={1}
                 >
                   {STRINGS.PREFERENCES_INCOME[labelKey]}
                 </Text>

@@ -23,6 +23,7 @@ import { colors } from '../../../theme';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { uploadSelfieApi } from '../../../modules/auth/api';
 import { styles } from './styles';
+import { PROFILE_SCREEN_EDGES } from '../profileScreenLayout';
 
 type NavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -82,7 +83,7 @@ export const SelfieCameraScreen: React.FC = () => {
   if (!hasPermission) {
     return (
       <View style={styles.wrapper}>
-        <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+        <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>
           <View style={styles.headerContainer}>
             <TouchableOpacity onPress={() => navigation.goBack()}>
               <BackArrowIcon size={48} backgroundColor="rgba(255, 255, 255, 0.2)" strokeColor="white" />
@@ -101,7 +102,7 @@ export const SelfieCameraScreen: React.FC = () => {
   if (!device) {
     return (
       <View style={styles.wrapper}>
-        <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+        <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>
           <View style={styles.headerContainer}>
             <TouchableOpacity onPress={() => navigation.goBack()}>
               <BackArrowIcon size={48} backgroundColor="rgba(255, 255, 255, 0.2)" strokeColor="white" />
@@ -130,7 +131,7 @@ export const SelfieCameraScreen: React.FC = () => {
         />
         <View style={styles.verifyingBackgroundOverlay} />
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+        <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>
           <View style={styles.verifyingContent}>
             <View style={styles.verifyingSelfieCircle}>
               <Image
@@ -182,7 +183,7 @@ export const SelfieCameraScreen: React.FC = () => {
           />
         )}
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+        <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>
           <View style={styles.verifiedContent}>
             <View style={styles.verifiedGreenCircle}>
               <View style={styles.verifiedCheckmarkWrapper}>
@@ -221,7 +222,7 @@ export const SelfieCameraScreen: React.FC = () => {
 
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+      <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>
         <View style={styles.headerContainer}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <BackArrowIcon size={48} backgroundColor="rgba(255, 255, 255, 0.2)" strokeColor="white" />

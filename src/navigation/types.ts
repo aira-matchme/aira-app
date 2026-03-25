@@ -95,9 +95,22 @@ export type AuthStackParamList = {
   Likes: undefined;
 };
 
+export type ChatStackParamList = {
+  ChatList: undefined;
+  ChatDetail: {
+    chatId: string;
+    name: string;
+    avatar?: number | { uri: string };
+    /** When true, show Accept / Decline / Block & Report (request mode) */
+    isRequest?: boolean;
+    /** Other user's id (for block API); required when isRequest is true */
+    otherUserId?: string;
+  };
+};
+
 export type TabStackParamList = {
   Home: undefined;
-  Chat: undefined;
+  Chat: NavigatorScreenParams<ChatStackParamList> | undefined;
   Match: undefined; // Center "ai" tab
   Likes: undefined;
   Profile: undefined;
@@ -137,17 +150,3 @@ export type ProfileStackParamList = {
   ReferenceImageIntro: { returnToProfileMain?: boolean } | undefined;
   ReferenceImagePreference: { returnToProfileMain?: boolean } | undefined;
 };
-
-export type ChatStackParamList = {
-  ChatList: undefined;
-  ChatDetail: {
-    chatId: string;
-    name: string;
-    avatar?: number | { uri: string };
-    /** When true, show Accept / Decline / Block & Report (request mode) */
-    isRequest?: boolean;
-    /** Other user's id (for block API); required when isRequest is true */
-    otherUserId?: string;
-  };
-};
-

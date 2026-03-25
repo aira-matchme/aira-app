@@ -516,7 +516,7 @@ export const MatchDetailsScreen: React.FC = () => {
     switch (level) {
       case 'phd_or_doctorate':
         return 'PhD/ Dr';
-      case 'masters_or_equivalent':
+      case 'masters_or_above':
         return 'Masters or equivalent';
       case 'bachelors_or_equivalent':
         return 'Bachelors or equivalent';

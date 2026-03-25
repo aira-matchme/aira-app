@@ -64,6 +64,7 @@ export const RangeSliderWithLabels: React.FC<RangeSliderWithLabelsProps> = ({
       }}
     >
       <View
+        pointerEvents="none"
         style={[
           styles.labelAbove,
           { left: lowLeft },
@@ -91,6 +92,7 @@ export const RangeSliderWithLabels: React.FC<RangeSliderWithLabelsProps> = ({
       />
 
       <View
+        pointerEvents="none"
         style={[
           styles.labelBelow,
           { left: highLeft },

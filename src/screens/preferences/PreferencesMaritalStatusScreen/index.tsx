@@ -113,7 +113,7 @@ export const PreferencesMaritalStatusScreen: React.FC = () => {
     <View style={styles.wrapper}>
       <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right','top']}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top', 'bottom']}>
         <View style={styles.headerContainer}>
           <TouchableOpacity
             onPress={handleBack}

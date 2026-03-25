@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,8 @@ import {
   Image,
   ScrollView,
   StyleSheet,
-  Platform,
-  Linking,
   ActivityIndicator,
-  useWindowDimensions,
+  InteractionManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -36,6 +34,7 @@ import { colors, typography } from '../../../theme';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { uploadProfilePhotoApi } from '../../../modules/auth/api';
 import { styles } from './styles';
+import { PROFILE_SCREEN_EDGES } from '../profileScreenLayout';
 
 const PHOTO_SLOTS = 6;
 const MIN_PHOTOS_REQUIRED = 2;
@@ -43,34 +42,19 @@ const MIN_PHOTOS_REQUIRED = 2;
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList, 'ProfilePhotos'>;
 
 const GRID_COLUMNS = 3;
-const CARD_GAP = 12;
-const HORIZONTAL_PADDING = 20;
+const GRID_ROWS = 2;
+
+/** After dismissing the permission sheet, iOS often drops the first picker result if we present immediately. */
+const PICKER_AFTER_PERMISSION_MS = 280;
+
+const openNativePickerWhenReady = (openPicker: () => void) => {
+  InteractionManager.runAfterInteractions(() => {
+    setTimeout(openPicker, PICKER_AFTER_PERMISSION_MS);
+  });
+};
 
 export const ProfilePhotosScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { width: screenWidth } = useWindowDimensions();
-  const gridStyles = useMemo(() => {
-    const availableWidth = screenWidth - HORIZONTAL_PADDING * 2;
-    const cardSize = (availableWidth - CARD_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
-    return {
-      grid: {
-        flexDirection: 'row' as const,
-        flexWrap: 'wrap' as const,
-        gap: CARD_GAP,
-        marginBottom: 24,
-      },
-      photoCard: {
-        width: cardSize,
-        height: cardSize,
-        borderRadius: 16,
-        overflow: 'hidden' as const,
-        borderWidth: 1.5,
-        borderStyle: 'dashed' as const,
-        borderColor: colors.neutral[200],
-        backgroundColor: colors.white,
-      },
-    };
-  }, [screenWidth]);
   const [photos, setPhotos] = useState<(string | null)[]>(
     Array(PHOTO_SLOTS).fill(null)
   );
@@ -96,17 +80,18 @@ export const ProfilePhotosScreen: React.FC = () => {
     const uri = response.assets?.[0]?.uri;
     if (!uri) return;
 
-    // Always place in the first empty slot (position 1, 2, 3...) regardless of which slot was tapped
-    const targetIndex = photos.findIndex((p) => p === null);
-    if (targetIndex === -1) return; // all slots full
-
-    const order = targetIndex + 1; // 1-based: 1st slot = order 1, 2nd = order 2, etc.
-
+    // Resolve first empty slot from latest state (picker callbacks must not use a stale `photos` closure).
+    let targetIndex = -1;
     setPhotos((prev) => {
+      targetIndex = prev.findIndex((p) => p === null);
+      if (targetIndex === -1) return prev;
       const next = [...prev];
       next[targetIndex] = uri;
       return next;
     });
+    if (targetIndex === -1) return;
+
+    const order = targetIndex + 1; // 1-based: 1st slot = order 1, 2nd = order 2, etc.
     setUploadedSlots((prev) => {
       const next = new Set(prev);
       next.delete(targetIndex);
@@ -177,7 +162,7 @@ export const ProfilePhotosScreen: React.FC = () => {
       setShowCameraPermissionSheet(false);
       setPendingCameraIndex(null);
       if (status === 'granted') {
-        openCameraForSlot(index);
+        openNativePickerWhenReady(() => openCameraForSlot(index));
       }
     } catch {
       setShowCameraPermissionSheet(false);
@@ -225,7 +210,7 @@ export const ProfilePhotosScreen: React.FC = () => {
       setPendingGalleryIndex(null);
       const hasAccess = status === 'granted' || status === 'limited';
       if (hasAccess) {
-        openGalleryForSlot(index);
+        openNativePickerWhenReady(() => openGalleryForSlot(index));
       }
     } catch {
       setShowGalleryPermissionSheet(false);
@@ -252,7 +237,7 @@ export const ProfilePhotosScreen: React.FC = () => {
       <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+      <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>
         <View style={styles.headerContainer}>
           <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.8}>
             <BackArrowIcon size={48} backgroundColor="#FFFFFF" strokeColor="#000000" />
@@ -260,6 +245,7 @@ export const ProfilePhotosScreen: React.FC = () => {
         </View>
 
         <ScrollView
+          style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
@@ -267,37 +253,41 @@ export const ProfilePhotosScreen: React.FC = () => {
             {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.TITLE}
           </Text>
 
-          <View style={gridStyles.grid}>
-            {photos.map((uri, index) => (
-              (() => {
-                const isUploading = uploadingSlots.has(index);
-                return (
-              <TouchableOpacity
-                key={index}
-                style={gridStyles.photoCard}
-                activeOpacity={0.8}
-                onPress={() => openActionSheet(index)}
-                disabled={isUploading}
-              >
-                {uri ? (
-                  <Image
-                    source={{ uri }}
-                    style={styles.photoImage}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View style={styles.placeholder}>
-                    <AddPhotoIcon stroke={colors.neutral[300]} />
-                  </View>
-                )}
-                {isUploading && (
-                  <View style={sheetStyles.uploadingOverlay}>
-                    <ActivityIndicator size="large" color={colors.white} />
-                  </View>
-                )}
-              </TouchableOpacity>
-                );
-              })()
+          <View style={styles.photoGrid}>
+            {Array.from({ length: GRID_ROWS }, (_, row) => (
+              <View key={row} style={styles.photoGridRow}>
+                {Array.from({ length: GRID_COLUMNS }, (_, col) => {
+                  const index = row * GRID_COLUMNS + col;
+                  const uri = photos[index];
+                  const isUploading = uploadingSlots.has(index);
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.photoCard}
+                      activeOpacity={0.8}
+                      onPress={() => openActionSheet(index)}
+                      disabled={isUploading}
+                    >
+                      {uri ? (
+                        <Image
+                          source={{ uri }}
+                          style={styles.photoImage}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={styles.placeholder}>
+                          <AddPhotoIcon stroke={colors.neutral[300]} />
+                        </View>
+                      )}
+                      {isUploading && (
+                        <View style={sheetStyles.uploadingOverlay}>
+                          <ActivityIndicator size="large" color={colors.white} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             ))}
           </View>
 

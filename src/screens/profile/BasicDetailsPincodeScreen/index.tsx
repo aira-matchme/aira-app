@@ -28,6 +28,7 @@ import { ETHNICITY_OPTIONS } from '../../../constants/profile';
 import { useApiErrorStore } from '../../../store/apiError.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './styles';
+import { PROFILE_SCREEN_EDGES } from '../profileScreenLayout';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
 
 type NavigationProp = NativeStackNavigationProp<
@@ -175,7 +176,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
     <KeyboardAvoidingView
       style={styles.wrapper}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+      keyboardVerticalOffset={0}
     >
       <ProfileScreenGradient />
       <LinearGradient
@@ -193,7 +194,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
       />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+      <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>
         <View style={{ paddingTop: 16, paddingHorizontal: 20 }}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
@@ -204,46 +205,53 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.content}>
-          <Text style={styles.title}>
-            {STRINGS.PROFILE_SETUP.PINCODE?.TITLE || "Let's find people around you"}
-          </Text>
-          <Text style={styles.subtitle}>
-            {STRINGS.PROFILE_SETUP.PINCODE?.SUBTITLE || "We use this to prioritize nearby matches."}
-          </Text>
+        <View style={styles.mainColumn}>
+          <View style={styles.formSection}>
+            <Text style={styles.title}>
+              {STRINGS.PROFILE_SETUP.PINCODE?.TITLE || "Let's find people around you"}
+            </Text>
+            <Text style={styles.subtitle}>
+              {STRINGS.PROFILE_SETUP.PINCODE?.SUBTITLE || "We use this to prioritize nearby matches."}
+            </Text>
 
-          <View style={styles.inputWrapper}>
-            <Controller
-              control={control}
-              name="pincode"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  value={value}
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  placeholder={STRINGS.PROFILE_SETUP.PINCODE?.PLACEHOLDER || 'Enter your postcode'}
-                  keyboardType="default"
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  autoFocus
-                  maxLength={8}
-                  error={errors.pincode?.message || ''}
-                  style={styles.input}
-                />
-              )}
+            <View
+              style={[
+                styles.inputWrapper,
+                errors.pincode?.message ? styles.inputWrapperWithError : null,
+              ]}
+            >
+              <Controller
+                control={control}
+                name="pincode"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <TextInput
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    placeholder={STRINGS.PROFILE_SETUP.PINCODE?.PLACEHOLDER || 'Enter your postcode'}
+                    keyboardType="default"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    autoFocus
+                    maxLength={8}
+                    error={errors.pincode?.message || ''}
+                    style={styles.input}
+                  />
+                )}
+              />
+            </View>
+          </View>
+
+          <View style={styles.buttonContainer}>
+            <Button
+              title={STRINGS.PROFILE_SETUP.COMMON.CONTINUE || "Next"}
+              onPress={handleSubmit(onSubmit)}
+              variant="primary"
+              disabled={!isValid || isLoading}
+              loading={isLoading}
+              style={styles.button}
             />
           </View>
-        </View>
-
-        <View style={Platform.OS === 'ios' ? styles.buttonContainer : styles.buttonContainerAndroid}>
-          <Button
-            title={STRINGS.PROFILE_SETUP.COMMON.CONTINUE || "Next"}
-            onPress={handleSubmit(onSubmit)}
-            variant="primary"
-            disabled={!isValid || isLoading}
-            loading={isLoading}
-            style={styles.button}
-          />
         </View>
       </SafeAreaView>
     </KeyboardAvoidingView>

@@ -113,7 +113,7 @@ export const STRINGS = {
     HEIGHT: {
       TITLE: 'How tall are you?',
       SUBTITLE:
-        'This helps us fine-tune compatibility and profile balance. You can update it anytime.',
+        'This helps us fine-tune compatibility and profile balance.',
       PLACEHOLDER: 'Enter your height',
       UNIT_CM: 'cm',
       UNIT_FT: 'ft',
@@ -123,10 +123,11 @@ export const STRINGS = {
       SUBTITLE: 'Helps us suggest more aligned profiles.',
       OPTIONS: {
         PHD: 'PhD/ Dr',
-        MASTER: 'Master or equivalent',
-        A_LEVEL: 'A level or equivalent',
-        GCSE: 'GCSE or equivalent',
-        OTHER: 'Other',
+        MASTER: 'Master or above',
+        DEGREE: 'Degree or above',
+        A_LEVEL: 'A level or above',
+        GCSE: 'GCSE or above',
+        ANY: 'Any',
       },
     },
     EMPLOYMENT: {
@@ -138,19 +139,18 @@ export const STRINGS = {
         UNEMPLOYED: 'Unemployed',
         STUDENT: 'Student',
      NOT_WORKING: 'Not currently working',
-     ANY_INCOME: 'Any income',
       },
     },
     FINAL: {
       TITLE: "What's your income range?",
       SUBTITLE: 'We only use ranges. Exact numbers are never shown.',
-      SUBTITLE_SECONDARY: '(Range $20,000 - $500,000)',
+      SUBTITLE_SECONDARY: '(Shown in £ thousands)',
       OPTIONS: {
-        BETWEEN_20000_AND_30000: '$20k - $30k',
-        BETWEEN_30000_AND_40000: '$30k - $40k',
-        BETWEEN_40000_AND_50000: '$40k - $50k',
-        OVER_50000: '$50k+',
-        ANY_INCOME: 'Any income',
+        RANGE_0_20: '£0k - £20k',
+        BETWEEN_20000_AND_30000: '£20k - £30k',
+        BETWEEN_30000_AND_40000: '£30k - £40k',
+        BETWEEN_40000_AND_50000: '£40k - £50k',
+        OVER_50000: '£50k+',
       },
       PLACEHOLDER: 'Enter your income range',
     },
@@ -340,12 +340,14 @@ export const STRINGS = {
   },
   PREFERENCES_EDUCATION: {
     TITLE: 'Education preference',
-    SUBTITLE: 'Select what matters to you.',
+    SUBTITLE:
+      "What is the minimum education level you'd like matches to have? We'll show people at that level or higher.",
     PHD_DR: 'PhD/ Dr',
-    MASTER: 'Master or equivalent',
-    A_LEVEL: 'A level or equivalent',
-    GCSE: 'GCSE or equivalent',
-    OTHER: 'Other',
+    MASTER: 'Master or above',
+    DEGREE_OR_ABOVE: 'Degree or above',
+    A_LEVEL_OR_ABOVE: 'A level or above',
+    GCSE_OR_ABOVE: 'GCSE or above',
+    ANY: 'Any',
   },
   PREFERENCES_EMPLOYMENT: {
     TITLE: 'Employment preference',
@@ -359,11 +361,11 @@ export const STRINGS = {
   PREFERENCES_INCOME: {
     TITLE: 'Income preference',
     SUBTITLE: 'Optional - only if this matters to you.',
-    RANGE_20_30: '£20k-30k',
-    RANGE_30_40: '£30k-40k',
-    RANGE_40_50: '£40k-50k',
-    ABOVE_50: '> £50k',
-    ANY_INCOME: 'Any Income',
+    RANGE_0_20: 'any income',
+    RANGE_20_30: '£20k or greater',
+    RANGE_30_40: '£30k or greater',
+    RANGE_40_50: '£40k or greater',
+    ABOVE_50: '£50k or greater',
   },
   PREFERENCES_RELIGION: {
     TITLE: 'Religious preference',
@@ -403,6 +405,11 @@ export const STRINGS = {
     LABEL_MARITAL_STATUS: 'Marital Status',
     LABEL_BODY_TYPE: 'Body type',
     REQUIRED: 'Required',
+  },
+  REFERENCE_IMAGE_PREFERENCE: {
+    TITLE: 'Which of these do you find more attractive?',
+    SIMILAR_IMAGES_HINT:
+      'These images may look very similar or almost identical. Please tap the one you find most attractive.',
   },
   PREFERENCES: {
     FINE_TUNE_TITLE: 'Fine-tune your matches.',

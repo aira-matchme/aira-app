@@ -25,6 +25,7 @@ import { useAuthStore } from '../../../store/auth.store';
 // import { styles } from './styles';
 import { styles } from '../BasicDetailsEducationScreen/styles';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
+import { PROFILE_SCREEN_EDGES } from '../profileScreenLayout';
 
 type NavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -110,7 +111,7 @@ export const BasicDetailsEthnicityScreen: React.FC = () => {
       <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+      <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>
         <View style={styles.content}>
           <View style={{ paddingBottom: 16 }}>
             <TouchableOpacity onPress={() => navigation.goBack()}>

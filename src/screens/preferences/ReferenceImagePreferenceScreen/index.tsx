@@ -31,10 +31,10 @@ import {
 import { colors } from '../../../theme';
 import { styles } from './styles';
 
-/** Humanize field key for question title, e.g. "skin_tone" -> "skin tone" */
-function fieldToQuestion(field: string): string {
-  const label = field.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toLowerCase());
-  return `Which ${label} do you find more attractive?`;
+/** API may send `faceShape`, `face_shape`, etc. */
+function isFaceShapeField(field: string | null | undefined): boolean {
+  if (!field) return false;
+  return field.replace(/_/g, '').toLowerCase() === 'faceshape';
 }
 
 type NavList = AuthStackParamList & ProfileStackParamList;
@@ -213,10 +213,16 @@ export const ReferenceImagePreferenceScreen: React.FC = () => {
             ) : currentPair ? (
               <>
                 {field ? (
-                  <Text style={styles.title} numberOfLines={2}>
-                    Which of these do you find more attractive?
-                    {/* {fieldToQuestion(field)} */}
-                  </Text>
+                  <>
+                    <Text style={styles.title} numberOfLines={2}>
+                      {STRINGS.REFERENCE_IMAGE_PREFERENCE.TITLE}
+                    </Text>
+                    {isFaceShapeField(field) ? (
+                      <Text style={styles.similarImagesHint}>
+                        {STRINGS.REFERENCE_IMAGE_PREFERENCE.SIMILAR_IMAGES_HINT}
+                      </Text>
+                    ) : null}
+                  </>
                 ) : null}
                 {currentPair.map((opt, index) => {
                   const selected = index === selectedIndex;

@@ -25,6 +25,7 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    minHeight: 0,
     paddingHorizontal: spacing.lg,
     // Align title vertically with other profile screens
     paddingTop: spacing.sm * 2,
@@ -83,7 +84,7 @@ export const styles = StyleSheet.create({
   },
   buttonContainer: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl * 1.5,
+    paddingBottom: spacing.sm,
     paddingTop: spacing.md,
   },
   button: {
