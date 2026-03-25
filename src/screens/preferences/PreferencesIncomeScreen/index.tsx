@@ -150,16 +150,6 @@ export const PreferencesIncomeScreen: React.FC = () => {
                 >
                   {STRINGS.PREFERENCES_INCOME[labelKey]}
                 </Text>
-                {/* <View
-                  style={[
-                    styles.checkbox,
-                    selected === value && styles.checkboxSelected,
-                  ]}
-                >
-                  {selected === value && (
-                    <InterestChipCheckIcon size={14} color="#FFFFFF" />
-                  )}
-                </View> */}
               </Pressable>
             ))}
           </ScrollView>

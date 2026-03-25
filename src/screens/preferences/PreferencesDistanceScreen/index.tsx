@@ -18,7 +18,8 @@ import { styles } from './styles';
 const DISTANCE_MIN_MILES = 0;
 const DISTANCE_MAX_MILES = 100;
 const DISTANCE_STEP = 1;
-const MIN_RANGE_MILES = 1;
+// Only "max distance" should be adjustable; minimum is fixed at 0.
+const MIN_RANGE_MILES = 0;
 
 type PreferencesDistanceNavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -34,24 +35,21 @@ export const PreferencesDistanceScreen: React.FC = () => {
   const route = useRoute<PreferencesDistanceRouteProp>();
   const openedEditFromSummary = usePreferencesStore((s) => s.openedEditFromSummary);
   const returnToSummary = (route.params?.returnToSummary ?? false) || openedEditFromSummary;
-  const distanceMilesLow = usePreferencesStore((s) => s.distanceMilesLow);
   const distanceMilesHigh = usePreferencesStore((s) => s.distanceMilesHigh);
   const setDistanceMiles = usePreferencesStore((s) => s.setDistanceMiles);
   const setOpenedEditFromSummary = usePreferencesStore((s) => s.setOpenedEditFromSummary);
-  const [low, setLow] = useState(distanceMilesLow);
   const [high, setHigh] = useState(distanceMilesHigh);
 
   useEffect(() => {
-    setLow(distanceMilesLow);
     setHigh(distanceMilesHigh);
-  }, [distanceMilesLow, distanceMilesHigh]);
+  }, [distanceMilesHigh]);
 
   const handleBack = () => {
     navigation.goBack();
   };
 
   const handleSave = async () => {
-    setDistanceMiles(low, high);
+    setDistanceMiles(DISTANCE_MIN_MILES, high);
     if (returnToSummary) {
       setOpenedEditFromSummary(false);
       try {
@@ -96,10 +94,11 @@ export const PreferencesDistanceScreen: React.FC = () => {
               max={DISTANCE_MAX_MILES}
               step={DISTANCE_STEP}
               minRange={MIN_RANGE_MILES}
-              low={low}
+              mode="singleHigh"
+              fixedLow={DISTANCE_MIN_MILES}
+              low={DISTANCE_MIN_MILES}
               high={high}
               onValueChanged={(l, h) => {
-                setLow(l);
                 setHigh(h);
               }}
               formatLabel={(value) => STRINGS.PREFERENCES.DISTANCE_MILES(value)}

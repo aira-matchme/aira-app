@@ -726,20 +726,20 @@ export const MatchScreen = () => {
                 </View>
 
                 <TouchableOpacity
-                  disabled={!hasText}
+                  disabled={!hasText || isTyping}
                   onPress={() => {
-                    if (!hasText) return;
+                    if (!hasText || isTyping) return;
                     handleSend(message);
                   }}
                   style={
-                    hasText
+                    hasText && !isTyping
                       ? styles.sendButton
                       : [styles.sendButton, styles.sendButtonDisabled]
                   }
                 >
                   <ForwardArrowIcon
                     size={22}
-                    color={hasText ? colors.white : colors.neutral[500]}
+                    color={hasText && !isTyping ? colors.white : colors.neutral[500]}
                   />
                 </TouchableOpacity>
               </View>

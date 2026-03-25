@@ -236,8 +236,17 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const aiSuggestionsRequestIdRef = useRef(0);
   const typingStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const otherUserTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+  // Prevent the "auto scroll to bottom" effect from running when we prepend older messages.
+  // (When pagination prepends items, ScrollView tends to jump if we always scrollToEnd.)
+  const isPrependingOlderMessagesRef = useRef(false);
+  const contentHeightRef = useRef(0);
+  const scrollYRef = useRef(0);
+  const layoutHeightRef = useRef(0);
+  const didInitialScrollToBottomRef = useRef(false);
+  const pendingPrependScrollRef = useRef<{ prevScrollY: number; prevContentHeight: number } | null>(null);
   const handleComposerLayout = useCallback((event: LayoutChangeEvent) => {
     const nextHeight = Math.round(event.nativeEvent.layout.height);
     if (nextHeight > 0) {
@@ -296,6 +305,21 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const isOtherUserOnlineFromPayload = useCallback(
     (payload: unknown): boolean | null => {
       if (!payload || !otherUserId) return null;
+      // Some backends emit arrays or nested objects for presence updates.
+      if (Array.isArray(payload)) {
+        const ids = payload
+          .map((x) => {
+            if (typeof x === 'string' || typeof x === 'number') return String(x);
+            if (x && typeof x === 'object') {
+              const o = x as Record<string, unknown>;
+              return String(o.userId ?? o.user_id ?? o.id ?? o._id ?? o.memberId ?? o.member_id ?? '');
+            }
+            return '';
+          })
+          .filter(Boolean);
+        return ids.includes(String(otherUserId));
+      }
+
       const data = payload as Record<string, unknown>;
 
       const directUserId = String(
@@ -330,7 +354,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             return '';
           })
           .filter(Boolean);
-        return onlineIds.includes(otherUserId);
+        return onlineIds.includes(String(otherUserId));
       }
       return null;
     },
@@ -487,16 +511,50 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       const applies =
         data.sender === otherUserId &&
         (data.receiver === currentUserId || !data.receiver);
-      if (applies) setOtherUserTyping(data.isTyping);
+      if (!applies) return;
+
+      // Some backends only emit "typing=true" and never send "typing=false".
+      // Auto-expire typing so the UI can fall back to "Online".
+      if (otherUserTypingTimeoutRef.current) {
+        clearTimeout(otherUserTypingTimeoutRef.current);
+        otherUserTypingTimeoutRef.current = null;
+      }
+
+      setOtherUserTyping(Boolean(data.isTyping));
+      if (data.isTyping) {
+        otherUserTypingTimeoutRef.current = setTimeout(() => {
+          setOtherUserTyping(false);
+          otherUserTypingTimeoutRef.current = null;
+        }, 2500);
+      }
     });
     const unsubJoinSuccess = socketService.on<unknown>('join_success', (data) => {
       const presence = isOtherUserOnlineFromPayload(data);
+      const shouldLog = (globalThis as any).__DEV__ ?? false;
+      if (shouldLog) {
+        console.log('[ChatDetail] presence event', {
+          chatId,
+          currentUserId,
+          otherUserId,
+          raw: data,
+          parsedPresence: presence,
+        });
+      }
       if (presence !== null) {
         setOtherUserOnline(presence);
       }
     });
     const unsubConnection = socketService.onConnectionChange((connected) => {
       setSocketConnected(connected);
+      const shouldLog = (globalThis as any).__DEV__ ?? false;
+      if (shouldLog) {
+        console.log('[ChatDetail] socket connection change', {
+          connected,
+          chatId,
+          currentUserId,
+          otherUserId,
+        });
+      }
       if (!connected) {
         setOtherUserOnline(false);
       }
@@ -531,6 +589,15 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   }, [chatId, currentUserId, otherUserId, isOtherUserOnlineFromPayload]);
 
   useEffect(() => {
+    return () => {
+      if (otherUserTypingTimeoutRef.current) {
+        clearTimeout(otherUserTypingTimeoutRef.current);
+        otherUserTypingTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!chatId || !currentUserId || !otherUserId) return;
     if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
     if (typingStopRef.current) clearTimeout(typingStopRef.current);
@@ -556,6 +623,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       return;
     }
     setMessagesLoadingMore(true);
+    pendingPrependScrollRef.current = {
+      prevScrollY: scrollYRef.current,
+      prevContentHeight: contentHeightRef.current,
+    };
     const nextPage = messagesPage + 1;
     try {
       const res = await getChatMessagesApi({ chatId, page: nextPage, limit: MESSAGES_PAGE_SIZE });
@@ -568,6 +639,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         : [];
 
       if (list.length > 0) {
+        // Tell the auto-scroll effect that we are prepending older messages,
+        // so it should NOT jump to the bottom.
+        isPrependingOlderMessagesRef.current = true;
         setMessages((prev) => [...list, ...prev]);
         const meta = res.data?.meta;
         const currentPage = meta?.currentPage ?? meta?.pageNo ?? nextPage;
@@ -575,10 +649,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         setMessagesPage(currentPage);
         setMessagesHasMore(currentPage < totalPages);
       } else {
+        pendingPrependScrollRef.current = null;
         setMessagesHasMore(false);
       }
     } catch {
       // keep existing messages; stop further loads on repeated failure
+      pendingPrependScrollRef.current = null;
       setMessagesHasMore(false);
     } finally {
       setMessagesLoadingMore(false);
@@ -587,6 +663,34 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
   useEffect(() => {
     if (messagesLoading || messages.length === 0) return;
+    if (isPrependingOlderMessagesRef.current) {
+      // We prepended older messages due to pagination; keep the current scroll position.
+      // Next message update (e.g. new incoming/append) can scroll as normal.
+      isPrependingOlderMessagesRef.current = false;
+      const pending = pendingPrependScrollRef.current;
+      pendingPrependScrollRef.current = null;
+      if (pending) {
+        // After React prepends content, adjust scrollY by the added content height.
+        requestAnimationFrame(() => {
+          const newContentHeight = contentHeightRef.current;
+          const delta = newContentHeight - pending.prevContentHeight;
+          if (delta > 0) {
+            scrollViewRef.current?.scrollTo({
+              y: pending.prevScrollY + delta,
+              animated: false,
+            });
+          }
+        });
+      }
+      return;
+    }
+    const distanceFromBottom =
+      (contentHeightRef.current ?? 0) -
+      ((scrollYRef.current ?? 0) + (layoutHeightRef.current ?? 0));
+    const isNearBottom = distanceFromBottom < 120;
+    const shouldScrollNow = !didInitialScrollToBottomRef.current || isNearBottom;
+    if (!shouldScrollNow) return;
+    didInitialScrollToBottomRef.current = true;
     const id = setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: false });
     }, 100);
@@ -1219,8 +1323,17 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
   const handleMessagesScroll = useCallback(
     (event: any) => {
-      const { contentOffset } = event.nativeEvent;
-      if (contentOffset.y <= 50) {
+      const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent ?? {};
+      const y = contentOffset?.y ?? 0;
+      scrollYRef.current = y;
+      if (layoutMeasurement?.height != null) {
+        layoutHeightRef.current = layoutMeasurement.height;
+      }
+      if (contentSize?.height != null) {
+        contentHeightRef.current = contentSize.height;
+      }
+
+      if (y <= 50) {
         loadMoreMessages();
       }
     },
@@ -1257,7 +1370,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         </TouchableOpacity>
         <TouchableOpacity style={styles.headerNameWrap} activeOpacity={0.8} onPress={openMatchDetails}>
           <Text style={styles.headerName} numberOfLines={1}>{name}</Text>
-          {otherUserOnline && <Text style={styles.headerOnline}>Online</Text>}
+          {otherUserTyping ? (
+            <Text style={styles.headerOnline}>typing…</Text>
+          ) : (
+            otherUserOnline && <Text style={styles.headerOnline}>Online</Text>
+          )}
         </TouchableOpacity>
         {!askAiraGenerating && generatedReplies == null && (
           <TouchableOpacity
@@ -1479,7 +1596,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 <Text style={styles.airaThinkingTitle}>Aira is thinking...</Text>
               </View>
               <View style={styles.airaThinkingHeaderRight}>
-                <Text style={styles.airaThinkingLeftCount}>2/3 left</Text>
+                {/* <Text style={styles.airaThinkingLeftCount}>2/3 left</Text> */}
                 <InformativeIcon width={14} height={14} color={colors.neutral[700]} />
               </View>
             </View>
@@ -1749,6 +1866,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       <ScrollView
         ref={scrollViewRef}
         style={styles.screen}
+        onLayout={(e) => {
+          layoutHeightRef.current = e.nativeEvent.layout.height;
+        }}
         contentContainerStyle={{
           ...styles.scrollContent,
           // Composer is fixed to bottom; pad for its height + keyboard so messages stay scrollable.
@@ -1758,6 +1878,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         onScroll={handleMessagesScroll}
+        onContentSizeChange={(w, h) => {
+          contentHeightRef.current = h;
+        }}
         scrollEventThrottle={16}
       >
         {messagesLoading ? (
@@ -1970,7 +2093,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               </TouchableOpacity>
               <TextInput
                 style={styles.input}
-                placeholder={STRINGS.CHAT.START_CHAT_PLACEHOLDER}
+                placeholder={otherUserTyping ? 'typing…' : STRINGS.CHAT.START_CHAT_PLACEHOLDER}
                 placeholderTextColor={colors.neutral[600]}
                 value={inputText}
                 onChangeText={setInputText}

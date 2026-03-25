@@ -361,7 +361,7 @@ export const STRINGS = {
   PREFERENCES_INCOME: {
     TITLE: 'Income preference',
     SUBTITLE: 'Optional - only if this matters to you.',
-    RANGE_0_20: 'any income',
+    RANGE_0_20: '£0k or greater',
     RANGE_20_30: '£20k or greater',
     RANGE_30_40: '£30k or greater',
     RANGE_40_50: '£40k or greater',

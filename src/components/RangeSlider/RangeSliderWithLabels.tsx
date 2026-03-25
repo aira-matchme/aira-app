@@ -17,9 +17,15 @@ interface RangeSliderWithLabelsProps {
   high: number;
   onValueChanged: (low: number, high: number) => void;
   formatLabel: (value: number) => string;
-  renderThumb: () => React.ReactNode;
+  renderThumb: (name: 'high' | 'low') => React.ReactNode;
   renderRail: () => React.ReactNode;
   renderRailSelected: () => React.ReactNode;
+  /**
+   * When `singleHigh` is enabled, the slider behaves like a single picker:
+   * only the `high` value is adjustable, while `low` is treated as fixed.
+   */
+  mode?: 'range' | 'singleHigh';
+  fixedLow?: number;
 }
 
 /** Range slider with both labels visible - low above left thumb, high below right thumb */
@@ -35,13 +41,19 @@ export const RangeSliderWithLabels: React.FC<RangeSliderWithLabelsProps> = ({
   renderThumb,
   renderRail,
   renderRailSelected,
+  mode = 'range',
+  fixedLow = min,
 }) => {
   const [wrapperWidth, setWrapperWidth] = React.useState(0);
   const [lowLabelWidth, setLowLabelWidth] = React.useState(0);
   const [highLabelWidth, setHighLabelWidth] = React.useState(0);
+  const [singleLabelWidth, setSingleLabelWidth] = React.useState(0);
+
   const range = Math.max(max - min, 1);
+
   const lowRatio = (low - min) / range;
   const highRatio = (high - min) / range;
+  const singleValueRatio = (high - min) / range;
 
   const getClampedLeft = React.useCallback(
     (ratio: number, labelWidth: number) => {
@@ -55,6 +67,9 @@ export const RangeSliderWithLabels: React.FC<RangeSliderWithLabelsProps> = ({
 
   const lowLeft = getClampedLeft(lowRatio, lowLabelWidth);
   const highLeft = getClampedLeft(highRatio, highLabelWidth);
+  const singleLeft = getClampedLeft(singleValueRatio, singleLabelWidth);
+
+  const isSingleHigh = mode === 'singleHigh';
 
   return (
     <View
@@ -63,47 +78,72 @@ export const RangeSliderWithLabels: React.FC<RangeSliderWithLabelsProps> = ({
         setWrapperWidth(event.nativeEvent.layout.width);
       }}
     >
-      <View
-        pointerEvents="none"
-        style={[
-          styles.labelAbove,
-          { left: lowLeft },
-        ]}
-        onLayout={(event) => {
-          const nextWidth = event.nativeEvent.layout.width;
-          if (nextWidth !== lowLabelWidth) setLowLabelWidth(nextWidth);
-        }}
-      >
-        <Label text={formatLabel(low)} pointerDirection="down" />
-      </View>
+      {!isSingleHigh && (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.labelAbove,
+            { left: lowLeft },
+          ]}
+          onLayout={(event) => {
+            const nextWidth = event.nativeEvent.layout.width;
+            if (nextWidth !== lowLabelWidth) setLowLabelWidth(nextWidth);
+          }}
+        >
+          <Label text={formatLabel(low)} pointerDirection="down" />
+        </View>
+      )}
 
       <RangeSlider
         style={styles.slider}
         min={min}
         max={max}
         step={step}
-        minRange={minRange}
-        low={low}
-        high={high}
+        minRange={isSingleHigh ? 0 : minRange}
+        low={isSingleHigh ? high : low}
+        high={isSingleHigh ? undefined : high}
+        disableRange={isSingleHigh}
         renderThumb={renderThumb}
         renderRail={renderRail}
         renderRailSelected={renderRailSelected}
-        onValueChanged={(l, h) => onValueChanged(l, h)}
+        onValueChanged={(l, h) => {
+          if (isSingleHigh) {
+            onValueChanged(fixedLow, l);
+            return;
+          }
+          onValueChanged(l, h);
+        }}
       />
 
-      <View
-        pointerEvents="none"
-        style={[
-          styles.labelBelow,
-          { left: highLeft },
-        ]}
-        onLayout={(event) => {
-          const nextWidth = event.nativeEvent.layout.width;
-          if (nextWidth !== highLabelWidth) setHighLabelWidth(nextWidth);
-        }}
-      >
-        <Label text={formatLabel(high)} pointerDirection="up" />
-      </View>
+      {isSingleHigh ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.labelBelow,
+            { left: singleLeft },
+          ]}
+          onLayout={(event) => {
+            const nextWidth = event.nativeEvent.layout.width;
+            if (nextWidth !== singleLabelWidth) setSingleLabelWidth(nextWidth);
+          }}
+        >
+          <Label text={formatLabel(high)} pointerDirection="up" />
+        </View>
+      ) : (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.labelBelow,
+            { left: highLeft },
+          ]}
+          onLayout={(event) => {
+            const nextWidth = event.nativeEvent.layout.width;
+            if (nextWidth !== highLabelWidth) setHighLabelWidth(nextWidth);
+          }}
+        >
+          <Label text={formatLabel(high)} pointerDirection="up" />
+        </View>
+      )}
     </View>
   );
 };
