@@ -37,6 +37,7 @@ import { getProfileApi } from '../../modules/auth/api';
 import { styles } from './styles';
 import { HomeFilterIcon } from '../../assets/icons/home/HomeFilterIcon';
 import { GENDER_OPTIONS } from '../../constants/profile';
+import DeviceInfo from 'react-native-device-info';
 
 const AIRA_PLUS_CARD_IMAGE = require('../../assets/images/AiraPlusCardBackground.png');
 const PRIVACY_POLICY_URL = 'https://airamatchme.com/privacy';
@@ -133,6 +134,12 @@ export const ProfileTabScreen = () => {
     (user as any)?.nickname ??
     user?.name ??
     'Guest';
+
+  const appVersionLabel = React.useMemo(() => {
+    const v = DeviceInfo.getVersion();
+    const build = DeviceInfo.getBuildNumber();
+    return build ? `Version ${v}-${build}` : `Version ${v}`;
+  }, []);
 
   const genderKey = (user as any)?.gender;
   const genderDisplay =
@@ -265,7 +272,7 @@ export const ProfileTabScreen = () => {
             <View style={styles.footerLogo}>
               <LogoWordmarkGradient width={116} height={56} />
             </View>
-            <Text style={styles.version}>Version 2026.0.1-123</Text>
+            <Text style={styles.version}>{appVersionLabel}</Text>
           <TouchableOpacity style={styles.logoutButton} onPress={logout} activeOpacity={0.9}>
               <LinearGradient
                 colors={[colors.secondary.lavender, colors.primary.purple] as [string, string]}

@@ -53,11 +53,22 @@ const openNativePickerWhenReady = (openPicker: () => void) => {
   });
 };
 
+function pickLocalUriFromPickerResponse(response: {
+  assets?: Array<{ uri?: string; originalPath?: string }>;
+}): string | null {
+  const a = response.assets?.[0];
+  const raw = a?.uri ?? a?.originalPath;
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  return raw.trim();
+}
+
 export const ProfilePhotosScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const [photos, setPhotos] = useState<(string | null)[]>(
     Array(PHOTO_SLOTS).fill(null)
   );
+  const photosRef = useRef<(string | null)[]>(photos);
+  photosRef.current = photos;
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [showCameraPermissionSheet, setShowCameraPermissionSheet] = useState(false);
@@ -70,26 +81,31 @@ export const ProfilePhotosScreen: React.FC = () => {
   const [uploadedSlots, setUploadedSlots] = useState<Set<number>>(new Set());
 
   const handlePickerResponse = async (
-    response: { didCancel?: boolean; errorCode?: string; errorMessage?: string; assets?: Array<{ uri?: string }> },
-    _tappedIndex: number
+    response: { didCancel?: boolean; errorCode?: string; errorMessage?: string; assets?: Array<{ uri?: string; originalPath?: string }> },
+    tappedIndex: number
   ) => {
     if (response.didCancel) return;
     if (response.errorCode) {
       return;
     }
-    const uri = response.assets?.[0]?.uri;
+    const uri = pickLocalUriFromPickerResponse(response);
     if (!uri) return;
 
-    // Resolve first empty slot from latest state (picker callbacks must not use a stale `photos` closure).
-    let targetIndex = -1;
-    setPhotos((prev) => {
-      targetIndex = prev.findIndex((p) => p === null);
-      if (targetIndex === -1) return prev;
-      const next = [...prev];
+    // Resolve slot synchronously. Do not rely on `targetIndex` from inside `setPhotos`:
+    // picker callbacks run from native code; the updater may not run before the next line,
+    // so `targetIndex` stayed -1 and the upload never ran.
+    const prev = photosRef.current;
+    const fromTap =
+      tappedIndex >= 0 && tappedIndex < PHOTO_SLOTS ? tappedIndex : null;
+    const firstEmpty = prev.findIndex((p) => p === null);
+    const targetIndex = fromTap != null ? fromTap : firstEmpty;
+    if (targetIndex === -1) return;
+
+    setPhotos((p) => {
+      const next = [...p];
       next[targetIndex] = uri;
       return next;
     });
-    if (targetIndex === -1) return;
 
     const order = targetIndex + 1; // 1-based: 1st slot = order 1, 2nd = order 2, etc.
     setUploadedSlots((prev) => {
@@ -133,7 +149,11 @@ export const ProfilePhotosScreen: React.FC = () => {
 
   const openCameraForSlot = (index: number) => {
     launchCamera(
-      { mediaType: 'photo', quality: 0.8 },
+      {
+        mediaType: 'photo',
+        quality: 0.8,
+        saveToPhotos: false,
+      },
       (response) => handlePickerResponse(response, index)
     );
   };
@@ -145,7 +165,7 @@ export const ProfilePhotosScreen: React.FC = () => {
 
     const status = await checkCameraPermission();
     if (status === 'granted') {
-      openCameraForSlot(index);
+      openNativePickerWhenReady(() => openCameraForSlot(index));
       return;
     }
 
@@ -192,7 +212,7 @@ export const ProfilePhotosScreen: React.FC = () => {
 
     if (hasAccess) {
       setPendingGalleryIndex(null);
-      openGalleryForSlot(index);
+      openNativePickerWhenReady(() => openGalleryForSlot(index));
       return;
     }
 

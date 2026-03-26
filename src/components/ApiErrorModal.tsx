@@ -1,8 +1,8 @@
 /**
- * Reusable API error modal (Figma: Something went wrong).
+ * Reusable API error modal (Figma: Something went wrong / No internet).
  * - Shows title, message, and an OK button (no Retry).
  * - OK or backdrop/drag closes the modal.
- * - Auto-closes after 5 seconds.
+ * - Auto-closes after 5 seconds (generic only; network stays until user dismisses or reconnects).
  *
  * Use globally: useApiErrorStore.getState().showError(message) from anywhere
  * (e.g. API interceptors). Or use as controlled: <ApiErrorModal visible={...} onClose={...} message={...} />.
@@ -12,6 +12,9 @@ import { View, Text, StyleSheet } from 'react-native';
 import { ReusableBottomSheet } from './BottomSheet';
 import { Button } from './Button';
 import { InformativeIcon } from '../assets/icons/common/InformativeIcon';
+import { NoInternetConnectionIcon } from '../assets/icons/common/NoInternetConnectionIcon';
+import { STRINGS } from '../constants/strings';
+import type { ApiErrorVariant } from '../store/apiError.store';
 import { colors, typography, spacing } from '../theme';
 
 const AUTO_CLOSE_MS = 5000;
@@ -25,6 +28,8 @@ export interface ApiErrorModalProps {
   message?: string;
   /** Optional title (default: "Something went wrong") */
   title?: string;
+  /** `network` uses Figma offline artwork and copy */
+  variant?: ApiErrorVariant;
 }
 
 const DEFAULT_TITLE = 'Something went wrong';
@@ -34,9 +39,15 @@ const DEFAULT_MESSAGE =
 export const ApiErrorModal: React.FC<ApiErrorModalProps> = ({
   visible,
   onClose,
-  message = DEFAULT_MESSAGE,
-  title = DEFAULT_TITLE,
+  message,
+  title,
+  variant = 'generic',
 }) => {
+  const isNetwork = variant === 'network';
+  const resolvedTitle = title ?? (isNetwork ? STRINGS.GENERAL.NO_INTERNET_TITLE : DEFAULT_TITLE);
+  const resolvedMessage =
+    message ?? (isNetwork ? STRINGS.GENERAL.NO_INTERNET_MESSAGE : DEFAULT_MESSAGE);
+
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearAutoClose = () => {
@@ -47,7 +58,7 @@ export const ApiErrorModal: React.FC<ApiErrorModalProps> = ({
   };
 
   useEffect(() => {
-    if (!visible) {
+    if (!visible || isNetwork) {
       clearAutoClose();
       return;
     }
@@ -56,7 +67,7 @@ export const ApiErrorModal: React.FC<ApiErrorModalProps> = ({
       onClose();
     }, AUTO_CLOSE_MS);
     return clearAutoClose;
-  }, [visible, onClose]);
+  }, [visible, onClose, isNetwork]);
 
   const handleClose = () => {
     clearAutoClose();
@@ -74,11 +85,17 @@ export const ApiErrorModal: React.FC<ApiErrorModalProps> = ({
       scrollEnabled={false}
     >
       <View style={styles.content}>
-        <View style={styles.iconCircle}>
-          <InformativeIcon width={40} height={40} />
-        </View>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.message}>{message}</Text>
+        {isNetwork ? (
+          <View style={styles.networkIconWrap}>
+            <NoInternetConnectionIcon width={80} height={80} />
+          </View>
+        ) : (
+          <View style={styles.iconCircle}>
+            <InformativeIcon width={40} height={40} />
+          </View>
+        )}
+        <Text style={styles.title}>{resolvedTitle}</Text>
+        <Text style={styles.message}>{resolvedMessage}</Text>
         <Button
           title="OK"
           onPress={handleClose}
@@ -104,6 +121,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
+  },
+  networkIconWrap: {
+    marginBottom: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     ...typography.h3,

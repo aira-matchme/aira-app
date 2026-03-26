@@ -13,6 +13,7 @@ import { useAuthStore } from '../store/auth.store';
 import { useApiErrorStore } from '../store/apiError.store';
 import { getPostAuthScreen } from './getPostAuthScreen';
 import { ApiErrorModal } from '../components/ApiErrorModal';
+import ConnectivityWatcher from '../components/ConnectivityWatcher';
 import { RequestTimeoutModal } from '../components/RequestTimeoutModal';
 
 const RootStack = createNativeStackNavigator();
@@ -20,7 +21,12 @@ const RootStack = createNativeStackNavigator();
 export const RootNavigator = () => {
   const { isAuthenticated, isLoading, user, shouldShowEnableNotifications, preferenceFlowCompleted } =
     useAuthStore();
-  const { visible: apiErrorVisible, message: apiErrorMessage, hideError: hideApiError } = useApiErrorStore();
+  const {
+    visible: apiErrorVisible,
+    message: apiErrorMessage,
+    variant: apiErrorVariant,
+    hideError: hideApiError,
+  } = useApiErrorStore();
   const postAuthScreen = getPostAuthScreen(user ?? null, shouldShowEnableNotifications);
   const shouldShowTabs =
     isAuthenticated && (postAuthScreen === 'Likes' || preferenceFlowCompleted);
@@ -42,10 +48,12 @@ export const RootNavigator = () => {
 
   return (
     <NavigationContainer>
+      <ConnectivityWatcher />
       <ApiErrorModal
         visible={apiErrorVisible}
         onClose={hideApiError}
         message={apiErrorMessage}
+        variant={apiErrorVariant}
       />
       <RequestTimeoutModal />
       <RootStack.Navigator screenOptions={{ headerShown: false }}>

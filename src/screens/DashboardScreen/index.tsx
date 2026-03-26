@@ -603,7 +603,9 @@ export const DashboardScreen = () => {
                   Request sent
                 </Text>
                 <Text style={[styles.firstMoveSubtitle, { fontSize: 12, lineHeight: 16 }]}>
-                  Waiting for {selectedMatch?.name ?? 'them'} to respond. You'll get notified when they do.
+                  {selectedMatch?.name
+                    ? `I've sent ${selectedMatch.name} a request. Once they reply, I'll let you know.`
+                    : "I've sent them a request. Once they reply, I'll let you know."}
                 </Text>
               </View>
             </View>

@@ -151,6 +151,30 @@ function formatMessageTimestamp(value: string | number | undefined): string {
   return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
 }
 
+/**
+ * add-chat-list returns chat id at `data.chat.id` (see API envelope: data.data.chat).
+ * Older code only read `data.chatId` / `data.id`, so `effectiveChatId` was always null.
+ */
+function extractChatIdFromAddChatResponse(addRes: { data?: unknown }): string | null {
+  const body = addRes?.data as Record<string, unknown> | undefined;
+  if (!body) return null;
+  const inner = body.data as Record<string, unknown> | undefined;
+  const chat = inner?.chat as Record<string, unknown> | undefined;
+  const fromChat = chat?.id ?? chat?._id;
+  if (typeof fromChat === 'string' && fromChat.length > 0) return fromChat;
+  if (inner) {
+    for (const key of ['chatId', 'id', '_id'] as const) {
+      const v = inner[key];
+      if (typeof v === 'string' && v.length > 0) return v;
+    }
+  }
+  for (const key of ['chatId', 'id', '_id'] as const) {
+    const v = body[key];
+    if (typeof v === 'string' && v.length > 0) return v;
+  }
+  return null;
+}
+
 /** Keyboard overlap with the app window (aligned with MatchScreen). */
 function keyboardOverlapFromEvent(windowHeight: number, e: KeyboardEvent): number {
   const ec = e.endCoordinates;
@@ -1068,6 +1092,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     const replyToPayload = replyingTo?.messageId ?? null;
     try {
       let effectiveChatId = chatId;
+      let justCreatedChatViaAdd = false;
 
       // If there is no existing chat, create it first with the first message
       if (!effectiveChatId) {
@@ -1076,11 +1101,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           receiverId: otherUserId,
           firstMessage: trimmed,
         });
-        effectiveChatId =
-          addRes.data?.chatId ??
-          addRes.data?.id ??
-          (addRes.data?.data && (addRes.data.data.chatId ?? addRes.data.data.id)) ??
-          null;
+        effectiveChatId = extractChatIdFromAddChatResponse(addRes);
 
         if (!effectiveChatId) {
           setSendLoading(false);
@@ -1090,33 +1111,62 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         setChatId(effectiveChatId);
         // Update navigation params so future navigations have the chat id
         navigation.setParams({ chatId: effectiveChatId } as any);
+        justCreatedChatViaAdd = true;
       }
 
       if (trimmed) {
         socketService.typing(currentUserId, otherUserId, false);
-        const res = await sendMessageApi({
-          chatId: effectiveChatId!,
-          content: trimmed,
-          messageType: 'text',
-          files: [],
-          replyTo: replyToPayload,
-        });
-        const apiMessage = (res?.data as unknown) as ChatMessageApiItem | undefined;
-        if (apiMessage) {
-          const ui = mapApiMessageToChatMessage(apiMessage, currentUserId);
-          if (ui) {
-            setMessages((prev) => [...prev, ui as ChatMessage]);
+        if (justCreatedChatViaAdd) {
+          // firstMessage is already stored by addChat — avoid duplicate sendMessage + clear UI now
+          setInputText('');
+          setReplyingTo(null);
+          try {
+            const msgRes = await getChatMessagesApi({
+              chatId: effectiveChatId!,
+              page: 1,
+              limit: MESSAGES_PAGE_SIZE,
+            });
+            const raw = msgRes.data?.list ?? msgRes.data?.messages ?? [];
+            const list = Array.isArray(raw)
+              ? raw
+                  .map((item) => mapApiMessageToChatMessage(item, currentUserId ?? undefined))
+                  .filter((m): m is ChatMessage => m != null)
+                  .reverse()
+              : [];
+            setMessages(list);
+            const meta = msgRes.data?.meta;
+            const currentPage = meta?.currentPage ?? meta?.pageNo ?? 1;
+            const totalPages = meta?.totalPages ?? 1;
+            setMessagesPage(currentPage);
+            setMessagesHasMore(currentPage < totalPages);
+          } catch {
+            // useEffect on chatId will still try to load messages
           }
-          if (currentUserId && otherUserId) {
-            socketService.messageSendFromApi(
-              currentUserId,
-              otherUserId,
-              apiMessage as unknown as Record<string, unknown>
-            );
+        } else {
+          const res = await sendMessageApi({
+            chatId: effectiveChatId!,
+            content: trimmed,
+            messageType: 'text',
+            files: [],
+            replyTo: replyToPayload,
+          });
+          const apiMessage = (res?.data as unknown) as ChatMessageApiItem | undefined;
+          if (apiMessage) {
+            const ui = mapApiMessageToChatMessage(apiMessage, currentUserId);
+            if (ui) {
+              setMessages((prev) => [...prev, ui as ChatMessage]);
+            }
+            if (currentUserId && otherUserId) {
+              socketService.messageSendFromApi(
+                currentUserId,
+                otherUserId,
+                apiMessage as unknown as Record<string, unknown>
+              );
+            }
           }
+          setInputText('');
+          setReplyingTo(null);
         }
-        setInputText('');
-        setReplyingTo(null);
       }
       for (const att of pendingAttachments) {
         const messageType = getMessageTypeFromAttachment(att);
@@ -1358,9 +1408,13 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       <View style={styles.screen}>
         <StatusBar barStyle="dark-content" translucent backgroundColor={colors.white}/>
         <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('ChatList')}
+          accessibilityRole="button"
+          accessibilityLabel="Back to chats"
+        >
           <BackArrowIcon size={48} />
-          </TouchableOpacity>
+        </TouchableOpacity>
         <TouchableOpacity activeOpacity={0.8} onPress={openMatchDetails}>
           {avatar != null ? (
             <Image source={avatar} style={styles.headerAvatar} resizeMode="cover" />

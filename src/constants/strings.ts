@@ -4,6 +4,9 @@
 export const STRINGS = {
   GENERAL: {
     ERROR_TRY_AGAIN: 'Something went wrong. Please try again.',
+    NO_INTERNET_TITLE: 'No internet connection',
+    NO_INTERNET_MESSAGE:
+      'Please check your Wi-Fi or mobile data and try again.',
   },
   // Email Login Screen
   EMAIL_LOGIN: {
@@ -361,7 +364,7 @@ export const STRINGS = {
   PREFERENCES_INCOME: {
     TITLE: 'Income preference',
     SUBTITLE: 'Optional - only if this matters to you.',
-    RANGE_0_20: '£0k or greater',
+    RANGE_0_20: 'Any income',
     RANGE_20_30: '£20k or greater',
     RANGE_30_40: '£30k or greater',
     RANGE_40_50: '£40k or greater',

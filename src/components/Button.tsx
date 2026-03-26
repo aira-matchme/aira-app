@@ -27,6 +27,7 @@ interface ButtonProps {
 
 const HEIGHT = 54;
 const RADIUS = 100;
+const SIDE_SLOT = 24;
 
 export const Button: React.FC<ButtonProps> = ({
   title,
@@ -63,27 +64,6 @@ export const Button: React.FC<ButtonProps> = ({
       );
     }
 
-    // ⏳ LOADING STATE
-    if (loading) {
-      return (
-        <Pressable style={[styles.wrapper, style]} disabled>
-          <LinearGradient
-            colors={[...colors.gradients.primary.colors]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0.88, y: 1 }}
-            style={styles.gradientLoading}
-          >
-            <View style={styles.contentRow}>
-              <ActivityIndicator size="small" color={colors.white} />
-              <Text style={[styles.text, styles.loadingText, textStyle]}>
-                {title}
-              </Text>
-            </View>
-          </LinearGradient>
-        </Pressable>
-      );
-    }
-
     // 🔥 NORMAL PRIMARY
     return (
       <Pressable
@@ -104,9 +84,17 @@ export const Button: React.FC<ButtonProps> = ({
           style={styles.gradient}
         >
           <View style={styles.contentRow}>
-            {leftIcon ? leftIcon : null}
+            <View style={styles.sideSlot} pointerEvents="none">
+              {loading ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                leftIcon ?? null
+              )}
+            </View>
             <Text style={[styles.text, textStyle]}>{title}</Text>
-            {rightIcon ? rightIcon : null}
+            <View style={styles.sideSlot} pointerEvents="none">
+              {loading ? null : rightIcon ?? null}
+            </View>
           </View>
         </LinearGradient>
       </Pressable>
@@ -153,20 +141,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden', // ✅ safe clipping
   },
 
-  gradientLoading: {
-    flex: 1,
-    borderRadius: RADIUS,
+  contentRow: {
+    width: '100%',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
-    overflow: 'hidden',
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
   },
 
-  contentRow: {
-    flexDirection: 'row',
+  sideSlot: {
+    width: SIDE_SLOT,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
   },
 
   text: {
@@ -210,8 +197,4 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
 
-  loadingText: {
-    color: colors.white,
-    marginLeft: 0,
-  },
 });

@@ -7,6 +7,20 @@ import { env } from '../../config/env';
 const isTimeoutError = (error: { code?: string; message?: string }) =>
   error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout');
 
+const isNetworkError = (error: {
+  message?: string;
+  code?: string;
+  response?: unknown;
+  request?: unknown;
+}) => {
+  if (isTimeoutError(error)) return false;
+  return (
+    error.message === 'Network Error' ||
+    error.code === 'ERR_NETWORK' ||
+    (!error.response && !!error.request)
+  );
+};
+
 export const setupInterceptors = () => {
   // Request interceptor - add auth token and API key
   apiClient.interceptors.request.use(
@@ -73,14 +87,18 @@ export const setupInterceptors = () => {
         return Promise.reject(error);
       }
 
+      // Offline / transport failure: Figma "no internet" sheet (not server error body)
+      if (isNetworkError(error)) {
+        useApiErrorStore.getState().showError(undefined, { variant: 'network' });
+        return Promise.reject(error);
+      }
+
       // Show global API error modal for other errors (not 401)
       const message =
         error.response?.data?.message ??
         error.response?.data?.error ??
-        (error.message === 'Network Error' || error.code === 'ERR_NETWORK'
-          ? 'Network error. Please check your connection.'
-          : 'Something went wrong. Please try again.');
-      useApiErrorStore.getState().showError(message);
+        'Something went wrong. Please try again.';
+      useApiErrorStore.getState().showError(message, { variant: 'generic' });
 
       return Promise.reject(error);
     }
