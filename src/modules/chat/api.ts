@@ -444,7 +444,7 @@ function formatMessageTime(iso?: string): string {
 }
 
 const AIRA_REQUEST_SENT_TEXT =
-  'Aira has send Request for messsage once they accept then you are able to chat with him';
+  'Aira has sent a request message. Once they accept, you will be able to chat with them.';
 
 function getSenderIdFromMessage(item: ChatMessageApiItem): string | null {
   const sender = item.sender;
@@ -460,11 +460,12 @@ function getSenderIdFromMessage(item: ChatMessageApiItem): string | null {
 
 function getTextFromApiMessage(item: ChatMessageApiItem, currentUserId?: string): string {
   const isAiraMessage = (item as { messageByAira?: unknown }).messageByAira === true;
+  const isIntroductionMessage = (item as { isIntroduction?: unknown }).isIntroduction === true;
   const senderId = getSenderIdFromMessage(item);
   const isFromCurrentUser =
     (typeof currentUserId === 'string' && senderId === currentUserId) ||
     (currentUserId == null && item.isSentByMe === true);
-  if (isAiraMessage && isFromCurrentUser) {
+  if (isAiraMessage && isIntroductionMessage && isFromCurrentUser) {
     return AIRA_REQUEST_SENT_TEXT;
   }
 
