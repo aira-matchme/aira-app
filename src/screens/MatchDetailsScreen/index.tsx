@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { View, Text, StatusBar, ActivityIndicator, ScrollView, Image, TouchableOpacity, Platform, StyleSheet, Modal, TouchableWithoutFeedback, Alert } from 'react-native';
+import { View, Text, StatusBar, ActivityIndicator, ScrollView, Image, TouchableOpacity, Platform, StyleSheet, Modal, TouchableWithoutFeedback, Alert, TextInput } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -31,6 +31,7 @@ import { AgeEssentialIcon } from '../../assets/icons/match/AgeEssentialIcon';
 import { OccupationEssentialIcon } from '../../assets/icons/match/OccupationEssentialIcon';
 import { EducationEssentialIcon } from '../../assets/icons/match/EducationEssentialIcon';
 import { InsightsTabIcon } from '../../assets/icons/match/InsightsTabIcon';
+import { InterestChipCheckIcon } from '../../assets/icons/common/InterestChipCheckIcon';
 
 type MatchDetailsRoute = RouteProp<RootStackParamList, 'MatchDetails'>;
 
@@ -55,6 +56,15 @@ type PersonalityCopy = {
   growthTitle: string;
   growthBody: string;
 };
+
+const REPORT_REASONS: { value: string; label: string }[] = [
+  { value: 'inappropriate_messages', label: 'Inappropriate messages' },
+  { value: 'fake_or_spam', label: 'Fake or spam account' },
+  { value: 'harassment_or_bullying', label: 'Harassment or bullying' },
+  { value: 'offensive_profile', label: 'Offensive profile content' },
+  { value: 'underage_user', label: 'Underage user' },
+  { value: 'something_else', label: "It's something else" },
+];
 
 const PERSONALITY_CONFIG: Record<string, PersonalityCopy> = {
   // Anchor + Anchor (example from user text)
@@ -412,6 +422,10 @@ export const MatchDetailsScreen: React.FC = () => {
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [blockLoading, setBlockLoading] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
+  const [showReportBlockSheet, setShowReportBlockSheet] = useState(false);
+  const [selectedReportReason, setSelectedReportReason] = useState<string | null>(null);
+  const [reportMessageInput, setReportMessageInput] = useState('');
+  const [reportBlockSubmitting, setReportBlockSubmitting] = useState(false);
 
   const fetchDetails = async () => {
     try {
@@ -837,15 +851,10 @@ export const MatchDetailsScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.reportContainer}
             activeOpacity={0.8}
-            onPress={async () => {
-              try {
-                await apiClient.post(endpoints.chat.blockreportUser, {
-                  targetUserId: userId,
-                });
-                navigation.goBack();
-              } catch {
-                // Silently fail for now; you can add a toast or alert if needed
-              }
+            onPress={() => {
+              setSelectedReportReason(null);
+              setReportMessageInput('');
+              setShowReportBlockSheet(true);
             }}
           >
             <Text style={styles.reportText}>Report &amp; Block</Text>
@@ -1008,6 +1017,124 @@ export const MatchDetailsScreen: React.FC = () => {
       </Modal>
 
       <ReusableBottomSheet
+        isOpen={showReportBlockSheet}
+        onClose={() => {
+          if (reportBlockSubmitting) return;
+          setShowReportBlockSheet(false);
+          setReportMessageInput('');
+          setSelectedReportReason(null);
+        }}
+        snapPoints={['90%']}
+        showDragHandle
+        showCloseButton={false}
+        enablePanDownToClose={!reportBlockSubmitting}
+        scrollEnabled={false}
+      >
+        <View style={reportSheetStyles.content}>
+          <View style={reportSheetStyles.iconWrap}>
+            <ReportIcon size={40} color={colors.primary.purple} />
+          </View>
+          <Text style={reportSheetStyles.title}>Why Report {name}?</Text>
+          <View style={reportSheetStyles.reasonsWrap}>
+            {REPORT_REASONS.map((reason) => {
+              const selected = selectedReportReason === reason.value;
+              return (
+                <TouchableOpacity
+                  key={reason.value}
+                  style={[reportSheetStyles.reasonRow, selected && reportSheetStyles.reasonRowSelected]}
+                  onPress={() => setSelectedReportReason(reason.value)}
+                  activeOpacity={0.7}
+                  disabled={reportBlockSubmitting}
+                >
+                  <View style={[reportSheetStyles.reasonCheck, selected && reportSheetStyles.reasonCheckSelected]}>
+                    {selected && <InterestChipCheckIcon size={12} color={colors.white} />}
+                  </View>
+                  <Text style={[reportSheetStyles.reasonLabel, selected && reportSheetStyles.reasonLabelSelected]}>
+                    {reason.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <TextInput
+            style={reportSheetStyles.optionalInput}
+            placeholder="Tell us the reason.. (optional)"
+            placeholderTextColor={colors.neutral[500]}
+            value={reportMessageInput}
+            onChangeText={setReportMessageInput}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+            editable={!reportBlockSubmitting}
+          />
+          <View style={reportSheetStyles.buttonRow}>
+            <TouchableOpacity
+              style={reportSheetStyles.cancelButton}
+              onPress={() => {
+                setShowReportBlockSheet(false);
+                setReportMessageInput('');
+                setSelectedReportReason(null);
+              }}
+              disabled={reportBlockSubmitting}
+              activeOpacity={0.8}
+            >
+              <Text style={reportSheetStyles.cancelButtonLabel}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={reportSheetStyles.submitButton}
+              onPress={async () => {
+                if (!selectedReportReason) return;
+                const reasonLabel =
+                  REPORT_REASONS.find((r) => r.value === selectedReportReason)?.label ?? selectedReportReason;
+                const reportMessage = reportMessageInput.trim()
+                  ? `${reasonLabel}\n${reportMessageInput.trim()}`
+                  : reasonLabel;
+                try {
+                  setReportBlockSubmitting(true);
+                  const res = await apiClient.post(endpoints.chat.blockreportUser, {
+                    targetUserId: userId,
+                    reportMessage,
+                  });
+                  const apiMessage =
+                    (res as any)?.data?.message ??
+                    (res as any)?.message ??
+                    'Report submitted and user blocked successfully.';
+                  setShowReportBlockSheet(false);
+                  setReportMessageInput('');
+                  setSelectedReportReason(null);
+                  Alert.alert('Done', apiMessage.toString());
+                  navigation.goBack();
+                } catch (e: any) {
+                  const errMessage =
+                    e?.response?.data?.message ??
+                    e?.message ??
+                    'Could not submit report. Please try again.';
+                  Alert.alert('Error', errMessage.toString());
+                } finally {
+                  setReportBlockSubmitting(false);
+                }
+              }}
+              disabled={reportBlockSubmitting || !selectedReportReason}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={colors.gradients.primary.colors as any}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={reportSheetStyles.submitButtonGradient}
+              >
+                {reportBlockSubmitting ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <Text style={reportSheetStyles.submitButtonLabel}>Submit</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ReusableBottomSheet>
+
+      <ReusableBottomSheet
         isOpen={showFirstMovePopup}
         onClose={() => setShowFirstMovePopup(false)}
         snapPoints={firstMoveStep === 'sent' ? ['30%'] : ['48%']}
@@ -1124,4 +1251,115 @@ export const MatchDetailsScreen: React.FC = () => {
     </View>
   );
 };
+
+const reportSheetStyles = StyleSheet.create({
+  content: {
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 32,
+    flex: 1,
+  },
+  iconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.primary[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '500',
+    color: colors.black,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  reasonsWrap: {
+    marginBottom: 16,
+  },
+  reasonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.neutral[100],
+    marginBottom: 8,
+    gap: 8,
+  },
+  reasonRowSelected: {
+    backgroundColor: colors.primary[50],
+    borderColor: colors.primary[50],
+  },
+  reasonCheck: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.neutral[300],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reasonCheckSelected: {
+    backgroundColor: colors.primary.purple,
+    borderColor: colors.primary.purple,
+  },
+  reasonLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.neutral[800],
+    flex: 1,
+  },
+  reasonLabelSelected: {
+    color: colors.primary.purple,
+  },
+  optionalInput: {
+    borderWidth: 1,
+    borderColor: colors.neutral[100],
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    fontSize: 16,
+    color: colors.neutral[900],
+    minHeight: 88,
+    marginBottom: 24,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  cancelButton: {
+    flex: 1,
+    height: 54,
+    borderRadius: 100,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.black,
+  },
+  submitButton: {
+    flex: 1,
+    height: 54,
+    borderRadius: 100,
+    overflow: 'hidden',
+  },
+  submitButtonGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitButtonLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.white,
+  },
+});
 

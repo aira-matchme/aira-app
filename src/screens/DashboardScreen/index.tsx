@@ -42,7 +42,13 @@ import { endpoints } from '../../services/api/endpoints';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const CARD_HEIGHT_RATIO = 0.9;
+const getCardHeightRatio = (screenHeight: number, screenWidth: number) => {
+  // Tune card height by device class so cards do not look too tall/short.
+  if (screenHeight <= 700) return 0.72; // compact phones
+  if (screenHeight <= 820) return 0.76; // standard phones
+  if (screenHeight >= 940 || screenWidth >= 430) return 0.82; // larger phones
+  return 0.8; // default
+};
 const SLIDE_GAP = 5;
 
 const PHOTO_COUNT = 5;
@@ -131,7 +137,7 @@ export const DashboardScreen = () => {
           overallPercent: item.matchScore,
           lifestylePercent: item.preferenceScore,
           personalityPercent: item.personalityScore,
-          otherPercent: item.relationshipIntentScore,
+          otherPercent: Math.round((item.relationshipIntentScore + item.visualScore) / 2),
           image: primaryImage,
           images: imageSources.length > 0 ? imageSources : undefined,
           isLiked: item.isLiked ?? false,
@@ -185,8 +191,9 @@ export const DashboardScreen = () => {
 
   const slideHeight = useMemo(() => {
     const headerApprox = 60 + insets.top;
+    const cardHeightRatio = getCardHeightRatio(SCREEN_HEIGHT, SCREEN_WIDTH);
     return Math.min(
-      (SCREEN_HEIGHT - headerApprox) * CARD_HEIGHT_RATIO,
+      (SCREEN_HEIGHT - headerApprox) * cardHeightRatio,
       SCREEN_HEIGHT * 0.95
     );
   }, [insets.top]);

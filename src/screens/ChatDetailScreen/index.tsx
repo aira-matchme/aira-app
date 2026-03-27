@@ -30,6 +30,8 @@ import {
   requestCameraPermission,
   checkPhotoLibraryPermission,
   requestPhotoLibraryPermission,
+  checkMicrophonePermission,
+  requestMicrophonePermission,
 } from '../../config/permissions';
 import { BackArrowIcon } from '../../assets/icons/common/BackArrowIcon';
 import { MoreVertIcon } from '../../assets/icons/common/MoreVertIcon';
@@ -39,6 +41,9 @@ import { InterestChipCheckIcon } from '../../assets/icons/common/InterestChipChe
 import { PlusIcon } from '../../assets/icons/common/PlusIcon';
 import { ForwardArrowIcon } from '../../assets/icons/common/ForwardArrowIcon';
 import { DeleteIcon } from '../../assets/icons/common/DeleteIcon';
+import { MicIcon } from '../../assets/icons/common/MicIcon';
+import { PlayIcon } from '../../assets/icons/common/PlayIcon';
+import { PauseIcon } from '../../assets/icons/common/PauseIcon';
 import { ReplyIcon } from '../../assets/icons/common/ReplyIcon';
 import { AskAiraIcon } from '../../assets/icons/common/AskAiraIcon';
 import { AskAiraSendIcon } from '../../assets/icons/common/AskAiraSendIcon';
@@ -60,16 +65,46 @@ import { styles, H_PADDING } from './styles';
 import { TabAICenterIcon } from '../../assets/icons/tabs/TabAICenterIcon';
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
+import {
+  startRecording as startAudioRecording,
+  stopRecording as stopAudioRecording,
+  pauseRecording as pauseAudioRecording,
+  resumeRecording as resumeAudioRecording,
+  playAudio,
+  stopAudio,
+  pauseAudio,
+  resumeAudio,
+} from '../../utils/audio';
 
 type Props = NativeStackScreenProps<ChatStackParamList, 'ChatDetail'>;
 
 type ChatMessage =
-  | { type: 'text'; text: string; timestamp: string; sent: boolean; replyTo?: { senderName: string; preview: string }; messageId?: string }
+  | {
+      type: 'text';
+      text: string;
+      timestamp: string;
+      sent: boolean;
+      replyTo?: { senderName: string; preview: string };
+      messageId?: string;
+    }
+  | {
+      type: 'rich';
+      blocks: Array<
+        | { type: 'paragraph'; text: string }
+        | {
+            type: 'bullet_list';
+            items: Array<{ title?: string; description?: string }>;
+          }
+      >;
+      timestamp: string;
+      sent: boolean;
+      messageId?: string;
+    }
   | { type: 'voice'; uri: string; timestamp: string; sent: boolean; messageId?: string }
   | { type: 'image'; uri: string; timestamp: string; sent: boolean; messageId?: string }
   | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean; messageId?: string };
 
-// const VOICE_WAVEFORM = [8, 12, 6, 14, 10, 16, 8, 14, 12, 10];
+const VOICE_WAVEFORM = [8, 12, 6, 14, 10, 16, 8, 14, 12, 10];
 
 const DONT_SHOW_ASK_AIRA_CONFIRM_KEY = 'dont_show_ask_aira_confirm';
 const MESSAGES_PAGE_SIZE = 10;
@@ -185,19 +220,28 @@ function keyboardOverlapFromEvent(windowHeight: number, e: KeyboardEvent): numbe
     return Math.max(0, Math.min(windowHeight, windowHeight - screenY));
   }
 
-  let h = typeof ec.height === 'number' && ec.height > 0 ? ec.height : 0;
-  if (typeof ec.screenY === 'number') {
-    const fromScreenY = Math.max(0, windowHeight - ec.screenY);
-    if (h <= 0) {
-      h = fromScreenY;
-    } else if (fromScreenY > 0) {
-      const delta = Math.abs(h - fromScreenY);
-      if (delta > 80) {
-        h = Math.max(h, fromScreenY);
-      }
-    }
+  const fromHeight = typeof ec.height === 'number' && ec.height > 0 ? ec.height : 0;
+  const fromScreenY =
+    typeof ec.screenY === 'number' ? Math.max(0, windowHeight - ec.screenY) : 0;
+
+  // Ignore unrealistic values so old-device quirks do not push composer too high.
+  const maxReasonableKeyboard = Math.floor(windowHeight * 0.45);
+  const minReasonableKeyboard = 80;
+  const candidates = [fromHeight, fromScreenY].filter(
+    (v) => v >= minReasonableKeyboard && v <= maxReasonableKeyboard
+  );
+  if (candidates.length > 0) {
+    // Some Android builds report inflated `height`; prefer the smaller sane value.
+    return Math.min(...candidates);
   }
-  return Math.max(0, h);
+
+  // Last fallback: prefer `screenY` overlap when available, then clamp.
+  const raw = Math.max(fromHeight, fromScreenY);
+  if (raw <= 0) return 0;
+  if (fromScreenY > 0) {
+    return Math.min(maxReasonableKeyboard, fromScreenY);
+  }
+  return Math.min(maxReasonableKeyboard, Math.max(minReasonableKeyboard, raw));
 }
 
 export const ChatDetailScreen = ({ route, navigation }: Props) => {
@@ -224,18 +268,19 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [blockConfirmVisible, setBlockConfirmVisible] = useState(false);
   const [blockConfirmLoading, setBlockConfirmLoading] = useState(false);
   const [showReportSheet, setShowReportSheet] = useState(false);
+  const [reportSheetMode, setReportSheetMode] = useState<'report' | 'blockReport'>('report');
   const [selectedReportReason, setSelectedReportReason] = useState<string | null>(null);
   const [reportMessageInput, setReportMessageInput] = useState('');
   const [reportSubmitting, setReportSubmitting] = useState(false);
-  // Voice chat state (disabled)
-  // const [voiceBarVisible, setVoiceBarVisible] = useState(false);
-  // const [voiceSeconds, setVoiceSeconds] = useState(0);
-  // const [voicePaused, setVoicePaused] = useState(false);
-  // const [voiceSendLoading, setVoiceSendLoading] = useState(false);
-  // const voiceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // const isRecordingRef = useRef(false);
-  // const audioRecorderPlayerRef = useRef(new AudioRecorderPlayer());
-  // const [recordFilePath, setRecordFilePath] = useState<string | null>(null);
+  const [voiceBarVisible, setVoiceBarVisible] = useState(false);
+  const [voiceSeconds, setVoiceSeconds] = useState(0);
+  const [voicePaused, setVoicePaused] = useState(false);
+  const [voiceSendLoading, setVoiceSendLoading] = useState(false);
+  const voiceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isRecordingRef = useRef(false);
+  const [recordFilePath, setRecordFilePath] = useState<string | null>(null);
+  const [playingVoiceMessageKey, setPlayingVoiceMessageKey] = useState<string | null>(null);
+  const [voiceListenPaused, setVoiceListenPaused] = useState(false);
   const [askAiraGenerating, setAskAiraGenerating] = useState(false);
   const [generatedReplies, setGeneratedReplies] = useState<string[] | null>(null);
   const [askAiraConfirmVisible, setAskAiraConfirmVisible] = useState(false);
@@ -257,6 +302,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [socketConnected, setSocketConnected] = useState(false);
   const [composerHeight, setComposerHeight] = useState(120);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const androidBaseWindowHeightRef = useRef(windowHeight);
   const aiSuggestionsRequestIdRef = useRef(0);
   const typingStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -289,6 +336,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   useEffect(() => {
     const applyOverlap = (e: KeyboardEvent) => {
       const overlap = keyboardOverlapFromEvent(windowHeight, e);
+      setIsKeyboardVisible(overlap > 0);
       setKeyboardHeight(overlap);
       scrollToEndAfterKeyboard(true);
     };
@@ -296,6 +344,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     if (Platform.OS === 'ios') {
       const frameSub = Keyboard.addListener('keyboardWillChangeFrame', applyOverlap);
       const hideSub = Keyboard.addListener('keyboardWillHide', () => {
+        setIsKeyboardVisible(false);
         setKeyboardHeight(0);
         scrollToEndAfterKeyboard(true);
       });
@@ -307,6 +356,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
     const showSub = Keyboard.addListener('keyboardDidShow', applyOverlap);
     const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setIsKeyboardVisible(false);
       setKeyboardHeight(0);
       scrollToEndAfterKeyboard(false);
     });
@@ -319,11 +369,44 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   useFocusEffect(
     useCallback(() => {
       return () => {
+        if (voiceTimerRef.current) {
+          clearInterval(voiceTimerRef.current);
+          voiceTimerRef.current = null;
+        }
+        if (isRecordingRef.current) {
+          stopAudioRecording().catch(() => {});
+          isRecordingRef.current = false;
+        }
+        stopAudio().catch(() => {});
+        setPlayingVoiceMessageKey(null);
+        setVoiceListenPaused(false);
+        setVoiceBarVisible(false);
+        setVoicePaused(false);
+        setVoiceSeconds(0);
+        setRecordFilePath(null);
+        setIsKeyboardVisible(false);
         setKeyboardHeight(0);
         Keyboard.dismiss();
       };
     }, [])
   );
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    // Learn the "keyboard hidden" baseline for this device/orientation.
+    if (!isKeyboardVisible && windowHeight > androidBaseWindowHeightRef.current) {
+      androidBaseWindowHeightRef.current = windowHeight;
+    }
+  }, [isKeyboardVisible, windowHeight]);
+
+  const androidWindowShrink = Math.max(
+    0,
+    androidBaseWindowHeightRef.current - windowHeight
+  );
+  const androidUsesResizeMode = androidWindowShrink > 60;
+  const shouldApplyManualKeyboardOffset =
+    Platform.OS === 'ios' || !androidUsesResizeMode;
+  const composerBottomOffset = shouldApplyManualKeyboardOffset ? keyboardHeight : 0;
 
 
   const isOtherUserOnlineFromPayload = useCallback(
@@ -413,31 +496,30 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     return ext.length <= 4 ? ext : 'FILE';
   };
 
-  // Voice bar timer helpers (voice chat disabled)
-  // const formatVoiceTime = (seconds: number) => {
-  //   const m = Math.floor(seconds / 60);
-  //   const s = seconds % 60;
-  //   return `${m}:${s.toString().padStart(2, '0')}`;
-  // };
-  //
-  // useEffect(() => {
-  //   if (!voiceBarVisible || voicePaused) {
-  //     if (voiceTimerRef.current) {
-  //       clearInterval(voiceTimerRef.current);
-  //       voiceTimerRef.current = null;
-  //     }
-  //     return;
-  //   }
-  //   voiceTimerRef.current = setInterval(() => {
-  //     setVoiceSeconds((prev) => prev + 1);
-  //   }, 1000);
-  //   return () => {
-  //     if (voiceTimerRef.current) {
-  //       clearInterval(voiceTimerRef.current);
-  //       voiceTimerRef.current = null;
-  //     }
-  //   };
-  // }, [voiceBarVisible, voicePaused]);
+  const formatVoiceTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  useEffect(() => {
+    if (!voiceBarVisible || voicePaused) {
+      if (voiceTimerRef.current) {
+        clearInterval(voiceTimerRef.current);
+        voiceTimerRef.current = null;
+      }
+      return;
+    }
+    voiceTimerRef.current = setInterval(() => {
+      setVoiceSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => {
+      if (voiceTimerRef.current) {
+        clearInterval(voiceTimerRef.current);
+        voiceTimerRef.current = null;
+      }
+    };
+  }, [voiceBarVisible, voicePaused]);
 
   // Turn off "thinking" once API response resolves (or is handled as limit reached).
   useEffect(() => {
@@ -468,7 +550,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         const raw = res.data?.list ?? res.data?.messages ?? [];
         const list = Array.isArray(raw)
           ? raw
-              .map((item) => mapApiMessageToChatMessage(item, currentUserId ?? undefined))
+              .map((item) =>
+                mapApiMessageToChatMessage(item, currentUserId ?? undefined, {
+                  chatStatus: String(((res.data?.chat as { status?: unknown } | undefined)?.status) ?? ''),
+                })
+              )
               .filter((m): m is ChatMessage => m != null)
               // Backend returns newest first; reverse so UI shows oldest -> newest.
               .reverse()
@@ -517,7 +603,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         isSentByMe: senderId === currentUserId,
       };
 
-      const ui = mapApiMessageToChatMessage(adjusted, currentUserId);
+      const ui = mapApiMessageToChatMessage(adjusted, currentUserId, {
+        chatStatus: isRequest ? 'pending' : undefined,
+      });
       if (!ui) return;
       setMessages((prev) => [...prev, ui as ChatMessage]);
       // Mark this chat as seen so unread counts are cleared on other screens.
@@ -594,7 +682,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             const raw = res.data?.list ?? res.data?.messages ?? [];
             const list = Array.isArray(raw)
               ? raw
-                  .map((item) => mapApiMessageToChatMessage(item, currentUserId ?? undefined))
+                  .map((item) =>
+                    mapApiMessageToChatMessage(item, currentUserId ?? undefined, {
+                      chatStatus: String(((res.data?.chat as { status?: unknown } | undefined)?.status) ?? ''),
+                    })
+                  )
                   .filter((m): m is ChatMessage => m != null)
                   .reverse()
               : [];
@@ -657,9 +749,14 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       const raw = res.data?.list ?? res.data?.messages ?? [];
       const list = Array.isArray(raw)
         ? raw
-            .map((item) => mapApiMessageToChatMessage(item, currentUserId ?? undefined))
+            .map((item) =>
+              mapApiMessageToChatMessage(item, currentUserId ?? undefined, {
+                chatStatus: String(((res.data?.chat as { status?: unknown } | undefined)?.status) ?? ''),
+              })
+            )
             .filter((m): m is ChatMessage => m != null)
             .reverse()
+
         : [];
 
       if (list.length > 0) {
@@ -829,160 +926,179 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
   const getMessagePreview = (msg: ChatMessage): string => {
     if (msg.type === 'text') return msg.text;
-    // if (msg.type === 'voice') return 'Voice message';
+    if (msg.type === 'rich') {
+      const paragraph = msg.blocks.find((b) => b.type === 'paragraph');
+      if (paragraph?.type === 'paragraph' && paragraph.text) return paragraph.text;
+      const bullet = msg.blocks.find((b) => b.type === 'bullet_list');
+      if (bullet?.type === 'bullet_list' && bullet.items.length > 0) {
+        return bullet.items[0]?.title ?? bullet.items[0]?.description ?? 'Message';
+      }
+      return 'Message';
+    }
+    if (msg.type === 'voice') return 'Voice message';
     if (msg.type === 'image') return 'Photo';
     if (msg.type === 'file') return msg.name;
     return '';
   };
 
-  // Voice recording and mic handlers (voice chat disabled)
-  // const startVoiceRecording = useCallback(async () => {
-  //   try {
-  //     const audioRecorderPlayer = audioRecorderPlayerRef.current;
-  //
-  //     const path =
-  //       Platform.OS === 'ios'
-  //         ? 'voice_record.m4a'
-  //         : `${Date.now()}.m4a`;
-  //
-  //     const result = await audioRecorderPlayer.startRecorder(path);
-  //
-  //     audioRecorderPlayer.addRecordBackListener(() => {
-  //       return;
-  //     });
-  //
-  //     isRecordingRef.current = true;
-  //
-  //     setRecordFilePath(result);
-  //   } catch (err) {
-  //     setVoiceBarVisible(false);
-  //   }
-  // }, []);
-  //
-  // const handleMicPress = async () => {
-  //   if (inputText.trim() || pendingAttachments.length) return;
-  //   const status = await checkMicrophonePermission();
-  //   if (status !== 'granted') {
-  //     setShowMicrophonePermissionSheet(true);
-  //     return;
-  //   }
-  //   setVoiceBarVisible(true);
-  //   setVoiceSeconds(0);
-  //   setVoicePaused(false);
-  //   await startVoiceRecording();
-  // };
-  //
-  // const handleAllowMicrophonePermission = async () => {
-  //   setIsRequestingPermission(true);
-  //   try {
-  //     const requested = await requestMicrophonePermission();
-  //     setShowMicrophonePermissionSheet(false);
-  //     if (requested === 'granted') {
-  //       setVoiceBarVisible(true);
-  //       setVoiceSeconds(0);
-  //       setVoicePaused(false);
-  //       await startVoiceRecording();
-  //     } else {
-  //       setShowMicrophonePermissionSheet(false);
-  //     }
-  //   } catch {
-  //     setShowMicrophonePermissionSheet(false);
-  //   } finally {
-  //     setIsRequestingPermission(false);
-  //   }
-  // };
-  //
-  // const handleVoiceTrash = () => {
-  //   if (isRecordingRef.current) {
-  //     const audioRecorderPlayer = audioRecorderPlayerRef.current;
-  //     audioRecorderPlayer.stopRecorder().catch(() => {});
-  //     isRecordingRef.current = false;
-  //   }
-  //   setRecordFilePath(null);
-  //   setVoiceBarVisible(false);
-  //   setVoiceSeconds(0);
-  //   setVoicePaused(false);
-  // };
-  //
-  // const handleVoicePlayPause = () => {
-  //   if (!isRecordingRef.current) return;
-  //   const audioRecorderPlayer = audioRecorderPlayerRef.current;
-  //   if (voicePaused) {
-  //     audioRecorderPlayer.resumeRecorder().catch(() => {});
-  //   } else {
-  //     audioRecorderPlayer.pauseRecorder().catch(() => {});
-  //   }
-  //   setVoicePaused((p) => !p);
-  // };
-  //
-  // const stopRecording = async () => {
-  //   try {
-  //     const audioRecorderPlayer = audioRecorderPlayerRef.current;
-  //
-  //     const result = await audioRecorderPlayer.stopRecorder();
-  //     audioRecorderPlayer.removeRecordBackListener();
-  //
-  //     isRecordingRef.current = false;
-  //
-  //     return result;
-  //   } catch (e) {
-  //     return null;
-  //   }
-  // };
-  //
-  // const handleVoiceSend = async () => {
-  //   if (!chatId || !currentUserId || !otherUserId) return;
-  //
-  //   try {
-  //     setVoiceSendLoading(true);
-  //
-  //     const path = await stopRecording();
-  //
-  //     if (!path) {
-  //       setVoiceBarVisible(false);
-  //       return;
-  //     }
-  //
-  //     const fileName = `voice_${Date.now()}.m4a`;
-  //
-  //     const { url, key } = await uploadChatFileApi(path, {
-  //       mimeType: 'audio/m4a',
-  //       fileName,
-  //     });
-  //
-  //     const res = await sendMessageApi({
-  //       chatId,
-  //       content: '',
-  //       messageType: 'audio',
-  //       files: [{ url, key }],
-  //       replyTo: replyingTo?.messageId ?? null,
-  //     });
-  //
-  //     const apiMessage = res?.data as ChatMessageApiItem;
-  //
-  //     if (apiMessage) {
-  //       const ui = mapApiMessageToChatMessage(apiMessage, currentUserId);
-  //
-  //       if (ui) {
-  //         setMessages(prev => [...prev, ui]);
-  //       }
-  //
-  //       socketService.messageSendFromApi(
-  //         currentUserId,
-  //         otherUserId,
-  //         apiMessage as unknown as Record<string, unknown>,
-  //       );
-  //     }
-  //
-  //     setVoiceBarVisible(false);
-  //     setVoiceSeconds(0);
-  //     setVoicePaused(false);
-  //     setRecordFilePath(null);
-  //   } catch (err) {
-  //   } finally {
-  //     setVoiceSendLoading(false);
-  //   }
-  // };
+  const startVoiceRecording = useCallback(async () => {
+    try {
+      const path = await startAudioRecording();
+      isRecordingRef.current = true;
+      setRecordFilePath(path);
+    } catch {
+      setVoiceBarVisible(false);
+    }
+  }, []);
+
+  const handleMicPress = async () => {
+    if (inputText.trim() || pendingAttachments.length || sendLoading) return;
+    const status = await checkMicrophonePermission();
+    if (status !== 'granted') {
+      setShowMicrophonePermissionSheet(true);
+      return;
+    }
+    setVoiceBarVisible(true);
+    setVoiceSeconds(0);
+    setVoicePaused(false);
+    await startVoiceRecording();
+  };
+
+  const handleAllowMicrophonePermission = async () => {
+    setIsRequestingPermission(true);
+    try {
+      const requested = await requestMicrophonePermission();
+      setShowMicrophonePermissionSheet(false);
+      if (requested === 'granted') {
+        setVoiceBarVisible(true);
+        setVoiceSeconds(0);
+        setVoicePaused(false);
+        await startVoiceRecording();
+      }
+    } finally {
+      setIsRequestingPermission(false);
+    }
+  };
+
+  const handleVoiceTrash = () => {
+    if (isRecordingRef.current) {
+      stopAudioRecording().catch(() => {});
+      isRecordingRef.current = false;
+    }
+    setRecordFilePath(null);
+    setVoiceBarVisible(false);
+    setVoiceSeconds(0);
+    setVoicePaused(false);
+  };
+
+  const handleVoicePlayPause = () => {
+    if (!isRecordingRef.current) return;
+    if (voicePaused) {
+      resumeAudioRecording().catch(() => {});
+    } else {
+      pauseAudioRecording().catch(() => {});
+    }
+    setVoicePaused((p) => !p);
+  };
+
+  const stopVoiceRecordingSafely = async () => {
+    try {
+      const result = await stopAudioRecording();
+      isRecordingRef.current = false;
+      return result;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleVoiceSend = async () => {
+    if (!currentUserId || !otherUserId || voiceSendLoading) return;
+    try {
+      setVoiceSendLoading(true);
+      let effectiveChatId = chatId;
+      if (!effectiveChatId) {
+        const addRes = await apiClient.post(endpoints.chat.addChat, {
+          senderId: currentUserId,
+          receiverId: otherUserId,
+          firstMessage: '',
+        });
+        effectiveChatId = extractChatIdFromAddChatResponse(addRes);
+        if (!effectiveChatId) {
+          setVoiceBarVisible(false);
+          return;
+        }
+        setChatId(effectiveChatId);
+        navigation.setParams({ chatId: effectiveChatId } as any);
+      }
+
+      const path = await stopVoiceRecordingSafely();
+      const uploadPath = path ?? recordFilePath;
+      if (!uploadPath) {
+        setVoiceBarVisible(false);
+        return;
+      }
+
+      const fileName = `voice_${Date.now()}.m4a`;
+      const { url, key } = await uploadChatFileApi(uploadPath, {
+        mimeType: 'audio/m4a',
+        fileName,
+      });
+
+      const res = await sendMessageApi({
+        chatId: effectiveChatId!,
+        content: '',
+        messageType: 'audio',
+        files: [{ url, key }],
+        replyTo: replyingTo?.messageId ?? null,
+      });
+
+      const apiMessage = (res?.data as unknown) as ChatMessageApiItem | undefined;
+      if (apiMessage) {
+        const ui = mapApiMessageToChatMessage(apiMessage, currentUserId, {
+          chatStatus: isRequest ? 'pending' : undefined,
+        });
+        if (ui) setMessages((prev) => [...prev, ui as ChatMessage]);
+        socketService.messageSendFromApi(
+          currentUserId,
+          otherUserId,
+          apiMessage as unknown as Record<string, unknown>,
+        );
+      }
+
+      setVoiceBarVisible(false);
+      setVoiceSeconds(0);
+      setVoicePaused(false);
+      setRecordFilePath(null);
+      setReplyingTo(null);
+    } finally {
+      setVoiceSendLoading(false);
+    }
+  };
+
+  const toggleVoiceMessagePlayback = async (
+    uri: string,
+    messageKey: string,
+  ) => {
+    try {
+      if (playingVoiceMessageKey !== messageKey) {
+        await stopAudio().catch(() => {});
+        setVoiceListenPaused(false);
+        await playAudio(uri);
+        setPlayingVoiceMessageKey(messageKey);
+        return;
+      }
+      if (voiceListenPaused) {
+        await resumeAudio();
+        setVoiceListenPaused(false);
+      } else {
+        await pauseAudio();
+        setVoiceListenPaused(true);
+      }
+    } catch {
+      setPlayingVoiceMessageKey(null);
+      setVoiceListenPaused(false);
+    }
+  };
 
   const openCamera = () => {
     launchCamera(
@@ -1129,7 +1245,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             const raw = msgRes.data?.list ?? msgRes.data?.messages ?? [];
             const list = Array.isArray(raw)
               ? raw
-                  .map((item) => mapApiMessageToChatMessage(item, currentUserId ?? undefined))
+                  .map((item) =>
+                    mapApiMessageToChatMessage(item, currentUserId ?? undefined, {
+                      chatStatus: String(((msgRes.data?.chat as { status?: unknown } | undefined)?.status) ?? ''),
+                    })
+                  )
                   .filter((m): m is ChatMessage => m != null)
                   .reverse()
               : [];
@@ -1152,7 +1272,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           });
           const apiMessage = (res?.data as unknown) as ChatMessageApiItem | undefined;
           if (apiMessage) {
-            const ui = mapApiMessageToChatMessage(apiMessage, currentUserId);
+            const ui = mapApiMessageToChatMessage(apiMessage, currentUserId, {
+              chatStatus: isRequest ? 'pending' : undefined,
+            });
             if (ui) {
               setMessages((prev) => [...prev, ui as ChatMessage]);
             }
@@ -1182,7 +1304,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         });
         const apiMessage = (res?.data as unknown) as ChatMessageApiItem | undefined;
         if (apiMessage) {
-          const ui = mapApiMessageToChatMessage(apiMessage, currentUserId);
+          const ui = mapApiMessageToChatMessage(apiMessage, currentUserId, {
+            chatStatus: isRequest ? 'pending' : undefined,
+          });
           if (ui) {
             setMessages((prev) => [...prev, ui]);
           }
@@ -1210,10 +1334,36 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     setRequestActionLoading('accept');
     try {
       await setChatRequestActionApi({ chatId, action: 'accept' });
-      navigation.goBack();
+      navigation.setParams({ isRequest: false } as any);
+      setMessagesLoading(true);
+      const res = await getChatMessagesApi({
+        chatId,
+        page: 1,
+        limit: MESSAGES_PAGE_SIZE,
+      });
+      const raw = res.data?.list ?? res.data?.messages ?? [];
+      const list = Array.isArray(raw)
+        ? raw
+            .map((item) =>
+              mapApiMessageToChatMessage(item, currentUserId ?? undefined, {
+                chatStatus: String(
+                  ((res.data?.chat as { status?: unknown } | undefined)?.status) ?? ''
+                ),
+              })
+            )
+            .filter((m): m is ChatMessage => m != null)
+            .reverse()
+        : [];
+      setMessages(list);
+      const meta = res.data?.meta;
+      const currentPage = meta?.currentPage ?? meta?.pageNo ?? 1;
+      const totalPages = meta?.totalPages ?? 1;
+      setMessagesPage(currentPage);
+      setMessagesHasMore(currentPage < totalPages);
     } catch (err: unknown) {
       // Action failed
     } finally {
+      setMessagesLoading(false);
       setRequestActionLoading(null);
     }
   };
@@ -1235,17 +1385,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     if (!otherUserId) {
       return;
     }
-    setRequestActionLoading('block');
-    try {
-      await apiClient.post(endpoints.chat.blockreportUser, {
-        targetUserId: otherUserId,
-      });
-      navigation.goBack();
-    } catch (err: unknown) {
-      // Block failed
-    } finally {
-      setRequestActionLoading(null);
-    }
+    setReportSheetMode('blockReport');
+    setSelectedReportReason(null);
+    setReportMessageInput('');
+    setShowReportSheet(true);
   };
 
   const handleAttachmentSelect = async (option: AttachmentOption) => {
@@ -1301,32 +1444,106 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         </React.Fragment>
       );
     }
-    // Voice message bubble (voice chat disabled)
-    // if (msg.type === 'voice') {
-    //   return (
-    //     <React.Fragment key={index}>
-    //       <View style={styles.messageRow}>
-    //         <TouchableOpacity
-    //           style={styles.voiceBubbleSent}
-    //           activeOpacity={1}
-    //           onLongPress={() => handleMessageLongPress(index)}
-    //         >
-    //           <TouchableOpacity style={styles.voiceBubblePlay} activeOpacity={0.8} onPress={() => {}}>
-    //             <PlayIcon size={40} color={colors.white} variant="voiceBubble" />
-    //           </TouchableOpacity>
-    //           <View style={styles.voiceBubbleWaveform}>
-    //             {VOICE_WAVEFORM.map((h, i) => (
-    //               <View key={i} style={[styles.voiceBubbleWaveformBar, { height: Math.max(6, h) }]} />
-    //             ))}
-    //           </View>
-    //         </TouchableOpacity>
-    //       </View>
-    //       <View style={styles.timeRow}>
-    //         <Text style={styles.timeText}>{msg.timestamp}</Text>
-    //       </View>
-    //     </React.Fragment>
-    //   );
-    // }
+    if (msg.type === 'rich') {
+      return (
+        <React.Fragment key={index}>
+          <View style={[styles.messageRow, msg.sent ? undefined : styles.messageRowReceived]}>
+            <TouchableOpacity
+              style={[styles.bubble, msg.sent ? styles.bubbleSent : styles.bubbleReceived]}
+              activeOpacity={1}
+              onLongPress={() => handleMessageLongPress(index)}
+            >
+              {msg.blocks.map((block, blockIndex) => {
+                if (block.type === 'paragraph') {
+                  return (
+                    <Text
+                      key={`${index}_p_${blockIndex}`}
+                      style={[styles.bubbleText, msg.sent && styles.bubbleTextSent, { marginBottom: 8 }]}
+                    >
+                      {block.text}
+                    </Text>
+                  );
+                }
+                return (
+                  <View key={`${index}_b_${blockIndex}`} style={{ marginBottom: 8 }}>
+                    {block.items.map((item, itemIndex) => (
+                      <View
+                        key={`${index}_${blockIndex}_${itemIndex}`}
+                        style={{ flexDirection: 'row', marginBottom: 6 }}
+                      >
+                        <Text style={[styles.bubbleText, msg.sent && styles.bubbleTextSent]}>{'\u2022 '}</Text>
+                        <Text style={[styles.bubbleText, msg.sent && styles.bubbleTextSent, { flex: 1 }]}>
+                          {item.title ? `${item.title}: ` : ''}
+                          {item.description ?? ''}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })}
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.timeRow, msg.sent ? undefined : styles.timeRowReceived]}>
+            <Text style={styles.timeText}>{msg.timestamp}</Text>
+          </View>
+        </React.Fragment>
+      );
+    }
+    if (msg.type === 'voice') {
+      const messageKey = msg.messageId ?? `${index}_${msg.uri}`;
+      const isCurrentPlaying = playingVoiceMessageKey === messageKey;
+      const isPlayingNow = isCurrentPlaying && !voiceListenPaused;
+      return (
+        <React.Fragment key={index}>
+          <View style={[styles.messageRow, msg.sent ? undefined : styles.messageRowReceived]}>
+            <TouchableOpacity
+              style={[
+                styles.voiceBubbleSent,
+                msg.sent ? undefined : styles.voiceBubbleReceived,
+              ]}
+              activeOpacity={1}
+              onLongPress={() => handleMessageLongPress(index)}
+            >
+              <TouchableOpacity
+                style={styles.voiceBubblePlay}
+                activeOpacity={0.8}
+                onPress={() => {
+                  toggleVoiceMessagePlayback(msg.uri, messageKey).catch(() => {});
+                }}
+              >
+                {isPlayingNow ? (
+                  <PauseIcon
+                    size={40}
+                    color={msg.sent ? colors.white : colors.primary.purple}
+                  />
+                ) : (
+                  <PlayIcon
+                    size={40}
+                    color={msg.sent ? colors.white : colors.primary.purple}
+                    variant="voiceBubble"
+                  />
+                )}
+              </TouchableOpacity>
+              <View style={styles.voiceBubbleWaveform}>
+                {VOICE_WAVEFORM.map((h, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.voiceBubbleWaveformBar,
+                      !msg.sent && styles.voiceBubbleWaveformBarReceived,
+                      { height: Math.max(6, h) },
+                    ]}
+                  />
+                ))}
+              </View>
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.timeRow, msg.sent ? undefined : styles.timeRowReceived]}>
+            <Text style={styles.timeText}>{msg.timestamp}</Text>
+          </View>
+        </React.Fragment>
+      );
+    }
     if (msg.type === 'image') {
       return (
         <React.Fragment key={index}>
@@ -1482,6 +1699,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                     if (!otherUserId) {
                       return;
                     }
+                    setReportSheetMode('report');
                     setReportMessageInput('');
                     setShowReportSheet(true);
                   }}
@@ -1927,7 +2145,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           ...styles.scrollContent,
           // Composer is fixed to bottom; pad for its height + keyboard so messages stay scrollable.
           paddingBottom:
-            (styles.scrollContent?.paddingBottom ?? 16) + composerHeight + 12 + keyboardHeight,
+            (styles.scrollContent?.paddingBottom ?? 16) +
+            composerHeight +
+            12 +
+            (shouldApplyManualKeyboardOffset ? keyboardHeight : 0),
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -1959,15 +2180,58 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       </View>
 
       <View
-        style={[styles.bottomComposerContainer, { bottom: keyboardHeight }]}
+        style={[styles.bottomComposerContainer, { bottom: composerBottomOffset }]}
         onLayout={handleComposerLayout}
       >
-      {/* Voice bar UI (voice chat disabled) */}
-      {/* {voiceBarVisible ? (
-        <View style={[styles.voiceBar, { paddingBottom: 12 + insets.bottom }]}>
-          ...
+      {voiceBarVisible ? (
+        <View style={[styles.voiceBar, { paddingBottom: 12 + bottomSafeInset }]}>
+          <TouchableOpacity
+            style={styles.voiceBarTrash}
+            activeOpacity={0.8}
+            onPress={handleVoiceTrash}
+            disabled={voiceSendLoading}
+          >
+            <DeleteIcon size={20} color={colors.white} />
+          </TouchableOpacity>
+          <View style={styles.voiceBarPill}>
+            <TouchableOpacity
+              style={styles.voiceBarPlayPause}
+              activeOpacity={0.8}
+              onPress={handleVoicePlayPause}
+              disabled={voiceSendLoading}
+            >
+              {voicePaused ? (
+                <PlayIcon size={22} color={colors.black} />
+              ) : (
+                <PauseIcon size={22} color={colors.black} />
+              )}
+            </TouchableOpacity>
+            <View style={styles.voiceBarWaveform}>
+              {VOICE_WAVEFORM.map((h, i) => (
+                <View
+                  key={i}
+                  style={[styles.voiceBarWaveformBar, { height: Math.max(6, h) }]}
+                />
+              ))}
+            </View>
+            <Text style={styles.voiceBarTimer}>{formatVoiceTime(voiceSeconds)}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.voiceBarSend}
+            activeOpacity={0.8}
+            onPress={() => {
+              handleVoiceSend().catch(() => {});
+            }}
+            disabled={voiceSendLoading}
+          >
+            {voiceSendLoading ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <ForwardArrowIcon size={22} color={colors.white} />
+            )}
+          </TouchableOpacity>
         </View>
-      ) :  */}{isRequest ? (
+      ) : isRequest ? (
         <View style={[styles.requestActionBar, { paddingBottom: 24 + bottomSafeInset }]}>
           <View style={styles.requestActionRow}>
             <TouchableOpacity
@@ -2159,13 +2423,24 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             </View>
           </View>
                     <TouchableOpacity
-            style={styles.sendButton}
+            style={[
+              styles.sendButton,
+              !inputText.trim() && pendingAttachments.length === 0 && styles.sendButtonMic,
+            ]}
             activeOpacity={0.8}
-            onPress={handleSend}
-            disabled={sendLoading}
+            onPress={() => {
+              if (!inputText.trim() && pendingAttachments.length === 0) {
+                handleMicPress().catch(() => {});
+                return;
+              }
+              handleSend().catch(() => {});
+            }}
+            disabled={sendLoading || voiceSendLoading}
           >
             {sendLoading ? (
               <ActivityIndicator size="small" color={colors.white} />
+            ) : !inputText.trim() && pendingAttachments.length === 0 ? (
+              <MicIcon size={22} color={colors.black} />
             ) : (
               <ForwardArrowIcon size={22} color={colors.white} />
             )}
@@ -2314,8 +2589,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           <View style={permissionSheetStyles.actions}>
             <TouchableOpacity
               activeOpacity={0.9}
-              // Voice recording disabled – just close the sheet
-              onPress={() => setShowMicrophonePermissionSheet(false)}
+              onPress={() => {
+                handleAllowMicrophonePermission().catch(() => {});
+              }}
               disabled={isRequestingPermission}
               style={permissionSheetStyles.primaryButton}
             >
@@ -2352,6 +2628,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         isOpen={showReportSheet}
         onClose={() => {
           setShowReportSheet(false);
+          setReportSheetMode('report');
           setReportMessageInput('');
           setSelectedReportReason(null);
         }}
@@ -2404,6 +2681,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               style={reportSheetStyles.cancelButton}
               onPress={() => {
                 setShowReportSheet(false);
+                setReportSheetMode('report');
                 setReportMessageInput('');
                 setSelectedReportReason(null);
               }}
@@ -2421,11 +2699,22 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   ? `${reasonLabel}\n${reportMessageInput.trim()}`
                   : reasonLabel;
                 setReportSubmitting(true);
-                reportUserApi({ reportedAgainst: otherUserId, reportMessage })
+                const submitPromise =
+                  reportSheetMode === 'blockReport'
+                    ? apiClient.post(endpoints.chat.blockreportUser, {
+                        targetUserId: otherUserId,
+                        reportMessage,
+                      })
+                    : reportUserApi({ reportedAgainst: otherUserId, reportMessage });
+                submitPromise
                   .then(() => {
                     setShowReportSheet(false);
+                    setReportSheetMode('report');
                     setReportMessageInput('');
                     setSelectedReportReason(null);
+                    if (reportSheetMode === 'blockReport') {
+                      navigation.goBack();
+                    }
                   })
                   .catch(() => {
                     // Report failed

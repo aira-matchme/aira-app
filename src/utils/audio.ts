@@ -7,10 +7,9 @@ import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 const audioRecorderPlayer = new AudioRecorderPlayer();
 
 export const startRecording = async () => {
-  console.log('startRecording');
-  const uri = `voice_${Date.now()}.m4a`;
-  const result = await audioRecorderPlayer.startRecorder(uri);
-  console.log('result', result);
+  // Let native pick a writable temp path and return absolute URI.
+  // Relative filenames can break multipart uploads on some Android devices.
+  const result = await audioRecorderPlayer.startRecorder();
   return result;
 };
 

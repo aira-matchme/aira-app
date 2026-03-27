@@ -338,11 +338,15 @@ export async function uploadChatFileApi(
   options: { mimeType: string; fileName: string }
 ): Promise<{ url: string; key: string }> {
   const formData = new FormData();
-  const uri = fileUri.startsWith('ph://')
-    ? fileUri
-    : fileUri.startsWith('file://')
-      ? fileUri
-      : `file://${fileUri}`;
+  const rawUri = String(fileUri ?? '').trim();
+  const uri =
+    rawUri.startsWith('ph://') ||
+    rawUri.startsWith('file://') ||
+    rawUri.startsWith('content://')
+      ? rawUri
+      : rawUri.startsWith('/')
+        ? `file://${rawUri}`
+        : rawUri;
   // IMPORTANT: For React Native, axios expects the "file" field value to be a plain
   // { uri, type, name } object. Avoid forcing Blob typings.
   formData.append('file', {
@@ -428,7 +432,27 @@ export async function getChatMessagesApi(
 
 /** UI chat message (matches ChatDetailScreen ChatMessage union). messageId from API _id for replyTo. */
 export type ChatMessageUi =
-  | { type: 'text'; text: string; timestamp: string; sent: boolean; replyTo?: { senderName: string; preview: string }; messageId?: string }
+  | {
+      type: 'text';
+      text: string;
+      timestamp: string;
+      sent: boolean;
+      replyTo?: { senderName: string; preview: string };
+      messageId?: string;
+    }
+  | {
+      type: 'rich';
+      blocks: Array<
+        | { type: 'paragraph'; text: string }
+        | {
+            type: 'bullet_list';
+            items: Array<{ title?: string; description?: string }>;
+          }
+      >;
+      timestamp: string;
+      sent: boolean;
+      messageId?: string;
+    }
   | { type: 'voice'; uri: string; timestamp: string; sent: boolean; messageId?: string }
   | { type: 'image'; uri: string; timestamp: string; sent: boolean; messageId?: string }
   | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean; messageId?: string };
@@ -458,14 +482,18 @@ function getSenderIdFromMessage(item: ChatMessageApiItem): string | null {
   return null;
 }
 
-function getTextFromApiMessage(item: ChatMessageApiItem, currentUserId?: string): string {
+function getTextFromApiMessage(
+  item: ChatMessageApiItem,
+  currentUserId?: string,
+  chatStatus?: string
+): string {
   const isAiraMessage = (item as { messageByAira?: unknown }).messageByAira === true;
-  const isIntroductionMessage = (item as { isIntroduction?: unknown }).isIntroduction === true;
+  const isIntroduction = (item as { isIntroduction?: unknown }).isIntroduction === true;
   const senderId = getSenderIdFromMessage(item);
   const isFromCurrentUser =
     (typeof currentUserId === 'string' && senderId === currentUserId) ||
     (currentUserId == null && item.isSentByMe === true);
-  if (isAiraMessage && isIntroductionMessage && isFromCurrentUser) {
+  if (isAiraMessage && isIntroduction && isFromCurrentUser) {
     return AIRA_REQUEST_SENT_TEXT;
   }
 
@@ -481,7 +509,8 @@ function getTextFromApiMessage(item: ChatMessageApiItem, currentUserId?: string)
  */
 export function mapApiMessageToChatMessage(
   item: ChatMessageApiItem,
-  currentUserId?: string
+  currentUserId?: string,
+  options?: { chatStatus?: string }
 ): ChatMessageUi | null {
   const type = (item.messageType ?? item.type ?? 'text') as string;
   const sent = item.isSentByMe === true;
@@ -491,7 +520,7 @@ export function mapApiMessageToChatMessage(
   if (type === 'text') {
     return {
       type: 'text',
-      text: getTextFromApiMessage(item, currentUserId),
+      text: getTextFromApiMessage(item, currentUserId, options?.chatStatus),
       timestamp,
       sent,
       replyTo: item.replyTo?.senderName != null
@@ -500,6 +529,45 @@ export function mapApiMessageToChatMessage(
             preview: item.replyTo.preview ?? item.replyTo.snippet ?? '',
           }
         : undefined,
+      messageId,
+    };
+  }
+  if (type === 'object') {
+    const rawBlocks = (item as { contentBlocks?: unknown }).contentBlocks;
+    const blocks: Array<
+      | { type: 'paragraph'; text: string }
+      | { type: 'bullet_list'; items: Array<{ title?: string; description?: string }> }
+    > = [];
+    if (Array.isArray(rawBlocks)) {
+      rawBlocks.forEach((block) => {
+        if (!block || typeof block !== 'object') return;
+        const b = block as { type?: unknown; text?: unknown; items?: unknown };
+        if (b.type === 'paragraph' && typeof b.text === 'string') {
+          blocks.push({ type: 'paragraph', text: b.text });
+          return;
+        }
+        if (b.type === 'bullet_list' && Array.isArray(b.items)) {
+          const items: Array<{ title?: string; description?: string }> = [];
+          b.items.forEach((item) => {
+            if (!item || typeof item !== 'object') return;
+            const it = item as { title?: unknown; description?: unknown };
+            items.push({
+              title: typeof it.title === 'string' ? it.title : undefined,
+              description: typeof it.description === 'string' ? it.description : undefined,
+            });
+          });
+          blocks.push({ type: 'bullet_list', items });
+        }
+      });
+    }
+    if (blocks.length > 0) {
+      return { type: 'rich', blocks, timestamp, sent, messageId };
+    }
+    return {
+      type: 'text',
+      text: getTextFromApiMessage(item, currentUserId, options?.chatStatus),
+      timestamp,
+      sent,
       messageId,
     };
   }
@@ -521,7 +589,7 @@ export function mapApiMessageToChatMessage(
   }
   return {
     type: 'text',
-    text: getTextFromApiMessage(item, currentUserId),
+    text: getTextFromApiMessage(item, currentUserId, options?.chatStatus),
     timestamp,
     sent,
     messageId,
