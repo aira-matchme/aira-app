@@ -373,7 +373,7 @@ export async function uploadChatFileApi(
 export type ChatMessageApiItem = {
   _id?: string;
   chatId?: string;
-  messageType?: 'text' | 'voice' | 'image' | 'file';
+  messageType?: 'text' | 'voice' | 'audio' | 'image' | 'file';
   content?: string | { text?: string; type?: string };
   files?: Array<{ url?: string; uri?: string; name?: string }>;
   isMedia?: boolean;
@@ -443,7 +443,31 @@ function formatMessageTime(iso?: string): string {
   return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
 }
 
-function getTextFromApiMessage(item: ChatMessageApiItem): string {
+const AIRA_REQUEST_SENT_TEXT =
+  'Aira has send Request for messsage once they accept then you are able to chat with him';
+
+function getSenderIdFromMessage(item: ChatMessageApiItem): string | null {
+  const sender = item.sender;
+  if (typeof sender === 'string') return sender;
+  if (sender && typeof sender === 'object') {
+    const senderObj = sender as { _id?: unknown; id?: unknown };
+    if (typeof senderObj._id === 'string') return senderObj._id;
+    if (typeof senderObj.id === 'string') return senderObj.id;
+  }
+  if (typeof item.senderId === 'string') return item.senderId;
+  return null;
+}
+
+function getTextFromApiMessage(item: ChatMessageApiItem, currentUserId?: string): string {
+  const isAiraMessage = (item as { messageByAira?: unknown }).messageByAira === true;
+  const senderId = getSenderIdFromMessage(item);
+  const isFromCurrentUser =
+    (typeof currentUserId === 'string' && senderId === currentUserId) ||
+    (currentUserId == null && item.isSentByMe === true);
+  if (isAiraMessage && isFromCurrentUser) {
+    return AIRA_REQUEST_SENT_TEXT;
+  }
+
   const c = item.content;
   if (typeof c === 'string') return c;
   if (item.text && typeof item.text === 'string') return item.text;
@@ -456,7 +480,7 @@ function getTextFromApiMessage(item: ChatMessageApiItem): string {
  */
 export function mapApiMessageToChatMessage(
   item: ChatMessageApiItem,
-  _currentUserId?: string
+  currentUserId?: string
 ): ChatMessageUi | null {
   const type = (item.messageType ?? item.type ?? 'text') as string;
   const sent = item.isSentByMe === true;
@@ -466,7 +490,7 @@ export function mapApiMessageToChatMessage(
   if (type === 'text') {
     return {
       type: 'text',
-      text: getTextFromApiMessage(item),
+      text: getTextFromApiMessage(item, currentUserId),
       timestamp,
       sent,
       replyTo: item.replyTo?.senderName != null
@@ -478,7 +502,7 @@ export function mapApiMessageToChatMessage(
       messageId,
     };
   }
-  if (type === 'voice') {
+  if (type === 'voice' || type === 'audio') {
     const file = item.files?.[0];
     const uri = item.uri ?? item.url ?? file?.url ?? file?.uri ?? '';
     return uri ? { type: 'voice', uri, timestamp, sent, messageId } : null;
@@ -496,7 +520,7 @@ export function mapApiMessageToChatMessage(
   }
   return {
     type: 'text',
-    text: getTextFromApiMessage(item),
+    text: getTextFromApiMessage(item, currentUserId),
     timestamp,
     sent,
     messageId,

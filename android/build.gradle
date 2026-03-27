@@ -20,3 +20,13 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// Force all Kotlin compile tasks (including third-party modules in node_modules)
+// to use JVM 17 so they match AGP/Java compile target.
+subprojects { subproject ->
+    subproject.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
+    }
+}

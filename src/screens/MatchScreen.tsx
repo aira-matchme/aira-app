@@ -77,6 +77,43 @@ function keyboardOverlapFromEvent(windowHeight: number, e: KeyboardEvent): numbe
   return Math.max(0, h);
 }
 
+/** Split `**bold**` segments (markdown-style) for inline bold in React Native `Text`. */
+function splitMarkdownBoldSegments(text: string): Array<{ text: string; bold: boolean }> {
+  const out: Array<{ text: string; bold: boolean }> = [];
+  let rest = text;
+  while (rest.length > 0) {
+    const start = rest.indexOf('**');
+    if (start === -1) {
+      out.push({ text: rest, bold: false });
+      break;
+    }
+    if (start > 0) {
+      out.push({ text: rest.slice(0, start), bold: false });
+    }
+    const afterOpen = rest.slice(start + 2);
+    const end = afterOpen.indexOf('**');
+    if (end === -1) {
+      out.push({ text: rest.slice(start), bold: false });
+      break;
+    }
+    out.push({ text: afterOpen.slice(0, end), bold: true });
+    rest = afterOpen.slice(end + 2);
+  }
+  return out;
+}
+
+function paragraphChildrenWithBold(text: string) {
+  return splitMarkdownBoldSegments(text).map((seg, i) =>
+    seg.bold ? (
+      <Text key={i} style={{ fontWeight: '700' }}>
+        {seg.text}
+      </Text>
+    ) : (
+      seg.text
+    )
+  );
+}
+
 export const MatchScreen = () => {
   const navigation = useNavigation<BottomTabNavigationProp<TabStackParamList, 'Match'>>();
   const { height: windowHeight } = useWindowDimensions();
@@ -598,7 +635,7 @@ export const MatchScreen = () => {
                             case 'paragraph':
                               return (
                                 <Text key={idx} style={styles.airaParagraph}>
-                                  {b.text}
+                                  {paragraphChildrenWithBold(b.text)}
                                 </Text>
                               );
                             case 'divider':

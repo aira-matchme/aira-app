@@ -857,6 +857,14 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.white,
     minHeight: 4,
   },
+  voiceBubbleReceived: {
+    backgroundColor: colors.primary[50],
+    borderBottomRightRadius: 20,
+    borderBottomLeftRadius: 6,
+  },
+  voiceBubbleWaveformBarReceived: {
+    backgroundColor: colors.primary.purple,
+  },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
