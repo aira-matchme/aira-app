@@ -476,12 +476,12 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  firstMoveButtonSay: {
+  firstMoveButtonNeutral: {
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.neutral[100],
   },
-  firstMoveButtonAira: {
+  firstMoveButtonActive: {
     backgroundColor: colors.secondary[50],
     borderWidth: 1,
     borderColor: colors.secondary[300],

@@ -108,6 +108,11 @@ const VOICE_WAVEFORM = [8, 12, 6, 14, 10, 16, 8, 14, 12, 10];
 
 const DONT_SHOW_ASK_AIRA_CONFIRM_KEY = 'dont_show_ask_aira_confirm';
 const MESSAGES_PAGE_SIZE = 10;
+const APPROX_MORE_MENU_HEIGHT = 124;
+const MORE_MENU_GAP = 8;
+const APPROX_MESSAGE_CONTEXT_HEIGHT = 132;
+const MESSAGE_CONTEXT_GAP = 8;
+const MESSAGE_CONTEXT_MIN_WIDTH = 172;
 
 const REPORT_REASONS: { value: string; label: string }[] = [
   { value: 'inappropriate_messages', label: 'Inappropriate messages' },
@@ -246,7 +251,7 @@ function keyboardOverlapFromEvent(windowHeight: number, e: KeyboardEvent): numbe
 
 export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const { name, avatar, chatId: initialChatId, isRequest, otherUserId } = route.params;
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const bottomSafeInset = insets.bottom;
   const currentUserId = useAuthStore((s) => s.user?.id);
@@ -265,6 +270,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<Array<{ type: 'image'; uri: string } | { type: 'file'; uri: string; name: string }>>([]);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
+  /** Screen-space placement for the header overflow menu (below / aligned to the ⋮ control). */
+  const [moreMenuScreenPos, setMoreMenuScreenPos] = useState<{ top: number; right: number } | null>(
+    null,
+  );
+  const moreMenuButtonRef = useRef<View>(null);
   const [blockConfirmVisible, setBlockConfirmVisible] = useState(false);
   const [blockConfirmLoading, setBlockConfirmLoading] = useState(false);
   const [showReportSheet, setShowReportSheet] = useState(false);
@@ -293,6 +303,13 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [airaSuggestionsTotalLimit, setAiraSuggestionsTotalLimit] = useState<number | null>(null);
   const [selectedReplyIndex, setSelectedReplyIndex] = useState(0);
   const [messageContextIndex, setMessageContextIndex] = useState<number | null>(null);
+  /** Screen-space anchor for Reply/Delete menu (aligned to the long-pressed bubble). */
+  const [messageContextAnchor, setMessageContextAnchor] = useState<{
+    top: number;
+    left?: number;
+    right?: number;
+  } | null>(null);
+  const messageBubbleRefsRef = useRef<Map<number, View>>(new Map());
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
   const isPickingFileRef = useRef(false);
   const [replyingTo, setReplyingTo] = useState<{ index: number; message: ChatMessage; senderName: string; messageId?: string } | null>(null);
@@ -1411,15 +1428,55 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
   };
 
-  const handleMessageLongPress = (index: number) => {
-    setMessageContextIndex(index);
-  };
+  const handleMessageLongPress = useCallback(
+    (index: number) => {
+      const msg = messages[index];
+      const sent = msg?.sent === true;
+      const node = messageBubbleRefsRef.current.get(index);
+
+      const applyAnchor = (x: number, y: number, width: number, height: number) => {
+        let top = y + height + MESSAGE_CONTEXT_GAP;
+        const bottomLimit = windowHeight - insets.bottom - 16;
+        if (top + APPROX_MESSAGE_CONTEXT_HEIGHT > bottomLimit) {
+          top = Math.max(insets.top + 8, y - APPROX_MESSAGE_CONTEXT_HEIGHT - MESSAGE_CONTEXT_GAP);
+        }
+        const pad = H_PADDING;
+        if (sent) {
+          const right = Math.max(pad, windowWidth - (x + width));
+          setMessageContextAnchor({ top, right });
+        } else {
+          let left = x;
+          left = Math.max(pad, Math.min(left, windowWidth - pad - MESSAGE_CONTEXT_MIN_WIDTH));
+          setMessageContextAnchor({ top, left });
+        }
+        setMessageContextIndex(index);
+      };
+
+      if (!node) {
+        setMessageContextAnchor(null);
+        setMessageContextIndex(index);
+        return;
+      }
+      requestAnimationFrame(() => {
+        node.measureInWindow((mx, my, mwidth, mheight) => {
+          if (mwidth <= 0 || mheight <= 0 || Number.isNaN(mx) || Number.isNaN(my)) {
+            setMessageContextAnchor(null);
+            setMessageContextIndex(index);
+            return;
+          }
+          applyAnchor(mx, my, mwidth, mheight);
+        });
+      });
+    },
+    [insets.bottom, insets.top, messages, windowHeight, windowWidth],
+  );
 
   const renderMessage = (msg: ChatMessage, index: number) => {
     if (msg.type === 'text') {
       return (
         <React.Fragment key={index}>
           <View style={[styles.messageRow, msg.sent ? undefined : styles.messageRowReceived]}>
+            <View ref={(r) => setMessageBubbleRef(index, r)} collapsable={false}>
             <TouchableOpacity
               style={[styles.bubble, msg.sent ? styles.bubbleSent : styles.bubbleReceived]}
               activeOpacity={1}
@@ -1437,6 +1494,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               )}
               <Text style={[styles.bubbleText, msg.sent && styles.bubbleTextSent]}>{msg.text}</Text>
             </TouchableOpacity>
+            </View>
           </View>
           <View style={[styles.timeRow, msg.sent ? undefined : styles.timeRowReceived]}>
             <Text style={styles.timeText}>{msg.timestamp}</Text>
@@ -1448,6 +1506,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       return (
         <React.Fragment key={index}>
           <View style={[styles.messageRow, msg.sent ? undefined : styles.messageRowReceived]}>
+            <View ref={(r) => setMessageBubbleRef(index, r)} collapsable={false}>
             <TouchableOpacity
               style={[styles.bubble, msg.sent ? styles.bubbleSent : styles.bubbleReceived]}
               activeOpacity={1}
@@ -1482,6 +1541,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 );
               })}
             </TouchableOpacity>
+            </View>
           </View>
           <View style={[styles.timeRow, msg.sent ? undefined : styles.timeRowReceived]}>
             <Text style={styles.timeText}>{msg.timestamp}</Text>
@@ -1496,6 +1556,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       return (
         <React.Fragment key={index}>
           <View style={[styles.messageRow, msg.sent ? undefined : styles.messageRowReceived]}>
+            <View ref={(r) => setMessageBubbleRef(index, r)} collapsable={false}>
             <TouchableOpacity
               style={[
                 styles.voiceBubbleSent,
@@ -1537,6 +1598,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 ))}
               </View>
             </TouchableOpacity>
+            </View>
           </View>
           <View style={[styles.timeRow, msg.sent ? undefined : styles.timeRowReceived]}>
             <Text style={styles.timeText}>{msg.timestamp}</Text>
@@ -1548,6 +1610,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       return (
         <React.Fragment key={index}>
           <View style={[styles.messageRow, msg.sent ? undefined : styles.messageRowReceived]}>
+            <View ref={(r) => setMessageBubbleRef(index, r)} collapsable={false}>
             <TouchableOpacity
               style={[styles.imageBubble, msg.sent ? undefined : styles.imageBubbleReceived]}
               activeOpacity={1}
@@ -1555,6 +1618,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             >
               <Image source={{ uri: msg.uri }} style={styles.imageBubbleImage} resizeMode="cover" />
             </TouchableOpacity>
+            </View>
           </View>
           <View style={[styles.timeRow, msg.sent ? undefined : styles.timeRowReceived]}>
             <Text style={styles.timeText}>{msg.timestamp}</Text>
@@ -1566,6 +1630,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       return (
         <React.Fragment key={index}>
           <View style={[styles.messageRow, msg.sent ? undefined : styles.messageRowReceived]}>
+            <View ref={(r) => setMessageBubbleRef(index, r)} collapsable={false}>
             <TouchableOpacity
               style={[styles.fileBubble, msg.sent ? undefined : styles.fileBubbleReceived]}
               activeOpacity={1}
@@ -1578,6 +1643,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 {msg.name}
               </Text>
             </TouchableOpacity>
+            </View>
           </View>
           <View style={[styles.timeRow, msg.sent ? undefined : styles.timeRowReceived]}>
             <Text style={styles.timeText}>{msg.timestamp}</Text>
@@ -1619,6 +1685,58 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     (navigation as unknown as { navigate: (name: string, params?: Record<string, unknown>) => void })
       .navigate('MatchDetails', { userId: otherUserId });
   }, [navigation, otherUserId]);
+
+  const openMoreMenu = useCallback(() => {
+    const applyPosition = (top: number, right: number) => {
+      setMoreMenuScreenPos({ top, right });
+      setMoreMenuVisible(true);
+    };
+    const fallbackPosition = () => {
+      const headerRow = 56;
+      applyPosition(insets.top + 12 + headerRow + MORE_MENU_GAP, H_PADDING);
+    };
+    const node = moreMenuButtonRef.current;
+    if (!node) {
+      fallbackPosition();
+      return;
+    }
+    requestAnimationFrame(() => {
+      node.measureInWindow((x, y, width, height) => {
+        if (width <= 0 || height <= 0 || Number.isNaN(x) || Number.isNaN(y)) {
+          fallbackPosition();
+          return;
+        }
+        let top = y + height + MORE_MENU_GAP;
+        const bottomLimit = windowHeight - insets.bottom - 16;
+        if (top + APPROX_MORE_MENU_HEIGHT > bottomLimit) {
+          top = Math.max(insets.top + 8, y - APPROX_MORE_MENU_HEIGHT - MORE_MENU_GAP);
+        }
+        const right = Math.max(8, windowWidth - (x + width));
+        applyPosition(top, right);
+      });
+    });
+  }, [insets.bottom, insets.top, windowHeight, windowWidth]);
+
+  useEffect(() => {
+    if (!moreMenuVisible) {
+      setMoreMenuScreenPos(null);
+    }
+  }, [moreMenuVisible]);
+
+  useEffect(() => {
+    if (messageContextIndex === null) {
+      setMessageContextAnchor(null);
+    }
+  }, [messageContextIndex]);
+
+  const setMessageBubbleRef = useCallback((index: number, node: View | null) => {
+    const m = messageBubbleRefsRef.current;
+    if (node) {
+      m.set(index, node);
+    } else {
+      m.delete(index);
+    }
+  }, []);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
@@ -1663,9 +1781,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             <AskAiraSendIcon width={52} height={52} />
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={styles.moreButton} onPress={() => setMoreMenuVisible(true)}>
-          <MoreVertIcon size={24} color={colors.black} />
-        </TouchableOpacity>
+        <View ref={moreMenuButtonRef} collapsable={false}>
+          <TouchableOpacity style={styles.moreButton} onPress={openMoreMenu} accessibilityLabel="Chat options">
+            <MoreVertIcon size={24} color={colors.black} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Modal
@@ -1676,42 +1796,49 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       >
         <TouchableWithoutFeedback onPress={() => setMoreMenuVisible(false)}>
           <View style={styles.moreMenuBackdrop}>
-            <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={[styles.moreMenu, { top: insets.top + 12 + 40 + 12 }]} collapsable={false}>
-                <TouchableOpacity
-                  style={styles.moreMenuItem}
-                  onPress={() => {
-                    setMoreMenuVisible(false);
-                    if (otherUserId) 
-                      setBlockConfirmVisible(true);
-                  }}
-                  activeOpacity={0.7}
+            {moreMenuScreenPos != null ? (
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View
+                  style={[
+                    styles.moreMenu,
+                    { top: moreMenuScreenPos.top, right: moreMenuScreenPos.right },
+                  ]}
+                  collapsable={false}
                 >
-                  <View style={styles.moreMenuIconWrap}>
-                    <BlockIcon size={20} color={colors.black} />
-                  </View>
-                  <Text style={styles.moreMenuLabel}>Block</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.moreMenuItem}
-                  onPress={() => {
-                    setMoreMenuVisible(false);
-                    if (!otherUserId) {
-                      return;
-                    }
-                    setReportSheetMode('report');
-                    setReportMessageInput('');
-                    setShowReportSheet(true);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.moreMenuIconWrap]}>
-                    <ReportIcon size={20} color={colors.semantic.error} />
-                  </View>
-                  <Text style={styles.moreMenuLabelReport}>Report</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
+                  <TouchableOpacity
+                    style={styles.moreMenuItem}
+                    onPress={() => {
+                      setMoreMenuVisible(false);
+                      if (otherUserId) setBlockConfirmVisible(true);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.moreMenuIconWrap}>
+                      <BlockIcon size={20} color={colors.black} />
+                    </View>
+                    <Text style={styles.moreMenuLabel}>Block</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.moreMenuItem}
+                    onPress={() => {
+                      setMoreMenuVisible(false);
+                      if (!otherUserId) {
+                        return;
+                      }
+                      setReportSheetMode('report');
+                      setReportMessageInput('');
+                      setShowReportSheet(true);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.moreMenuIconWrap]}>
+                      <ReportIcon size={20} color={colors.semantic.error} />
+                    </View>
+                    <Text style={styles.moreMenuLabelReport}>Report</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableWithoutFeedback>
+            ) : null}
           </View>
         </TouchableWithoutFeedback>
       </Modal>
@@ -2046,9 +2173,25 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         onRequestClose={() => setMessageContextIndex(null)}
       >
         <TouchableWithoutFeedback onPress={() => setMessageContextIndex(null)}>
-          <View style={styles.messageContextBackdrop}>
+          <View
+            style={[
+              styles.messageContextBackdrop,
+              messageContextAnchor == null && styles.messageContextBackdropCentered,
+            ]}
+          >
             <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={styles.messageContextBubble}>
+              <View
+                style={[
+                  styles.messageContextBubble,
+                  messageContextAnchor != null && {
+                    position: 'absolute',
+                    top: messageContextAnchor.top,
+                    ...(messageContextAnchor.left != null
+                      ? { left: messageContextAnchor.left }
+                      : { right: messageContextAnchor.right ?? H_PADDING }),
+                  },
+                ]}
+              >
                 <TouchableOpacity
                   style={styles.messageContextItem}
                   onPress={() => {

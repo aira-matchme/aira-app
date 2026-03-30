@@ -96,10 +96,11 @@ export const styles = StyleSheet.create({
   },
   moreMenu: {
     position: 'absolute',
-    right: H_PADDING,
-    minWidth: 160,
+    // `top` / `right` come from measureInWindow on the overflow button so the sheet
+    // sits flush under the icon and stays out of the message list.
+    minWidth: 172,
     backgroundColor: '#F2F2F2',
-    borderRadius: 12,
+    borderRadius: 14,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -109,7 +110,8 @@ export const styles = StyleSheet.create({
       },
       android: { elevation: 8 },
     }),
-    paddingVertical: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
   },
   moreMenuItem: {
     flexDirection: 'row',
@@ -144,14 +146,16 @@ export const styles = StyleSheet.create({
   messageContextBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  messageContextBackdropCentered: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   messageContextBubble: {
     backgroundColor: colors.white,
     borderRadius: 16,
-    minWidth: 160,
-    paddingVertical: 8,
+    minWidth: 172,
+    paddingVertical: 10,
     paddingHorizontal: 4,
     ...Platform.select({
       ios: {

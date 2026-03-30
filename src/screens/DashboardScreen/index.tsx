@@ -6,6 +6,7 @@ import {
   Image,
   Dimensions,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   StatusBar,
   ImageSourcePropType,
@@ -523,9 +524,12 @@ export const DashboardScreen = () => {
               
             </View>
             <View style={styles.firstMoveButtonsRow}>
-              <TouchableOpacity
-                style={[styles.firstMoveButton, styles.firstMoveButtonSay]}
-                activeOpacity={0.8}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.firstMoveButton,
+                  styles.firstMoveButtonNeutral,
+                  pressed && styles.firstMoveButtonActive,
+                ]}
                 onPress={() => {
                   const m = selectedMatch;
                   if (!m) return;
@@ -548,10 +552,13 @@ export const DashboardScreen = () => {
                   <TabChatIcon color={colors.primary.purple} width={24} height={24} />
                 </View>
                 <Text style={styles.firstMoveButtonText}>Say it in your words</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.firstMoveButton, styles.firstMoveButtonAira]}
-                activeOpacity={0.8}
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.firstMoveButton,
+                  styles.firstMoveButtonNeutral,
+                  (pressed || firstMoveLoading) && styles.firstMoveButtonActive,
+                ]}
                 disabled={firstMoveLoading}
                 onPress={async () => {
                   const m = selectedMatch;
@@ -586,7 +593,7 @@ export const DashboardScreen = () => {
                     the ice
                   </GradientText>
                 </View>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
         ) : (

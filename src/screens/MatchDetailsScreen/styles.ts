@@ -421,12 +421,14 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  firstMoveButtonSay: {
+  /** Default look for both first-move options (no selection until pressed). */
+  firstMoveButtonNeutral: {
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.neutral[100],
   },
-  firstMoveButtonAira: {
+  /** Shown only while the option is pressed / active (e.g. Aira request in flight). */
+  firstMoveButtonActive: {
     backgroundColor: colors.secondary[50],
     borderWidth: 1,
     borderColor: colors.secondary[300],

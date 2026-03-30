@@ -1,5 +1,20 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { View, Text, StatusBar, ActivityIndicator, ScrollView, Image, TouchableOpacity, Platform, StyleSheet, Modal, TouchableWithoutFeedback, Alert, TextInput } from 'react-native';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StatusBar,
+  ActivityIndicator,
+  ScrollView,
+  Image,
+  TouchableOpacity,
+  Pressable,
+  Platform,
+  StyleSheet,
+  Modal,
+  TouchableWithoutFeedback,
+  Alert,
+  TextInput,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -480,6 +495,29 @@ export const MatchDetailsScreen: React.FC = () => {
     const list = profile?.galleryPhotos ?? [];
     return [...list].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }, [profile?.galleryPhotos]);
+
+  /** Match details sits on the root stack; Chat lives under `Tabs` → `Chat` → `ChatDetail`. */
+  const openChatFromFirstMove = useCallback(() => {
+    const d = details as Record<string, any> | null | undefined;
+    const rawChatId = d?.chatId ?? d?.match?.chatId ?? d?.existingChatId ?? d?.profile?.chatId;
+    const chatId =
+      typeof rawChatId === 'string' && rawChatId.length > 0 ? rawChatId : '';
+    const firstPhoto = galleryPhotos.find((p: { url?: string }) => Boolean(p?.url));
+    setShowFirstMovePopup(false);
+    navigation.navigate('Tabs', {
+      screen: 'Chat',
+      params: {
+        screen: 'ChatDetail',
+        params: {
+          chatId,
+          name,
+          ...(firstPhoto?.url ? { avatar: { uri: String(firstPhoto.url) } } : {}),
+          isRequest: false,
+          otherUserId: userId,
+        },
+      },
+    });
+  }, [details, galleryPhotos, name, navigation, userId]);
 
   const distanceLabel = useMemo(() => {
     const miles = details?.distanceMiles;
@@ -1159,31 +1197,25 @@ export const MatchDetailsScreen: React.FC = () => {
               </View>
             </View>
             <View style={styles.firstMoveButtonsRow}>
-              <TouchableOpacity
-                style={[styles.firstMoveButton, styles.firstMoveButtonSay]}
-                activeOpacity={0.8}
-                onPress={() => {
-                  setShowFirstMovePopup(false);
-                  navigation.navigate('Chat', {
-                    screen: 'ChatDetail',
-                    params: {
-                      chatId: userId,
-                      name,
-                      avatar: galleryPhotos[0]?.url ? { uri: galleryPhotos[0].url } : undefined,
-                      isRequest: false,
-                      otherUserId: userId,
-                    },
-                  });
-                }}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.firstMoveButton,
+                  styles.firstMoveButtonNeutral,
+                  pressed && styles.firstMoveButtonActive,
+                ]}
+                onPress={openChatFromFirstMove}
               >
                 <View style={styles.firstMoveButtonIcon}>
                   <TabChatIcon color={colors.primary.purple} width={24} height={24} />
                 </View>
                 <Text style={styles.firstMoveButtonText}>Say it in your words</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.firstMoveButton, styles.firstMoveButtonAira]}
-                activeOpacity={0.8}
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.firstMoveButton,
+                  styles.firstMoveButtonNeutral,
+                  (pressed || firstMoveLoading) && styles.firstMoveButtonActive,
+                ]}
                 disabled={firstMoveLoading}
                 onPress={async () => {
                   if (firstMoveLoading) return;
@@ -1217,7 +1249,7 @@ export const MatchDetailsScreen: React.FC = () => {
                     the ice
                   </GradientText>
                 </View>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
         ) : (

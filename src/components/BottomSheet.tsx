@@ -281,11 +281,15 @@ export const ReusableBottomSheet: React.FC<BottomSheetProps> = ({
                 ],
               },
             ]}
-            {...(enablePanDownToClose ? panResponder.panHandlers : {})}
+            {...(enablePanDownToClose && !showDragHandle ? panResponder.panHandlers : {})}
+            // eslint-disable-next-line react/jsx-props-no-spreading
           >
-            {/* Drag Handle */}
+            {/* Drag Handle — pan gestures confined here so Touchables get the first press */}
             {showDragHandle && (
-              <View style={[styles.dragHandleContainer, dragHandleContainerStyle]}>
+              <View
+                style={[styles.dragHandleContainer, dragHandleContainerStyle]}
+                {...(enablePanDownToClose ? panResponder.panHandlers : {})}
+              >
                 <View style={[styles.dragHandle, dragHandleStyle]} />
               </View>
             )}
@@ -301,24 +305,32 @@ export const ReusableBottomSheet: React.FC<BottomSheetProps> = ({
               </TouchableOpacity>
             )}
 
-            {/* Content */}
-            <ScrollView
-              style={styles.scrollView}
-              contentContainerStyle={[
-                styles.scrollViewContent,
-                Platform.OS === 'android' && { paddingBottom: 300 },
-              ]}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
-              showsVerticalScrollIndicator={false}
-              bounces={false}
-              nestedScrollEnabled={true}
-              scrollEnabled={scrollEnabled}
-            >
-              <View style={styles.contentContainer} pointerEvents="box-none">
-                {children}
+            {/* Content — plain View when not scrollable avoids ScrollView eating the first tap (Android). */}
+            {scrollEnabled ? (
+              <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={[
+                  styles.scrollViewContent,
+                  Platform.OS === 'android' && { paddingBottom: 300 },
+                ]}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+                nestedScrollEnabled={true}
+                scrollEnabled
+              >
+                <View style={styles.contentContainer} pointerEvents="box-none">
+                  {children}
+                </View>
+              </ScrollView>
+            ) : (
+              <View style={styles.scrollView} pointerEvents="box-none">
+                <View style={[styles.scrollViewContent, styles.contentContainer]} pointerEvents="box-none">
+                  {children}
+                </View>
               </View>
-            </ScrollView>
+            )}
           </Animated.View>
         </Animated.View>
       </View>
