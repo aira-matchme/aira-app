@@ -1333,8 +1333,8 @@ borderRadius: 16,
     borderBottomLeftRadius: 6,
   },
   imageBubbleImage: {
-    width: IMAGE_BUBBLE_SIZE,
-    height: IMAGE_BUBBLE_SIZE,
+    width: '100%',
+    height: '100%',
   },
   fileBubble: {
     maxWidth: BUBBLE_MAX_WIDTH,

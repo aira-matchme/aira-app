@@ -57,6 +57,8 @@ const PHOTO_INTERVAL_MS = 4000;
 
 type MatchItem = {
   id: string;
+  /** Cursor id used by /matches/cursor save + paging. */
+  matchId?: string;
   name: string;
   age: number;
   /** Existing chat id with this match, if any */
@@ -73,6 +75,8 @@ type MatchItem = {
 
 type GetMatchesItem = {
   userId: string;
+  _id?: string;
+  matchId?: string;
   chatId?: string;
   name: string;
   galleryPhotos?: { order: number; url: string }[];
@@ -101,6 +105,7 @@ type GetMatchesResponse = {
 export const DashboardScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const scrollRef = useRef<ScrollView | null>(null);
   const [showFirstMovePopup, setShowFirstMovePopup] = useState(false);
   const [firstMoveStep, setFirstMoveStep] = useState<'choose' | 'sent'>('choose');
   const [firstMoveLoading, setFirstMoveLoading] = useState(false);
@@ -110,54 +115,260 @@ export const DashboardScreen = () => {
   const [blockLoading, setBlockLoading] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
   const [matches, setMatches] = useState<MatchItem[]>([]);
+  const [pagingLoading, setPagingLoading] = useState(false);
+  const [pagingBootstrapped, setPagingBootstrapped] = useState(false);
+  const pagingInFlightRef = useRef(false);
+  const lastSavedCursorRef = useRef<string | null>(null);
+  const lastIndexHandledRef = useRef<number | null>(null);
+  const hasMoreNextRef = useRef(true);
+  const hasMorePrevRef = useRef(true);
+  const topCursorRef = useRef<string | null>(null);
+  const bottomCursorRef = useRef<string | null>(null);
   /** Current photo index per match (for multi-photo auto-rotate). Key = match.id, value = 0..images.length-1 */
   const [photoIndexByMatchId, setPhotoIndexByMatchId] = useState<Record<string, number>>({});
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const currentIndexRef = useRef(0);
 
-  const refreshMatches = useCallback(async () => {
-    try {
-      const { data } = await apiClient.post<GetMatchesResponse>(
-        endpoints.matches.getMatches
+  const CURSOR_PAGE_LIMIT = 4;
+
+  const mapMatches = useCallback((items: GetMatchesItem[]): MatchItem[] => {
+    return items.map((item) => {
+      const sortedPhotos = [...(item.galleryPhotos ?? [])].sort(
+        (a, b) => (a.order ?? 0) - (b.order ?? 0)
       );
-      const items = data?.data?.items ?? [];
-      const mapped: MatchItem[] = items.map((item) => {
-        const sortedPhotos = [...(item.galleryPhotos ?? [])].sort(
-          (a, b) => (a.order ?? 0) - (b.order ?? 0)
-        );
-        const imageSources: ImageSourcePropType[] = sortedPhotos.map((p) => ({
-          uri: p.url,
-        }));
-        const primaryImage: ImageSourcePropType =
-          imageSources[0] ?? require('../../assets/images/Profile1.png');
+      const imageSources: ImageSourcePropType[] = sortedPhotos.map((p) => ({
+        uri: p.url,
+      }));
+      const primaryImage: ImageSourcePropType =
+        imageSources[0] ?? require('../../assets/images/Profile1.png');
 
-        return {
-          id: item.userId,
-          chatId: item.chatId,
-          name: item.name,
-          age: 0,
-          overallPercent: item.matchScore,
-          lifestylePercent: item.preferenceScore,
-          personalityPercent: item.personalityScore,
-          otherPercent: Math.round((item.relationshipIntentScore + item.visualScore) / 2),
-          image: primaryImage,
-          images: imageSources.length > 0 ? imageSources : undefined,
-          isLiked: item.isLiked ?? false,
-        };
-      });
-      setMatches(mapped);
-    } catch (e) {
-      // On failure, keep current matches.
+      const matchId = item.matchId ?? item._id;
+
+      return {
+        id: item.userId,
+        matchId,
+        chatId: item.chatId,
+        name: item.name,
+        age: 0,
+        overallPercent: item.matchScore,
+        lifestylePercent: item.preferenceScore,
+        personalityPercent: item.personalityScore,
+        otherPercent: Math.round((item.relationshipIntentScore + item.visualScore) / 2),
+        image: primaryImage,
+        images: imageSources.length > 0 ? imageSources : undefined,
+        isLiked: item.isLiked ?? false,
+      };
+    });
+  }, []);
+
+  const getCursorId = useCallback(async (): Promise<string | null> => {
+    try {
+      const res = await apiClient.get(endpoints.matches.getMatchesCursor);
+      const matchId =
+        res?.data?.data?.matchId ??
+        res?.data?.data?._id ??
+        res?.data?.matchId ??
+        null;
+      return typeof matchId === 'string' && matchId.length > 0 ? matchId : null;
+    } catch {
+      return null;
     }
   }, []);
 
+  const fetchCursorPage = useCallback(
+    async (cursor: string | null, direction: 'forward' | 'backward') => {
+      const res = await apiClient.post(endpoints.matches.getMatchesCursorPage, {
+        cursor,
+        direction,
+        limit: CURSOR_PAGE_LIMIT,
+      });
+
+      const payload = res?.data?.data;
+      const items: GetMatchesItem[] = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.items)
+          ? payload.items
+          : [];
+
+      const mapped = mapMatches(items);
+      const hasNext =
+        typeof payload?.hasNext === 'boolean' ? payload.hasNext : mapped.length > 0;
+      const hasPrev =
+        typeof payload?.hasPrev === 'boolean' ? payload.hasPrev : mapped.length > 0;
+
+      return { items: mapped, hasNext, hasPrev };
+    },
+    [mapMatches]
+  );
+
+  const saveCursor = useCallback(async (matchId: string) => {
+    try {
+      await apiClient.post(endpoints.matches.saveMatchesCursor, { matchId });
+      lastSavedCursorRef.current = matchId;
+    } catch {
+      // non-blocking
+    }
+  }, []);
+
+  const getRenderKey = useCallback((m: MatchItem, index?: number) => {
+    // Must be stable across renders/pages, otherwise we can't reliably dedupe.
+    // Backend-provided matchId should be unique per match; fallback to userId.
+    if (m.matchId && m.matchId.length > 0) return m.matchId;
+    return m.id;
+  }, []);
+
+  const getCursorFromMatch = useCallback((m: MatchItem | undefined | null) => {
+    const cursor = m?.matchId ?? m?.id ?? null;
+    return typeof cursor === 'string' && cursor.length > 0 ? cursor : null;
+  }, []);
+
+  const slideHeight = useMemo(() => {
+    const headerApprox = 60 + insets.top;
+    const cardHeightRatio = getCardHeightRatio(SCREEN_HEIGHT, SCREEN_WIDTH);
+    return Math.min((SCREEN_HEIGHT - headerApprox) * cardHeightRatio, SCREEN_HEIGHT * 0.95);
+  }, [insets.top]);
+
+  const contentHeight = useMemo(
+    () =>
+      matches.length * (slideHeight + SLIDE_GAP) +
+      SLIDE_GAP +
+      (matches.length > 0 ? 80 : 0),
+    [matches.length, slideHeight]
+  );
+
+  const ensureMoreMatchesIfNeeded = useCallback(async () => {
+    if (pagingInFlightRef.current) return;
+    if (!hasMoreNextRef.current) return;
+    // Only fetch when user reaches the end of loaded cards
+    const atEnd = currentIndexRef.current >= Math.max(0, matches.length - 1);
+    if (!atEnd) return;
+
+    pagingInFlightRef.current = true;
+    setPagingLoading(true);
+    try {
+      const cursorId = bottomCursorRef.current ?? (await getCursorId());
+      const page = await fetchCursorPage(cursorId, 'forward');
+      const next = page.items;
+
+      setMatches((prev) => {
+        const seen = new Set<string>();
+        prev.forEach((m, i) => {
+          seen.add(getRenderKey(m));
+        });
+        const merged = [...prev];
+        next.forEach((m) => {
+          const key = getRenderKey(m);
+          if (!seen.has(key)) {
+            seen.add(key);
+            merged.push(m);
+          }
+        });
+        topCursorRef.current = getCursorFromMatch(merged[0]);
+        bottomCursorRef.current = getCursorFromMatch(merged[merged.length - 1]);
+        return merged;
+      });
+
+      hasMoreNextRef.current = !!page.hasNext;
+      hasMorePrevRef.current = !!page.hasPrev;
+    } finally {
+      setPagingLoading(false);
+      pagingInFlightRef.current = false;
+    }
+  }, [fetchCursorPage, getCursorFromMatch, getCursorId, getRenderKey, matches.length]);
+
+  const ensurePreviousMatchesIfNeeded = useCallback(async () => {
+    if (pagingInFlightRef.current) return;
+    if (!hasMorePrevRef.current) return;
+    // Only fetch when user reaches the top of loaded cards
+    const atTop = currentIndexRef.current <= 0;
+    if (!atTop) return;
+
+    pagingInFlightRef.current = true;
+    setPagingLoading(true);
+    try {
+      const cursorId = topCursorRef.current ?? (await getCursorId());
+      const page = await fetchCursorPage(cursorId, 'backward');
+      const prevItems = page.items;
+      if (!prevItems.length) {
+        hasMorePrevRef.current = !!page.hasPrev;
+        hasMoreNextRef.current = !!page.hasNext;
+        return;
+      }
+
+      let addedCount = 0;
+      setMatches((prev) => {
+        const seen = new Set<string>();
+        prev.forEach((m, i) => {
+          seen.add(getRenderKey(m));
+        });
+        const toPrepend: MatchItem[] = [];
+        prevItems.forEach((m) => {
+          const key = getRenderKey(m);
+          if (!seen.has(key)) {
+            seen.add(key);
+            toPrepend.push(m);
+          }
+        });
+        addedCount = toPrepend.length;
+        const merged = [...toPrepend, ...prev];
+        topCursorRef.current = getCursorFromMatch(merged[0]);
+        bottomCursorRef.current = getCursorFromMatch(merged[merged.length - 1]);
+        return merged;
+      });
+
+      // Keep the currently visible card anchored after prepend.
+      requestAnimationFrame(() => {
+        if (addedCount <= 0) return;
+        const deltaY = addedCount * (slideHeight + SLIDE_GAP);
+        scrollRef.current?.scrollTo({ y: deltaY, animated: false });
+        currentIndexRef.current = addedCount;
+        lastIndexHandledRef.current = addedCount;
+      });
+
+      hasMorePrevRef.current = !!page.hasPrev;
+      hasMoreNextRef.current = !!page.hasNext;
+    } finally {
+      setPagingLoading(false);
+      pagingInFlightRef.current = false;
+    }
+  }, [fetchCursorPage, getCursorFromMatch, getCursorId, getRenderKey, slideHeight]);
+
+  const bootstrapMatches = useCallback(async () => {
+    if (pagingInFlightRef.current) return;
+    pagingInFlightRef.current = true;
+    setPagingLoading(true);
+    try {
+      hasMoreNextRef.current = true;
+      hasMorePrevRef.current = true;
+      topCursorRef.current = null;
+      bottomCursorRef.current = null;
+      lastIndexHandledRef.current = null;
+      const cursorId = await getCursorId();
+      const firstPage = await fetchCursorPage(cursorId, 'forward');
+      setMatches(() => {
+        const items = firstPage.items;
+        topCursorRef.current = getCursorFromMatch(items[0]);
+        bottomCursorRef.current = getCursorFromMatch(items[items.length - 1]);
+        return items;
+      });
+      hasMoreNextRef.current = !!firstPage.hasNext;
+      hasMorePrevRef.current = !!firstPage.hasPrev;
+      setPagingBootstrapped(true);
+      currentIndexRef.current = 0;
+    } finally {
+      setPagingLoading(false);
+      pagingInFlightRef.current = false;
+    }
+  }, [fetchCursorPage, getCursorFromMatch, getCursorId]);
+
   useEffect(() => {
-    refreshMatches();
-  }, [refreshMatches]);
+    bootstrapMatches();
+  }, [bootstrapMatches]);
 
   useFocusEffect(
     useCallback(() => {
-      refreshMatches();
-    }, [refreshMatches]),
+      bootstrapMatches();
+    }, [bootstrapMatches]),
   );
 
   useEffect(() => {
@@ -190,29 +401,12 @@ export const DashboardScreen = () => {
     };
   }, [matches]);
 
-  const slideHeight = useMemo(() => {
-    const headerApprox = 60 + insets.top;
-    const cardHeightRatio = getCardHeightRatio(SCREEN_HEIGHT, SCREEN_WIDTH);
-    return Math.min(
-      (SCREEN_HEIGHT - headerApprox) * cardHeightRatio,
-      SCREEN_HEIGHT * 0.95
-    );
-  }, [insets.top]);
-
-  const contentHeight = useMemo(
-    () =>
-      matches.length * (slideHeight + SLIDE_GAP) +
-      SLIDE_GAP +
-      (matches.length > 0 ? 80 : 0),
-    [matches.length, slideHeight]
-  );
-
   const handleLike = async (id: string) => {
     try {
       await apiClient.post(endpoints.matches.addLike, {
         likedUserId: id,
       });
-      await refreshMatches();
+      await bootstrapMatches();
     } catch {
       // Keep card state on failure
     }
@@ -223,7 +417,7 @@ export const DashboardScreen = () => {
       await apiClient.post(endpoints.matches.removeLike, {
         likedUserId: id,
       });
-      await refreshMatches();
+      await bootstrapMatches();
     } catch {
       // Keep card state on failure
     }
@@ -271,6 +465,9 @@ export const DashboardScreen = () => {
           </View>
         ) : (
           <ScrollView
+            ref={(r) => {
+              scrollRef.current = r;
+            }}
             style={styles.scrollView}
             contentContainerStyle={[
               styles.scrollContent,
@@ -280,10 +477,26 @@ export const DashboardScreen = () => {
             snapToInterval={slideHeight + SLIDE_GAP}
             snapToAlignment="start"
             decelerationRate="fast"
+            onMomentumScrollEnd={(e) => {
+              const y = e.nativeEvent.contentOffset.y ?? 0;
+              const idx = Math.max(0, Math.round(y / (slideHeight + SLIDE_GAP)));
+              if (lastIndexHandledRef.current === idx) return;
+              lastIndexHandledRef.current = idx;
+              currentIndexRef.current = idx;
+
+              const m = matches[idx];
+              const matchIdToSave = m?.matchId ?? m?.id;
+              if (matchIdToSave && lastSavedCursorRef.current !== matchIdToSave) {
+                saveCursor(matchIdToSave);
+              }
+              // Only check paging when we actually swiped to a new card
+              ensurePreviousMatchesIfNeeded();
+              ensureMoreMatchesIfNeeded();
+            }}
           >
-            {matches?.map((match) => (
+            {matches?.map((match, index) => (
               <View
-                key={match.id}
+                key={getRenderKey(match, index)}
                 style={[
                   styles.slide,
                   {
@@ -482,6 +695,11 @@ export const DashboardScreen = () => {
                 </View>
               </View>
             ))}
+            {pagingBootstrapped && pagingLoading && (
+              <View style={{ paddingVertical: 14 }}>
+                <ActivityIndicator size="small" color={colors.primary.purple} />
+              </View>
+            )}
             {matches.length > 0 && (
               <View
                 style={[
@@ -663,7 +881,7 @@ export const DashboardScreen = () => {
                         'User blocked successfully.';
                       setShowMatchOptions(false);
                       setOptionsMatch(null);
-                      await refreshMatches();
+                      await bootstrapMatches();
                       Alert.alert('Blocked', apiMessage.toString());
                     } catch (e: any) {
                       const errMessage =
@@ -706,7 +924,7 @@ export const DashboardScreen = () => {
                         'Report submitted successfully.';
                       setShowMatchOptions(false);
                       setOptionsMatch(null);
-                      await refreshMatches();
+                      await bootstrapMatches();
                       Alert.alert('Reported', apiMessage.toString());
                     } catch (e: any) {
                       const errMessage =

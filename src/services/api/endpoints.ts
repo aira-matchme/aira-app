@@ -35,6 +35,9 @@ export const endpoints = {
   },
   matches: {
     getMatches: '/user-match-profile/matches',
+    getMatchesCursor: '/user-match-profile/matches/cursor',
+    saveMatchesCursor: '/user-match-profile/matches/cursor',
+    getMatchesCursorPage: '/user-match-profile/matches/cursor1',
     getMatchDetails: '/user-match-profile/profile-insights/{id}',
     addLike: '/user-like',
     removeLike: '/user-like/dislike',

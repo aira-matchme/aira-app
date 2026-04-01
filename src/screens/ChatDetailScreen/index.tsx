@@ -254,6 +254,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const bottomSafeInset = insets.bottom;
+  const imageBubbleSize = Math.max(160, Math.min(Math.round(windowWidth * 0.75), 320));
   const currentUserId = useAuthStore((s) => s.user?.id);
   const [chatId, setChatId] = useState<string | null>(initialChatId ?? null);
   const [requestActionLoading, setRequestActionLoading] = useState<'accept' | 'decline' | 'block' | null>(null);
@@ -320,6 +321,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [composerHeight, setComposerHeight] = useState(120);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
+  const [imagePreviewZoomed, setImagePreviewZoomed] = useState(false);
+  const imagePreviewLastTapRef = useRef<number>(0);
   const androidBaseWindowHeightRef = useRef(windowHeight);
   const aiSuggestionsRequestIdRef = useRef(0);
   const typingStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1130,11 +1134,31 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
   const openGallery = () => {
     launchImageLibrary(
-      { mediaType: 'photo', quality: 0.8 },
+      {
+        mediaType: 'photo',
+        quality: 0.8,
+        // Allow selecting multiple photos (incl. Google Photos picker).
+        // `0` means "no limit" in react-native-image-picker.
+        selectionLimit: 0,
+      },
       (response) => {
         if (response.didCancel || response.errorCode) return;
-        const uri = response.assets?.[0]?.uri;
-        if (uri) setPendingAttachments((p) => [...p, { type: 'image', uri }]);
+        const uris =
+          response.assets
+            ?.map((a) => a?.uri)
+            .filter((u): u is string => typeof u === 'string' && u.length > 0) ?? [];
+        if (!uris.length) return;
+        setPendingAttachments((prev) => {
+          const existing = new Set(prev.map((p) => p.uri));
+          const next = [...prev];
+          uris.forEach((uri) => {
+            if (!existing.has(uri)) {
+              existing.add(uri);
+              next.push({ type: 'image', uri });
+            }
+          });
+          return next;
+        });
       }
     );
   };
@@ -1612,8 +1636,13 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           <View style={[styles.messageRow, msg.sent ? undefined : styles.messageRowReceived]}>
             <View ref={(r) => setMessageBubbleRef(index, r)} collapsable={false}>
             <TouchableOpacity
-              style={[styles.imageBubble, msg.sent ? undefined : styles.imageBubbleReceived]}
+              style={[
+                styles.imageBubble,
+                msg.sent ? undefined : styles.imageBubbleReceived,
+                { width: imageBubbleSize, height: imageBubbleSize },
+              ]}
               activeOpacity={1}
+              onPress={() => openImagePreview(msg.uri)}
               onLongPress={() => handleMessageLongPress(index)}
             >
               <Image source={{ uri: msg.uri }} style={styles.imageBubbleImage} resizeMode="cover" />
@@ -1738,6 +1767,17 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
   }, []);
 
+  const openImagePreview = useCallback((uri: string) => {
+    if (!uri) return;
+    setImagePreviewZoomed(false);
+    setImagePreviewUri(uri);
+  }, []);
+
+  const closeImagePreview = useCallback(() => {
+    setImagePreviewUri(null);
+    setImagePreviewZoomed(false);
+  }, []);
+
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <View style={styles.screen}>
@@ -1841,6 +1881,60 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             ) : null}
           </View>
         </TouchableWithoutFeedback>
+      </Modal>
+
+      <Modal
+        visible={imagePreviewUri != null}
+        transparent
+        animationType="fade"
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+        hardwareAccelerated
+        onRequestClose={closeImagePreview}
+      >
+        <View style={imagePreviewStyles.backdrop}>
+          <View style={[imagePreviewStyles.topBar, { paddingTop: insets.top + 10 }]}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Close image preview"
+              onPress={closeImagePreview}
+              activeOpacity={0.8}
+              style={imagePreviewStyles.closeButton}
+            >
+              <GeneratingCloseIcon size={28} color={colors.white} />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableWithoutFeedback onPress={closeImagePreview}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
+
+          <View style={imagePreviewStyles.content}>
+            {imagePreviewUri != null && (
+              <View style={imagePreviewStyles.card}>
+                <TouchableWithoutFeedback
+                  onPress={() => {
+                    const nowTap = Date.now();
+                    const delta = nowTap - (imagePreviewLastTapRef.current || 0);
+                    imagePreviewLastTapRef.current = nowTap;
+                    if (delta < 260) {
+                      setImagePreviewZoomed((z) => !z);
+                    }
+                  }}
+                >
+                  <Image
+                    source={{ uri: imagePreviewUri }}
+                    resizeMode="contain"
+                    style={[
+                      imagePreviewStyles.image,
+                      imagePreviewZoomed && imagePreviewStyles.imageZoomed,
+                    ]}
+                  />
+                </TouchableWithoutFeedback>
+              </View>
+            )}
+          </View>
+        </View>
       </Modal>
 
       <Modal
@@ -3092,5 +3186,51 @@ const reportSheetStyles = StyleSheet.create({
     fontWeight: '500',
     fontFamily: typography.fontFamily.medium,
     color: colors.white,
+  },
+});
+
+const imagePreviewStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+  },
+  topBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 3,
+    alignItems: 'flex-end',
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+  },
+  closeButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 360,
+    height: 420,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  imageZoomed: {
+    transform: [{ scale: 1.6 }],
   },
 });
