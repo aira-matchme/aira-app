@@ -375,35 +375,55 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   useEffect(() => {
     const applyOverlap = (e: KeyboardEvent) => {
       const overlap = keyboardOverlapFromEvent(windowHeight, e);
+    
+      if (Math.abs(overlap - keyboardHeight) < 10) return;
+    
       setIsKeyboardVisible(overlap > 0);
-      setKeyboardHeight(overlap);
-      scrollToEndAfterKeyboard(true);
+    
+      // ✅ ALWAYS update height (THIS FIXES YOUR ISSUE)
+      if (overlap > 0) {
+        setKeyboardHeight(overlap);
+      }
+    
+      requestAnimationFrame(() => {
+        scrollToEndAfterKeyboard(true);
+      });
     };
-
+  
     if (Platform.OS === 'ios') {
       const frameSub = Keyboard.addListener('keyboardWillChangeFrame', applyOverlap);
+  
       const hideSub = Keyboard.addListener('keyboardWillHide', () => {
         setIsKeyboardVisible(false);
         setKeyboardHeight(0);
-        scrollToEndAfterKeyboard(true);
+  
+        requestAnimationFrame(() => {
+          scrollToEndAfterKeyboard(true);
+        });
       });
+  
       return () => {
         frameSub.remove();
         hideSub.remove();
       };
     }
-
+  
     const showSub = Keyboard.addListener('keyboardDidShow', applyOverlap);
+  
     const hideSub = Keyboard.addListener('keyboardDidHide', () => {
       setIsKeyboardVisible(false);
       setKeyboardHeight(0);
-      scrollToEndAfterKeyboard(false);
+  
+      requestAnimationFrame(() => {
+        scrollToEndAfterKeyboard(false);
+      });
     });
+  
     return () => {
       showSub.remove();
       hideSub.remove();
     };
-  }, [windowHeight, scrollToEndAfterKeyboard]);
+  }, [windowHeight, scrollToEndAfterKeyboard, keyboardHeight]);
 
   useFocusEffect(
     useCallback(() => {
@@ -437,16 +457,35 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       androidBaseWindowHeightRef.current = windowHeight;
     }
   }, [isKeyboardVisible, windowHeight]);
+  // const shouldApplyManualKeyboardOffset =
+  // Platform.OS === 'ios' || keyboardHeight > 0;
+  const isAndroid = Platform.OS === 'android';
 
-  const androidWindowShrink = Math.max(
-    0,
-    androidBaseWindowHeightRef.current - windowHeight
-  );
-  const androidUsesResizeMode = androidWindowShrink > 60;
-  const shouldApplyManualKeyboardOffset =
-    Platform.OS === 'ios' || !androidUsesResizeMode;
-  const composerBottomOffset = shouldApplyManualKeyboardOffset ? keyboardHeight : 0;
+  const androidWindowShrink =
+    androidBaseWindowHeightRef.current - windowHeight;
+  
+  // Detect real resize
+  const isKeyboardHandledBySystem = isAndroid && androidWindowShrink > 100;
 
+  const isWeirdKeyboard =
+  Platform.OS === 'android' &&
+  isKeyboardVisible &&
+  keyboardHeight < 120;
+  
+  // const composerBottomOffset =
+  // Platform.OS === 'ios'
+  //   ? keyboardHeight
+  //   : isKeyboardHandledBySystem
+  //   ? 0
+  //   : isWeirdKeyboard
+  //   ? 0 // 🚨 KEY FIX
+  //   : keyboardHeight;
+  const composerBottomOffset =
+  Platform.OS === 'ios'
+    ? keyboardHeight
+    : isKeyboardHandledBySystem
+    ? 0
+    : keyboardHeight;
 
   const isOtherUserOnlineFromPayload = useCallback(
     (payload: unknown): boolean | null => {
@@ -2490,10 +2529,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           ...styles.scrollContent,
           // Composer is fixed to bottom; pad for its height + keyboard so messages stay scrollable.
           paddingBottom:
-            (styles.scrollContent?.paddingBottom ?? 16) +
-            composerHeight +
-            12 +
-            (shouldApplyManualKeyboardOffset ? keyboardHeight : 0),
+          (styles.scrollContent?.paddingBottom ?? 16) +
+          composerHeight +
+          12 +
+          (isWeirdKeyboard ? 0 : composerBottomOffset),
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -2773,9 +2812,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 )}
                 <CommitContentTextInput
                   style={styles.input}
+                  ref={inputRef}
                   placeholder=""
                   value={inputText}
-                  onChangeText={setInputText}
+                  onChangeText={(text) => setInputText(text)}
                   onCommitContent={handleKeyboardCommitContent}
                   multiline
                   underlineColorAndroid="transparent"
