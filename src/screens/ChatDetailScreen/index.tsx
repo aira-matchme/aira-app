@@ -17,6 +17,7 @@ import {
   LayoutChangeEvent,
   useWindowDimensions,
   type KeyboardEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -24,6 +25,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { pick } from '@react-native-documents/picker';
 import { Button } from '../../components/Button';
+import { CommitContentTextInput } from '../../components/CommitContentTextInput';
 import { ReusableBottomSheet } from '../../components/BottomSheet';
 import {
   checkCameraPermission,
@@ -103,6 +105,12 @@ type ChatMessage =
   | { type: 'voice'; uri: string; timestamp: string; sent: boolean; messageId?: string }
   | { type: 'image'; uri: string; timestamp: string; sent: boolean; messageId?: string }
   | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean; messageId?: string };
+
+type PendingAttachment =
+  | { type: 'image'; uri: string; name?: string; mimeType?: string }
+  | { type: 'file'; uri: string; name: string };
+
+type CommitContentEvent = NativeSyntheticEvent<{ uri?: string; mimeType?: string }>;
 
 const VOICE_WAVEFORM = [8, 12, 6, 14, 10, 16, 8, 14, 12, 10];
 
@@ -249,6 +257,16 @@ function keyboardOverlapFromEvent(windowHeight: number, e: KeyboardEvent): numbe
   return Math.min(maxReasonableKeyboard, Math.max(minReasonableKeyboard, raw));
 }
 
+function firstNonEmptyString(...values: Array<unknown>): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) return trimmed;
+    }
+  }
+  return undefined;
+}
+
 export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const { name, avatar, chatId: initialChatId, isRequest, otherUserId } = route.params;
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
@@ -269,7 +287,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [showGalleryPermissionSheet, setShowGalleryPermissionSheet] = useState(false);
   const [showMicrophonePermissionSheet, setShowMicrophonePermissionSheet] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
-  const [pendingAttachments, setPendingAttachments] = useState<Array<{ type: 'image'; uri: string } | { type: 'file'; uri: string; name: string }>>([]);
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   /** Screen-space placement for the header overflow menu (below / aligned to the ⋮ control). */
   const [moreMenuScreenPos, setMoreMenuScreenPos] = useState<{ top: number; right: number } | null>(
@@ -491,24 +509,38 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
 
   const getMessageTypeFromAttachment = (
-    att: { type: 'image'; uri: string } | { type: 'file'; uri: string; name: string }
-  ): 'image' | 'audio' | 'video' => {
+    att: PendingAttachment
+  ): 'image' | 'audio' | 'video' | 'document' => {
     if (att.type === 'image') return 'image';
     const name = (att as { type: 'file'; name: string }).name?.toLowerCase() ?? '';
     const ext = name.split('.').pop() ?? '';
     if (['mp4', 'mov', 'webm', 'mkv'].includes(ext)) return 'video';
     if (['mp3', 'm4a', 'wav', 'aac', 'ogg'].includes(ext)) return 'audio';
-    return 'video';
+    return 'document';
   };
 
   const getMimeTypeFromAttachment = (
-    att: { type: 'image'; uri: string } | { type: 'file'; uri: string; name: string }
+    att: PendingAttachment
   ): string => {
-    if (att.type === 'image') return 'image/jpeg';
+    if (att.type === 'image') {
+      const explicit = firstNonEmptyString(att.mimeType);
+      if (explicit && explicit.startsWith('image/')) return explicit;
+      const name = firstNonEmptyString(att.name, att.uri)?.toLowerCase() ?? '';
+      const ext = name.split('.').pop() ?? '';
+      if (ext === 'gif') return 'image/gif';
+      if (ext === 'png') return 'image/png';
+      if (ext === 'webp') return 'image/webp';
+      return 'image/jpeg';
+    }
     const name = (att as { type: 'file'; name: string }).name?.toLowerCase() ?? '';
     const ext = name.split('.').pop() ?? '';
     if (['mp4', 'mov', 'webm', 'mkv'].includes(ext)) return 'video/mp4';
     if (['mp3', 'm4a', 'wav', 'aac', 'ogg'].includes(ext)) return 'audio/mpeg';
+    if (ext === 'pdf') return 'application/pdf';
+    if (['doc', 'docx'].includes(ext)) return 'application/msword';
+    if (['xls', 'xlsx'].includes(ext)) return 'application/vnd.ms-excel';
+    if (['ppt', 'pptx'].includes(ext)) return 'application/vnd.ms-powerpoint';
+    if (ext === 'txt') return 'text/plain';
     return 'application/octet-stream';
   };
 
@@ -522,6 +554,26 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     const s = seconds % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
+
+  const handleKeyboardCommitContent = useCallback((event: CommitContentEvent) => {
+    const uri = firstNonEmptyString(event?.nativeEvent?.uri);
+    const mimeType = firstNonEmptyString(event?.nativeEvent?.mimeType);
+    if (!uri) return;
+    if (mimeType && !mimeType.startsWith('image/')) return;
+    const ext = mimeType === 'image/gif' ? 'gif' : mimeType === 'image/png' ? 'png' : 'jpg';
+    setPendingAttachments((prev) => {
+      if (prev.some((item) => item.uri === uri)) return prev;
+      return [
+        ...prev,
+        {
+          type: 'image',
+          uri,
+          mimeType: mimeType ?? undefined,
+          name: `keyboard_${Date.now()}.${ext}`,
+        },
+      ];
+    });
+  }, []);
 
   useEffect(() => {
     if (!voiceBarVisible || voicePaused) {
@@ -1126,8 +1178,14 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       { mediaType: 'photo', quality: 0.8 },
       (response) => {
         if (response.didCancel || response.errorCode) return;
-        const uri = response.assets?.[0]?.uri;
-        if (uri) setPendingAttachments((p) => [...p, { type: 'image', uri }]);
+        const asset = response.assets?.[0];
+        const uri = asset?.uri;
+        if (uri) {
+          setPendingAttachments((p) => [
+            ...p,
+            { type: 'image', uri, name: asset?.fileName, mimeType: asset?.type },
+          ]);
+        }
       }
     );
   };
@@ -1135,26 +1193,38 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const openGallery = () => {
     launchImageLibrary(
       {
-        mediaType: 'photo',
-        quality: 0.8,
+        // Some devices/providers flag GIFs outside strict "photo" mode.
+        // Use mixed and filter to images so GIF selection is accepted.
+        mediaType: 'mixed',
         // Allow selecting multiple photos (incl. Google Photos picker).
         // `0` means "no limit" in react-native-image-picker.
         selectionLimit: 0,
+        assetRepresentationMode: 'current',
       },
       (response) => {
         if (response.didCancel || response.errorCode) return;
-        const uris =
-          response.assets
-            ?.map((a) => a?.uri)
-            .filter((u): u is string => typeof u === 'string' && u.length > 0) ?? [];
-        if (!uris.length) return;
+        const pickedImages: PendingAttachment[] = [];
+        (response.assets ?? []).forEach((a) => {
+          const uri = a?.uri;
+          if (!uri) return;
+          const mimeType = a?.type;
+          // Keep only images (including image/gif) from mixed picker results.
+          if (typeof mimeType === 'string' && !mimeType.startsWith('image/')) return;
+          pickedImages.push({
+            type: 'image',
+            uri,
+            name: a?.fileName,
+            mimeType,
+          });
+        });
+        if (!pickedImages.length) return;
         setPendingAttachments((prev) => {
           const existing = new Set(prev.map((p) => p.uri));
           const next = [...prev];
-          uris.forEach((uri) => {
-            if (!existing.has(uri)) {
-              existing.add(uri);
-              next.push({ type: 'image', uri });
+          pickedImages.forEach((img) => {
+            if (!existing.has(img.uri)) {
+              existing.add(img.uri);
+              next.push(img);
             }
           });
           return next;
@@ -1334,7 +1404,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       for (const att of pendingAttachments) {
         const messageType = getMessageTypeFromAttachment(att);
         const mimeType = getMimeTypeFromAttachment(att);
-        const fileName = att.type === 'image' ? `image_${Date.now()}.jpg` : att.name;
+        const fileName = att.type === 'image'
+          ? firstNonEmptyString(att.name, `image_${Date.now()}.jpg`)!
+          : att.name;
+          console.log('mimeType', mimeType);
+          console.log('fileName', fileName);
+          console.log('att.uri', att.uri);
         const { url, key } = await uploadChatFileApi(att.uri, { mimeType, fileName });
         const res = await sendMessageApi({
           chatId: effectiveChatId!,
@@ -1345,7 +1420,25 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         });
         const apiMessage = (res?.data as unknown) as ChatMessageApiItem | undefined;
         if (apiMessage) {
-          const ui = mapApiMessageToChatMessage(apiMessage, currentUserId, {
+          const firstFile = Array.isArray(apiMessage.files) ? apiMessage.files[0] : undefined;
+          const normalizedApiMessage: ChatMessageApiItem = {
+            ...apiMessage,
+            files: [
+              {
+                ...(firstFile ?? {}),
+                url: firstNonEmptyString(firstFile?.url, firstFile?.uri, url),
+                uri: firstNonEmptyString(firstFile?.uri, firstFile?.url, url),
+                name: firstNonEmptyString(firstFile?.name, firstFile?.filename, fileName),
+              },
+            ],
+            name: firstNonEmptyString(
+              apiMessage.name,
+              firstFile?.name,
+              firstFile?.filename,
+              fileName,
+            ),
+          };
+          const ui = mapApiMessageToChatMessage(normalizedApiMessage, currentUserId, {
             chatStatus: isRequest ? 'pending' : undefined,
           });
           if (ui) {
@@ -1355,7 +1448,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             socketService.messageSendFromApi(
               currentUserId,
               otherUserId,
-              apiMessage as unknown as Record<string, unknown>
+              normalizedApiMessage as unknown as Record<string, unknown>
             );
           }
         }
@@ -1662,7 +1755,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             <View ref={(r) => setMessageBubbleRef(index, r)} collapsable={false}>
             <TouchableOpacity
               style={[styles.fileBubble, msg.sent ? undefined : styles.fileBubbleReceived]}
-              activeOpacity={1}
+              activeOpacity={0.9}
+              onPress={() => {
+                openDocument(msg.uri).catch(() => {});
+              }}
               onLongPress={() => handleMessageLongPress(index)}
             >
               <View style={styles.fileBubbleIcon}>
@@ -1776,6 +1872,18 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const closeImagePreview = useCallback(() => {
     setImagePreviewUri(null);
     setImagePreviewZoomed(false);
+  }, []);
+
+  const openDocument = useCallback(async (uri: string) => {
+    if (!uri) return;
+    try {
+      const supported = await Linking.canOpenURL(uri);
+      if (supported) {
+        await Linking.openURL(uri);
+      }
+    } catch {
+      // Ignore open failures to keep interaction smooth.
+    }
   }, []);
 
   return (
@@ -2646,17 +2754,38 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               <TouchableOpacity style={styles.attachButton} activeOpacity={0.7} onPress={() => setAttachmentSheetOpen(true)}>
                 <PlusIcon size={18} color={colors.black} />
               </TouchableOpacity>
-              <TextInput
-                style={styles.input}
-                placeholder={otherUserTyping ? 'typing…' : STRINGS.CHAT.START_CHAT_PLACEHOLDER}
-                placeholderTextColor={colors.neutral[600]}
-                value={inputText}
-                onChangeText={setInputText}
-                multiline
-                returnKeyType="default"
-                cursorColor={colors.primary.purple}
-                selectionColor={colors.primary[50]}
-              />
+              <View style={{ flex: 1, position: 'relative', justifyContent: 'center' }}>
+                {inputText.length === 0 && (
+                  <Text
+                    pointerEvents="none"
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      color: colors.neutral[600],
+                      fontFamily: typography.fontFamily.regular,
+                      fontSize: 16,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {otherUserTyping ? 'typing…' : STRINGS.CHAT.START_CHAT_PLACEHOLDER}
+                  </Text>
+                )}
+                <CommitContentTextInput
+                  style={styles.input}
+                  placeholder=""
+                  value={inputText}
+                  onChangeText={setInputText}
+                  onCommitContent={handleKeyboardCommitContent}
+                  multiline
+                  underlineColorAndroid="transparent"
+                  textAlignVertical="center"
+                  disableFullscreenUI
+                  returnKeyType="default"
+                  cursorColor={colors.primary.purple}
+                  selectionColor={colors.primary[50]}
+                />
+              </View>
             </View>
           </View>
                     <TouchableOpacity
@@ -3192,7 +3321,7 @@ const reportSheetStyles = StyleSheet.create({
 const imagePreviewStyles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.92)',
+    backgroundColor: 'rgba(0,0,0,0.95)',
   },
   topBar: {
     position: 'absolute',
@@ -3217,10 +3346,12 @@ const imagePreviewStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
+    paddingVertical: 24,
   },
   card: {
     width: '100%',
     maxWidth: 360,
+    maxHeight: '82%',
     height: 420,
     borderRadius: 16,
     overflow: 'hidden',

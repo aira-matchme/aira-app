@@ -313,7 +313,7 @@ export type SendMessageFileItem = { url: string; key: string };
 export type SendMessagePayload = {
   chatId: string;
   content: string;
-  messageType: 'text' | 'image' | 'audio' | 'video';
+  messageType: 'text' | 'image' | 'audio' | 'video' | 'document';
   files: SendMessageFileItem[];
   /** Message id as string when replying, otherwise null */
   replyTo: string | null;
@@ -377,9 +377,9 @@ export async function uploadChatFileApi(
 export type ChatMessageApiItem = {
   _id?: string;
   chatId?: string;
-  messageType?: 'text' | 'voice' | 'audio' | 'image' | 'file';
+  messageType?: 'text' | 'voice' | 'audio' | 'image' | 'file' | 'document';
   content?: string | { text?: string; type?: string };
-  files?: Array<{ url?: string; uri?: string; name?: string }>;
+  files?: Array<{ url?: string; uri?: string; name?: string; filename?: string }>;
   isMedia?: boolean;
   isReply?: boolean;
   isEdited?: boolean;
@@ -467,6 +467,28 @@ function formatMessageTime(iso?: string): string {
   return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
 }
 
+function extractFileNameFromUri(uri: string): string {
+  if (!uri) return 'File';
+  try {
+    const withoutQuery = uri.split('?')[0] ?? uri;
+    const tail = withoutQuery.split('/').pop() ?? '';
+    const decoded = decodeURIComponent(tail).trim();
+    return decoded.length > 0 ? decoded : 'File';
+  } catch {
+    return 'File';
+  }
+}
+
+function firstNonEmptyString(...values: Array<unknown>): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) return trimmed;
+    }
+  }
+  return undefined;
+}
+
 const AIRA_REQUEST_SENT_TEXT =
   'Aira has sent a request message. Once they accept, you will be able to chat with them.';
 
@@ -532,7 +554,7 @@ export function mapApiMessageToChatMessage(
       messageId,
     };
   }
-  if (type === 'object') {
+  if (type === 'array') {
     const rawBlocks = (item as { contentBlocks?: unknown }).contentBlocks;
     const blocks: Array<
       | { type: 'paragraph'; text: string }
@@ -581,10 +603,12 @@ export function mapApiMessageToChatMessage(
     const uri = item.uri ?? item.url ?? file?.url ?? file?.uri ?? '';
     return uri ? { type: 'image', uri, timestamp, sent, messageId } : null;
   }
-  if (type === 'file') {
+  if (type === 'file' || type === 'document') {
     const file = item.files?.[0];
-    const uri = item.uri ?? item.url ?? file?.url ?? file?.uri ?? '';
-    const name = item.name ?? file?.name ?? 'File';
+    const uri = firstNonEmptyString(item.uri, item.url, file?.url, file?.uri) ?? '';
+    const name =
+      firstNonEmptyString(item.name, file?.name, file?.filename) ??
+      extractFileNameFromUri(uri);
     return uri ? { type: 'file', uri, name, timestamp, sent, messageId } : null;
   }
   return {

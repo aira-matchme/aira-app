@@ -887,8 +887,8 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: H_PADDING,
-    paddingTop: 12,
-    paddingBottom: 12,
+    paddingTop: 8,
+    paddingBottom: 8,
     backgroundColor: colors.white,
   },
   inputBarContent: {
@@ -1081,7 +1081,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
-    marginBottom: 8,
+    marginBottom: 0,
   },
   sendButtonMic: {
     backgroundColor: INPUT_PILL_BG,
