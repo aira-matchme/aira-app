@@ -20,7 +20,7 @@ import { getPostAuthScreen, type PostAuthUser } from '../../../navigation/getPos
 import Toast from 'react-native-toast-message';
 import { styles } from './styles';
 import { getDeviceToken } from '../../../services/firebase/messaging';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getNativeDeviceId } from '../../../utils/getNativeDeviceId';
 
 type OTPVerificationNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -71,33 +71,6 @@ export const OTPVerificationScreen: React.FC = () => {
       otp: '',
     },
   });
-  const DEVICE_ID_KEY = '@device_id';
-  const generateInstallId = () =>
-    'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-  
-  const getDeviceId = async (): Promise<string> => {
-    try {
-      const { getUniqueId } = require('react-native-device-info');
-      const deviceId = await getUniqueId();
-      if (deviceId) return deviceId;
-    } catch {
-      // DeviceInfo not available or failed
-    }
-    try {
-      let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
-      if (!id) {
-        id = generateInstallId();
-        await AsyncStorage.setItem(DEVICE_ID_KEY, id);
-      }
-      return id;
-    } catch {
-      return generateInstallId();
-    }
-  };
 
   const handleOTPChange = (_text: string) => {
     if (apiError) {
@@ -163,7 +136,7 @@ export const OTPVerificationScreen: React.FC = () => {
         email,
         otp: data.otp,
         deviceToken: await getDeviceToken() ?? '',
-        deviceId: await getDeviceId() ?? '',
+        deviceId: await getNativeDeviceId(),
         deviceType: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web',
       });
       if (response.data?.accessToken && response.data?.refreshToken) {

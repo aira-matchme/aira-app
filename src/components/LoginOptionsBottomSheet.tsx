@@ -17,40 +17,11 @@ import { useSocialLogin } from '../modules/auth/hooks';
 import { useAuthStore } from '../store/auth.store';
 import { checkNotificationPermission } from '../config/permissions';
 import { getPostAuthScreen } from '../navigation/getPostAuthScreen';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import appleAuth from '@invertase/react-native-apple-authentication';
 import { apiClient } from '../services/api/client';
 import { endpoints } from '../services/api/endpoints';
 import { getDeviceToken } from '../services/firebase/messaging';
-
-const DEVICE_ID_KEY = '@device_id';
-
-const generateInstallId = () =>
-  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-
-const getDeviceId = async (): Promise<string> => {
-  try {
-    const { getUniqueId } = require('react-native-device-info');
-    const deviceId = await getUniqueId();
-    if (deviceId) return deviceId;
-  } catch {
-    // DeviceInfo not available or failed
-  }
-  try {
-    let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
-    if (!id) {
-      id = generateInstallId();
-      await AsyncStorage.setItem(DEVICE_ID_KEY, id);
-    }
-    return id;
-  } catch {
-    return generateInstallId();
-  }
-};
+import { getNativeDeviceId } from '../utils/getNativeDeviceId';
 
 type LoginOptionsNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -138,7 +109,7 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
     const payload = {
       idToken: idToken,
       deviceType: Platform.OS === 'android' ? 'android' : 'ios',
-      deviceId: await getDeviceId(),
+      deviceId: await getNativeDeviceId(),
       deviceToken: await getDeviceToken(),
 
     };
@@ -188,7 +159,7 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
       const payload = {
         idToken:identityToken,
         deviceType: Platform.OS === 'android' ? 'android' : 'ios',
-        deviceId: await getDeviceId(),
+        deviceId: await getNativeDeviceId(),
         deviceToken: await getDeviceToken(),
       };
 

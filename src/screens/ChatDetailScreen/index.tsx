@@ -17,7 +17,6 @@ import {
   LayoutChangeEvent,
   useWindowDimensions,
   type KeyboardEvent,
-  type NativeSyntheticEvent,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -25,7 +24,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { pick } from '@react-native-documents/picker';
 import { Button } from '../../components/Button';
-import { CommitContentTextInput } from '../../components/CommitContentTextInput';
 import { ReusableBottomSheet } from '../../components/BottomSheet';
 import {
   checkCameraPermission,
@@ -109,8 +107,6 @@ type ChatMessage =
 type PendingAttachment =
   | { type: 'image'; uri: string; name?: string; mimeType?: string }
   | { type: 'file'; uri: string; name: string };
-
-type CommitContentEvent = NativeSyntheticEvent<{ uri?: string; mimeType?: string }>;
 
 const VOICE_WAVEFORM = [8, 12, 6, 14, 10, 16, 8, 14, 12, 10];
 
@@ -480,12 +476,14 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   //   : isWeirdKeyboard
   //   ? 0 // 🚨 KEY FIX
   //   : keyboardHeight;
+  // const composerBottomOffset =
+  // Platform.OS === 'ios'
+  //   ? keyboardHeight
+  //   : isKeyboardHandledBySystem
+  //   ? 0
+  //   : keyboardHeight;
   const composerBottomOffset =
-  Platform.OS === 'ios'
-    ? keyboardHeight
-    : isKeyboardHandledBySystem
-    ? 0
-    : keyboardHeight;
+  Platform.OS === 'ios' ? keyboardHeight : 0;
 
   const isOtherUserOnlineFromPayload = useCallback(
     (payload: unknown): boolean | null => {
@@ -566,7 +564,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       if (explicit && explicit.startsWith('image/')) return explicit;
       const name = firstNonEmptyString(att.name, att.uri)?.toLowerCase() ?? '';
       const ext = name.split('.').pop() ?? '';
-      if (ext === 'gif') return 'image/gif';
       if (ext === 'png') return 'image/png';
       if (ext === 'webp') return 'image/webp';
       return 'image/jpeg';
@@ -593,26 +590,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     const s = seconds % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
-
-  const handleKeyboardCommitContent = useCallback((event: CommitContentEvent) => {
-    const uri = firstNonEmptyString(event?.nativeEvent?.uri);
-    const mimeType = firstNonEmptyString(event?.nativeEvent?.mimeType);
-    if (!uri) return;
-    if (mimeType && !mimeType.startsWith('image/')) return;
-    const ext = mimeType === 'image/gif' ? 'gif' : mimeType === 'image/png' ? 'png' : 'jpg';
-    setPendingAttachments((prev) => {
-      if (prev.some((item) => item.uri === uri)) return prev;
-      return [
-        ...prev,
-        {
-          type: 'image',
-          uri,
-          mimeType: mimeType ?? undefined,
-          name: `keyboard_${Date.now()}.${ext}`,
-        },
-      ];
-    });
-  }, []);
 
   useEffect(() => {
     if (!voiceBarVisible || voicePaused) {
@@ -1232,10 +1209,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const openGallery = () => {
     launchImageLibrary(
       {
-        // Some devices/providers flag GIFs outside strict "photo" mode.
-        // Use mixed and filter to images so GIF selection is accepted.
-        mediaType: 'mixed',
-        // Allow selecting multiple photos (incl. Google Photos picker).
+        mediaType: 'photo',
         // `0` means "no limit" in react-native-image-picker.
         selectionLimit: 0,
         assetRepresentationMode: 'current',
@@ -1247,8 +1221,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           const uri = a?.uri;
           if (!uri) return;
           const mimeType = a?.type;
-          // Keep only images (including image/gif) from mixed picker results.
-          if (typeof mimeType === 'string' && !mimeType.startsWith('image/')) return;
+          if (typeof mimeType === 'string') {
+            if (!mimeType.startsWith('image/')) return;
+            if (mimeType === 'image/gif') return;
+          }
+          const lowerUri = uri.split('?')[0]?.toLowerCase() ?? '';
+          if (lowerUri.endsWith('.gif')) return;
           pickedImages.push({
             type: 'image',
             uri,
@@ -1380,11 +1358,28 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         justCreatedChatViaAdd = true;
       }
 
+      const clearComposerNative = () => {
+        // For the Android native input we sometimes need to explicitly clear the
+        // underlying EditText so the UI + placeholder stay in sync.
+        const anyRef = inputRef as any;
+        const current = anyRef?.current;
+        if (current?.setNativeProps) {
+          current.setNativeProps({ text: '', value: '' });
+        }
+      };
+      const clearComposer = () => {
+        clearComposerNative();
+        setInputText('');
+        if (Platform.OS === 'android') {
+          requestAnimationFrame(() => clearComposerNative());
+        }
+      };
+
       if (trimmed) {
         socketService.typing(currentUserId, otherUserId, false);
         if (justCreatedChatViaAdd) {
           // firstMessage is already stored by addChat — avoid duplicate sendMessage + clear UI now
-          setInputText('');
+          clearComposer();
           setReplyingTo(null);
           try {
             const msgRes = await getChatMessagesApi({
@@ -1436,7 +1431,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               );
             }
           }
-          setInputText('');
+          clearComposer();
           setReplyingTo(null);
         }
       }
@@ -1492,6 +1487,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           }
         }
       }
+
+      // Clear composer text/reply state after sending attachments too.
+      clearComposer();
+      setReplyingTo(null);
+
       if (pendingAttachments.length > 0) {
         setPendingAttachments([]);
       }
@@ -1763,6 +1763,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       );
     }
     if (msg.type === 'image') {
+      const imageUri = msg.uri;
       return (
         <React.Fragment key={index}>
           <View style={[styles.messageRow, msg.sent ? undefined : styles.messageRowReceived]}>
@@ -1774,10 +1775,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 { width: imageBubbleSize, height: imageBubbleSize },
               ]}
               activeOpacity={1}
-              onPress={() => openImagePreview(msg.uri)}
+              onPress={() => openImagePreview(imageUri)}
               onLongPress={() => handleMessageLongPress(index)}
             >
-              <Image source={{ uri: msg.uri }} style={styles.imageBubbleImage} resizeMode="cover" />
+              <Image source={{ uri: imageUri }} style={styles.imageBubbleImage} resizeMode="cover" />
             </TouchableOpacity>
             </View>
           </View>
@@ -2527,12 +2528,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         }}
         contentContainerStyle={{
           ...styles.scrollContent,
-          // Composer is fixed to bottom; pad for its height + keyboard so messages stay scrollable.
           paddingBottom:
-          (styles.scrollContent?.paddingBottom ?? 16) +
-          composerHeight +
-          12 +
-          (isWeirdKeyboard ? 0 : composerBottomOffset),
+            (styles.scrollContent?.paddingBottom ?? 16) +
+            composerHeight +
+            12,
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -2810,14 +2809,30 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                     {otherUserTyping ? 'typing…' : STRINGS.CHAT.START_CHAT_PLACEHOLDER}
                   </Text>
                 )}
-                <CommitContentTextInput
+                <TextInput
                   style={styles.input}
                   ref={inputRef}
                   placeholder=""
                   value={inputText}
-                  onChangeText={(text) => setInputText(text)}
-                  onCommitContent={handleKeyboardCommitContent}
+                  onChangeText={setInputText}
+                  onFocus={() => {
+                    if (currentUserId && otherUserId) {
+                      if (typingStopRef.current) clearTimeout(typingStopRef.current);
+                      typingStopRef.current = null;
+                      socketService.typing(currentUserId, otherUserId, true);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (currentUserId && otherUserId) {
+                      if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+                      typingDebounceRef.current = null;
+                      if (typingStopRef.current) clearTimeout(typingStopRef.current);
+                      typingStopRef.current = null;
+                      socketService.typing(currentUserId, otherUserId, false);
+                    }
+                  }}
                   multiline
+                  scrollEnabled={false}
                   underlineColorAndroid="transparent"
                   textAlignVertical="center"
                   disableFullscreenUI
