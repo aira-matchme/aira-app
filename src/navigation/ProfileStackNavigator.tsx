@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ProfileTabScreen } from '../screens/ProfileTabScreen';
+import { BlockedUsersScreen } from '../screens/profile/BlockedUsersScreen';
 import { EditProfileScreen } from '../screens/profile/EditProfileScreen';
 import { BasicDetailsNameScreen } from '../screens/profile/BasicDetailsNameScreen';
 import { BasicDetailsDobScreen } from '../screens/profile/BasicDetailsDobScreen';
@@ -62,6 +63,11 @@ const profileScreenOptions = {
 export const ProfileStackNavigator = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="ProfileMain" component={ProfileTabScreen} />
+    <Stack.Screen
+      name="BlockedUsers"
+      component={BlockedUsersScreen}
+      options={profileScreenOptions}
+    />
     <Stack.Screen
       name="EditProfile"
       component={EditProfileScreen}

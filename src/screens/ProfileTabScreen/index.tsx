@@ -20,15 +20,13 @@ import { ProfileProgressRing } from '../../components/ProfileProgressRing';
 import { useAuthStore } from '../../store/auth.store';
 import { colors } from '../../theme';
 import {
-  ProfilePreferencesIcon,
   ProfileReferralIcon,
   ProfileSubscriptionIcon,
   ProfileHelpIcon,
-  ProfilePrivacyIcon,
   ProfileChevronRightIcon,
   ProfileEditPencilIcon,
 } from '../../assets/icons/profile/ProfileMenuIcons';
-import { VerifiedIcon } from '../../assets/icons/common/VerifiedIcon';
+import { BlockIcon } from '../../assets/icons/common/BlockIcon';
 import { LogoWordmarkGradient } from '../../assets/icons/home/LogoWordmarkGradient';
 import { AiraPlusLogo } from '../../assets/icons/profile/AiraPlusLogo';
 import { getPreferencesAndHydrateStore } from '../../modules/preferences/api';
@@ -37,21 +35,34 @@ import { getProfileApi } from '../../modules/auth/api';
 import { styles } from './styles';
 import { HomeFilterIcon } from '../../assets/icons/home/HomeFilterIcon';
 import { GENDER_OPTIONS } from '../../constants/profile';
+import { STRINGS } from '../../constants/strings';
 import DeviceInfo from 'react-native-device-info';
 
 const AIRA_PLUS_CARD_IMAGE = require('../../assets/images/AiraPlusCardBackground.png');
 const PRIVACY_POLICY_URL = 'https://airamatchme.com/privacy';
 const SUPPORT_EMAIL_URL = 'mailto:support@airamatchme.com';
 
+const BlockedMenuIcon: React.FC<{ width?: number; height?: number; color?: string }> = ({
+  width = 20,
+  color = colors.primary.purple,
+}) => <BlockIcon size={width} color={color} />;
+
 const MENU_ITEMS: Array<{
   id: string;
   label: string;
   Icon: React.FC<{ width?: number; height?: number; color?: string }>;
-  screen?: string;
+  screen?: keyof ProfileStackParamList;
   url?: string;
   iconColor?: string;
 }> = [
   { id: 'preferences', label: 'Preferences', Icon: HomeFilterIcon, screen: 'PreferencesSummary', iconColor: colors.primary.purple },
+  {
+    id: 'blocked',
+    label: STRINGS.BLOCKED_USERS.MENU,
+    Icon: BlockedMenuIcon,
+    screen: 'BlockedUsers',
+    iconColor: colors.primary.purple,
+  },
   { id: 'referral', label: 'Referral Points', Icon: ProfileReferralIcon },
   { id: 'subscription', label: 'My Subscription', Icon: ProfileSubscriptionIcon },
   { id: 'help', label: 'Help Center', Icon: ProfileHelpIcon, url: SUPPORT_EMAIL_URL },
@@ -73,7 +84,6 @@ function getGalleryImageUrl(photo: unknown): string | null {
   }
   return null;
 }
-
 export const ProfileTabScreen = () => {
   const navigation = useNavigation<ProfileMainNav>();
   const { user, logout, setUser } = useAuthStore();
@@ -172,6 +182,10 @@ export const ProfileTabScreen = () => {
         // If fetching fails, still allow navigation with existing store values.
       }
       navigation.navigate('PreferencesSummary');
+      return;
+    }
+    if (screen) {
+      navigation.navigate(screen as never);
     }
   };
 

@@ -118,6 +118,7 @@ export type TabStackParamList = {
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
+  BlockedUsers: undefined;
   EditProfile: undefined;
   BasicDetailsName: { fromEditProfile?: boolean } | undefined;
   BasicDetailsDob: { fromEditProfile?: boolean } | undefined;

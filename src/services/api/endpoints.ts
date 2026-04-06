@@ -60,7 +60,8 @@ export const endpoints = {
     blockUser: '/block-user' ,
     reportUser: '/report-user',
     blockreportUser: '/report-block',
-    unblockUser: '/chat/unblock',
+    /** Users you have blocked; body `{ page, limit }`. */
+    getBlockedUsers: '/block-user/get-users-i-blocked',
     addChat: 'chat/add-chat-list',
   },
   chatbot: {

@@ -203,7 +203,7 @@ export async function setChatRequestActionApi(
 
 export type BlockUserParams = {
   blockUserId: string;
-  type: 'block';
+  type: 'block' | 'unblock';
 };
 
 export async function blockUserApi(params: BlockUserParams): Promise<{ statusCode?: number; message?: string; data?: unknown }> {
@@ -214,6 +214,57 @@ export async function blockUserApi(params: BlockUserParams): Promise<{ statusCod
   return data;
 }
 
+export type GetBlockedUsersParams = {
+  page: number;
+  limit?: number;
+};
+
+export type GetBlockedUsersResult = {
+  items: unknown[];
+  currentPage: number;
+  hasMore: boolean;
+};
+
+/**
+ * Users the current account has blocked. POST `{ page, limit }`.
+ */
+export async function getBlockedUsersApi(params: GetBlockedUsersParams): Promise<GetBlockedUsersResult> {
+  const limit = params.limit ?? 20;
+  const { data } = await apiClient.post<unknown>(endpoints.chat.getBlockedUsers, {
+    page: params.page,
+    limit,
+  });
+  const body = data as Record<string, unknown> | null | undefined;
+  if (!body) {
+    return { items: [], currentPage: params.page, hasMore: false };
+  }
+  const inner = (body.data as Record<string, unknown> | undefined) ?? body;
+  const list =
+    inner.list ??
+    inner.users ??
+    inner.blockedUsers ??
+    inner.blocked ??
+    inner.data ??
+    (Array.isArray(body) ? body : null);
+  const items = Array.isArray(list) ? list : [];
+
+  const meta = (inner.meta as Record<string, unknown> | undefined) ?? (body.meta as Record<string, unknown> | undefined) ?? {};
+  const currentPage = Number(meta.currentPage ?? meta.pageNo ?? meta.page ?? params.page) || params.page;
+  const totalPages = Number(meta.totalPages ?? meta.totalPage ?? 0);
+  const totalCount = Number(meta.total ?? meta.totalCount ?? 0);
+  let hasMore = false;
+  if (totalPages > 0) {
+    hasMore = currentPage < totalPages;
+  } else if (typeof meta.hasMore === 'boolean') {
+    hasMore = meta.hasMore;
+  } else if (totalCount > 0 && items.length > 0) {
+    hasMore = currentPage * limit < totalCount;
+  } else {
+    hasMore = items.length >= limit;
+  }
+
+  return { items, currentPage, hasMore };
+}
 
 export type ReportUserParams = {
   reportedAgainst: string;

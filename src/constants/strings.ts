@@ -430,6 +430,18 @@ export const STRINGS = {
     EMPTY_DESCRIPTION:
       'Your liked profiles live here. Time to head back and find someone interesting.',
   },
+  BLOCKED_USERS: {
+    MENU: 'Blocked',
+    TITLE: 'Blocked',
+    SECTION_TITLE: 'Blocked profiles',
+    NOTE:
+      "Note: Blocked users can't see your profile, send messages, or find you on Aira.",
+    EMPTY: 'You haven’t blocked anyone.',
+    UNBLOCK: 'Unblock',
+    UNBLOCKED: 'User unblocked.',
+    UNBLOCK_FAILED: 'Could not unblock. Try again.',
+    LOAD_ERROR: 'Could not load the list. Try again.',
+  },
   CHAT: {
     TITLE: 'Messages',
     TAB_CHATS: 'Chats',
@@ -463,6 +475,13 @@ export const STRINGS = {
     ATTACH_CAMERA: 'Camera',
     ATTACH_GALLERY: 'Gallery',
     ATTACH_FILES: 'Files',
+    GIF_BUTTON: 'GIF',
+    GIF_PICKER_TITLE: 'Search GIFs',
+    GIF_PICKER_SEARCH_PLACEHOLDER: 'Search Tenor…',
+    GIF_PICKER_ERROR: 'Could not load GIFs. Try again.',
+    GIF_PICKER_NO_KEY:
+      'Add TENOR_API_KEY to your .env file (see Google Tenor API quickstart).',
+    GIF_PICKER_EMPTY: 'No GIFs found',
     VOICE_DURATION: (min: number, sec: number) => `${min}:${sec.toString().padStart(2, '0')}`,
     BLOCK: 'Block',
     REPORT: 'Report',
