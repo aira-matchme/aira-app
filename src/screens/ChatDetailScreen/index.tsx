@@ -61,7 +61,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setChatRequestActionApi, blockUserApi, reportUserApi, getChatMessagesApi, mapApiMessageToChatMessage, markChatSeenApi, sendMessageApi, uploadChatFileApi, postAIMessagesApi, getAiSuggestionsApi, deleteMessageApi, type ChatMessageApiItem } from '../../modules/chat/api';
 import { useAuthStore } from '../../store/auth.store';
 import socketService, { type MessageReceivePayload, type MessageDeletePayload, type TypingPayload } from '../../services/socket/socketService';   
-import { styles, H_PADDING } from './styles';
+import { styles, H_PADDING, CHAT_INPUT_MIN_HEIGHT, CHAT_INPUT_MAX_HEIGHT } from './styles';
 import { TabAICenterIcon } from '../../assets/icons/tabs/TabAICenterIcon';
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
@@ -333,6 +333,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [otherUserOnline, setOtherUserOnline] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
   const [composerHeight, setComposerHeight] = useState(120);
+  /** Growing multiline composer: expands until CHAT_INPUT_MAX_HEIGHT, then scrolls inside. */
+  const [composerInputHeight, setComposerInputHeight] = useState(CHAT_INPUT_MIN_HEIGHT);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
@@ -912,6 +914,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setDontShowAskAiraPersisted(value === 'true');
     });
   }, []);
+
+  useEffect(() => {
+    if (inputText.length > 0) return;
+    setComposerInputHeight(CHAT_INPUT_MIN_HEIGHT);
+  }, [inputText]);
 
   useEffect(() => {
     if (!airaLimitReachedVisible) return;
@@ -1926,6 +1933,16 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
   }, []);
 
+  const handleComposerTextContentSizeChange = useCallback(
+    (e: { nativeEvent: { contentSize: { height: number } } }) => {
+      const h = e.nativeEvent.contentSize.height;
+      setComposerInputHeight(
+        Math.min(CHAT_INPUT_MAX_HEIGHT, Math.max(CHAT_INPUT_MIN_HEIGHT, h)),
+      );
+    },
+    [],
+  );
+
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <View style={styles.screen}>
@@ -2623,7 +2640,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               disabled={requestActionLoading !== null}
               activeOpacity={0.8}
             >
-              <Text style={styles.requestDeclineLabel}>{STRINGS.CHAT.DECLINE}</Text>
+              {requestActionLoading === 'decline' ? (
+                <ActivityIndicator size="small" color={colors.black} />
+              ) : (
+                <Text style={styles.requestDeclineLabel}>{STRINGS.CHAT.DECLINE}</Text>
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.requestAcceptButton}
@@ -2637,7 +2658,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 end={{ x: 1, y: 0.5 }}
                 style={StyleSheet.absoluteFill}
               />
-              <Text style={styles.requestAcceptLabel}>{STRINGS.CHAT.ACCEPT}</Text>
+              {requestActionLoading === 'accept' ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Text style={styles.requestAcceptLabel}>{STRINGS.CHAT.ACCEPT}</Text>
+              )}
             </TouchableOpacity>
           </View>
           <TouchableOpacity
@@ -2792,7 +2817,14 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               <TouchableOpacity style={styles.attachButton} activeOpacity={0.7} onPress={() => setAttachmentSheetOpen(true)}>
                 <PlusIcon size={18} color={colors.black} />
               </TouchableOpacity>
-              <View style={{ flex: 1, position: 'relative', justifyContent: 'center' }}>
+              <View
+                style={{
+                  flex: 1,
+                  minHeight: CHAT_INPUT_MIN_HEIGHT,
+                  position: 'relative',
+                  justifyContent: 'flex-start',
+                }}
+              >
                 {inputText.length === 0 && (
                   <Text
                     pointerEvents="none"
@@ -2800,6 +2832,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                       position: 'absolute',
                       left: 0,
                       right: 0,
+                      top: Platform.OS === 'ios' ? 8 : 10,
                       color: colors.neutral[600],
                       fontFamily: typography.fontFamily.regular,
                       fontSize: 16,
@@ -2810,11 +2843,20 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   </Text>
                 )}
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    {
+                      height: composerInputHeight,
+                      maxHeight: CHAT_INPUT_MAX_HEIGHT,
+                      flexGrow: 0,
+                      flexShrink: 0,
+                    },
+                  ]}
                   ref={inputRef}
                   placeholder=""
                   value={inputText}
                   onChangeText={setInputText}
+                  onContentSizeChange={handleComposerTextContentSizeChange}
                   onFocus={() => {
                     if (currentUserId && otherUserId) {
                       if (typingStopRef.current) clearTimeout(typingStopRef.current);
@@ -2832,9 +2874,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                     }
                   }}
                   multiline
-                  scrollEnabled={false}
+                  scrollEnabled={composerInputHeight >= CHAT_INPUT_MAX_HEIGHT}
                   underlineColorAndroid="transparent"
-                  textAlignVertical="center"
+                  textAlignVertical="top"
                   disableFullscreenUI
                   returnKeyType="default"
                   cursorColor={colors.primary.purple}

@@ -283,12 +283,29 @@ export const styles = StyleSheet.create({
     letterSpacing: 0.48,
     color: colors.white,
   },
+  previewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 0,
+  },
+  previewThumb: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: colors.neutral[200],
+    flexShrink: 0,
+  },
   preview: {
     fontSize: 16,
     fontWeight: '400',
     lineHeight: 22,
     letterSpacing: 0.32,
     color: colors.neutral[600],
+  },
+  previewText: {
+    flex: 1,
+    minWidth: 0,
   },
   previewDraft: {
     color: colors.primary.purple,

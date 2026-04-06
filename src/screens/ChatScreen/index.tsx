@@ -32,6 +32,8 @@ type ChatItem = {
   name: string;
   avatar: { uri: string } | null;
   preview: string;
+  /** Last message image thumbnail (shown next to preview line when present). */
+  previewThumbUri?: string | null;
   previewDraft?: string; // if set, show "Draft: " + this in purple
   time: string;
   unreadCount?: number;
@@ -302,12 +304,23 @@ export const ChatScreen = () => {
                 </View>
               )}
             </View>
-            <Text
-              style={[styles.preview, isDraft && styles.previewDraft]}
-              numberOfLines={1}
-            >
-              {previewText}
-            </Text>
+            <View style={styles.previewRow}>
+              {!isDraft && item.previewThumbUri ? (
+                <Image
+                  source={{ uri: item.previewThumbUri }}
+                  style={styles.previewThumb}
+                  resizeMode="cover"
+                  accessibilityIgnoresInvertColors
+                />
+              ) : null}
+              <Text
+                style={[styles.preview, styles.previewText, isDraft && styles.previewDraft]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {previewText}
+              </Text>
+            </View>
           </View>
           <View style={styles.timeCol}>
             <Text style={styles.time}>{item.time}</Text>

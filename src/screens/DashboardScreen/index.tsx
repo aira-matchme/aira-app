@@ -14,6 +14,7 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -99,7 +100,20 @@ type GetMatchesResponse = {
     limit: number;
     totalPages: number;
     fromCache?: boolean;
+    hasNext?: boolean;
+    hasPrev?: boolean;
+    nextCursor?: string;
+    prevCursor?: string;
+    centerMatchId?: string;
   };
+};
+
+type CursorPageResult = {
+  items: MatchItem[];
+  hasNext: boolean;
+  hasPrev: boolean;
+  nextCursor: string | null;
+  prevCursor: string | null;
 };
 
 export const DashboardScreen = () => {
@@ -116,7 +130,12 @@ export const DashboardScreen = () => {
   const [reportLoading, setReportLoading] = useState(false);
   const [matches, setMatches] = useState<MatchItem[]>([]);
   const [pagingLoading, setPagingLoading] = useState(false);
+  /** Distinguishes prev vs next fetch so pull-refresh UI only reflects backward paging. */
+  const [pagingKind, setPagingKind] = useState<'prev' | 'next' | null>(null);
   const [pagingBootstrapped, setPagingBootstrapped] = useState(false);
+  /** Mirrors hasMore* refs so layout (extra scroll slack) updates when paging flags change. */
+  const [hasMoreNext, setHasMoreNext] = useState(true);
+  const [hasMorePrev, setHasMorePrev] = useState(true);
   const pagingInFlightRef = useRef(false);
   const lastSavedCursorRef = useRef<string | null>(null);
   const lastIndexHandledRef = useRef<number | null>(null);
@@ -124,6 +143,10 @@ export const DashboardScreen = () => {
   const hasMorePrevRef = useRef(true);
   const topCursorRef = useRef<string | null>(null);
   const bottomCursorRef = useRef<string | null>(null);
+  const nextCursorRef = useRef<string | null>(null);
+  const prevCursorRef = useRef<string | null>(null);
+  /** Lets ScrollView exceed viewport when only one card so user can scroll to trigger next-page. */
+  const [scrollViewportH, setScrollViewportH] = useState(0);
   /** Current photo index per match (for multi-photo auto-rotate). Key = match.id, value = 0..images.length-1 */
   const [photoIndexByMatchId, setPhotoIndexByMatchId] = useState<Record<string, number>>({});
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -176,7 +199,7 @@ export const DashboardScreen = () => {
   }, []);
 
   const fetchCursorPage = useCallback(
-    async (cursor: string | null, direction: 'forward' | 'backward') => {
+    async (cursor: string | null, direction: 'forward' | 'backward'): Promise<CursorPageResult> => {
       const res = await apiClient.post(endpoints.matches.getMatchesCursorPage, {
         cursor,
         direction,
@@ -196,7 +219,26 @@ export const DashboardScreen = () => {
       const hasPrev =
         typeof payload?.hasPrev === 'boolean' ? payload.hasPrev : mapped.length > 0;
 
-      return { items: mapped, hasNext, hasPrev };
+      const center =
+        typeof payload?.centerMatchId === 'string' && payload.centerMatchId.length > 0
+          ? payload.centerMatchId
+          : null;
+      const nextRaw =
+        typeof payload?.nextCursor === 'string' && payload.nextCursor.length > 0
+          ? payload.nextCursor
+          : null;
+      const prevRaw =
+        typeof payload?.prevCursor === 'string' && payload.prevCursor.length > 0
+          ? payload.prevCursor
+          : null;
+
+      return {
+        items: mapped,
+        hasNext,
+        hasPrev,
+        nextCursor: nextRaw ?? center,
+        prevCursor: prevRaw ?? center,
+      };
     },
     [mapMatches]
   );
@@ -236,6 +278,15 @@ export const DashboardScreen = () => {
     [matches.length, slideHeight]
   );
 
+  const scrollContentHeight = useMemo(() => {
+    const base = contentHeight;
+    if (matches.length === 0 || scrollViewportH <= 0) return base;
+    if (hasMoreNext && base <= scrollViewportH) {
+      return scrollViewportH + slideHeight + SLIDE_GAP;
+    }
+    return base;
+  }, [contentHeight, matches.length, scrollViewportH, slideHeight, hasMoreNext]);
+
   const ensureMoreMatchesIfNeeded = useCallback(async () => {
     if (pagingInFlightRef.current) return;
     if (!hasMoreNextRef.current) return;
@@ -244,9 +295,11 @@ export const DashboardScreen = () => {
     if (!atEnd) return;
 
     pagingInFlightRef.current = true;
+    setPagingKind('next');
     setPagingLoading(true);
     try {
-      const cursorId = bottomCursorRef.current ?? (await getCursorId());
+      const cursorId =
+        nextCursorRef.current ?? bottomCursorRef.current ?? (await getCursorId());
       const page = await fetchCursorPage(cursorId, 'forward');
       const next = page.items;
 
@@ -270,8 +323,13 @@ export const DashboardScreen = () => {
 
       hasMoreNextRef.current = !!page.hasNext;
       hasMorePrevRef.current = !!page.hasPrev;
+      setHasMoreNext(!!page.hasNext);
+      setHasMorePrev(!!page.hasPrev);
+      if (page.nextCursor != null) nextCursorRef.current = page.nextCursor;
+      if (page.prevCursor != null) prevCursorRef.current = page.prevCursor;
     } finally {
       setPagingLoading(false);
+      setPagingKind(null);
       pagingInFlightRef.current = false;
     }
   }, [fetchCursorPage, getCursorFromMatch, getCursorId, getRenderKey, matches.length]);
@@ -286,12 +344,17 @@ export const DashboardScreen = () => {
     pagingInFlightRef.current = true;
     setPagingLoading(true);
     try {
-      const cursorId = topCursorRef.current ?? (await getCursorId());
+      const cursorId =
+        prevCursorRef.current ?? topCursorRef.current ?? (await getCursorId());
       const page = await fetchCursorPage(cursorId, 'backward');
       const prevItems = page.items;
       if (!prevItems.length) {
         hasMorePrevRef.current = !!page.hasPrev;
         hasMoreNextRef.current = !!page.hasNext;
+        setHasMorePrev(!!page.hasPrev);
+        setHasMoreNext(!!page.hasNext);
+        if (page.nextCursor != null) nextCursorRef.current = page.nextCursor;
+        if (page.prevCursor != null) prevCursorRef.current = page.prevCursor;
         return;
       }
 
@@ -327,8 +390,13 @@ export const DashboardScreen = () => {
 
       hasMorePrevRef.current = !!page.hasPrev;
       hasMoreNextRef.current = !!page.hasNext;
+      setHasMorePrev(!!page.hasPrev);
+      setHasMoreNext(!!page.hasNext);
+      if (page.nextCursor != null) nextCursorRef.current = page.nextCursor;
+      if (page.prevCursor != null) prevCursorRef.current = page.prevCursor;
     } finally {
       setPagingLoading(false);
+      setPagingKind(null);
       pagingInFlightRef.current = false;
     }
   }, [fetchCursorPage, getCursorFromMatch, getCursorId, getRenderKey, slideHeight]);
@@ -336,12 +404,17 @@ export const DashboardScreen = () => {
   const bootstrapMatches = useCallback(async () => {
     if (pagingInFlightRef.current) return;
     pagingInFlightRef.current = true;
+    setPagingKind(null);
     setPagingLoading(true);
     try {
       hasMoreNextRef.current = true;
       hasMorePrevRef.current = true;
+      setHasMoreNext(true);
+      setHasMorePrev(true);
       topCursorRef.current = null;
       bottomCursorRef.current = null;
+      nextCursorRef.current = null;
+      prevCursorRef.current = null;
       lastIndexHandledRef.current = null;
       const cursorId = await getCursorId();
       const firstPage = await fetchCursorPage(cursorId, 'forward');
@@ -353,10 +426,15 @@ export const DashboardScreen = () => {
       });
       hasMoreNextRef.current = !!firstPage.hasNext;
       hasMorePrevRef.current = !!firstPage.hasPrev;
+      setHasMoreNext(!!firstPage.hasNext);
+      setHasMorePrev(!!firstPage.hasPrev);
+      if (firstPage.nextCursor != null) nextCursorRef.current = firstPage.nextCursor;
+      if (firstPage.prevCursor != null) prevCursorRef.current = firstPage.prevCursor;
       setPagingBootstrapped(true);
       currentIndexRef.current = 0;
     } finally {
       setPagingLoading(false);
+      setPagingKind(null);
       pagingInFlightRef.current = false;
     }
   }, [fetchCursorPage, getCursorFromMatch, getCursorId]);
@@ -469,29 +547,61 @@ export const DashboardScreen = () => {
               scrollRef.current = r;
             }}
             style={styles.scrollView}
+            onLayout={(e) => setScrollViewportH(e.nativeEvent.layout.height)}
             contentContainerStyle={[
               styles.scrollContent,
-              { height: contentHeight },
+              { height: scrollContentHeight },
             ]}
             showsVerticalScrollIndicator={false}
             snapToInterval={slideHeight + SLIDE_GAP}
             snapToAlignment="start"
             decelerationRate="fast"
+            refreshControl={
+              hasMorePrev ? (
+                <RefreshControl
+                  refreshing={pagingLoading && pagingKind === 'prev'}
+                  onRefresh={() => void ensurePreviousMatchesIfNeeded()}
+                  tintColor={colors.primary.purple}
+                  colors={[colors.primary.purple]}
+                />
+              ) : undefined
+            }
             onMomentumScrollEnd={(e) => {
               const y = e.nativeEvent.contentOffset.y ?? 0;
-              const idx = Math.max(0, Math.round(y / (slideHeight + SLIDE_GAP)));
-              if (lastIndexHandledRef.current === idx) return;
+              const lh = e.nativeEvent.layoutMeasurement?.height ?? 0;
+              const ch = e.nativeEvent.contentSize?.height ?? 0;
+              const slideStep = slideHeight + SLIDE_GAP;
+              const rawIdx = Math.round(y / slideStep);
+              const idx = Math.max(0, rawIdx);
+              const prevIdx = lastIndexHandledRef.current;
+              const indexChanged = prevIdx !== idx;
               lastIndexHandledRef.current = idx;
-              currentIndexRef.current = idx;
 
-              const m = matches[idx];
+              const lastMatchIdx = Math.max(0, matches.length - 1);
+              const matchIdx = Math.min(idx, lastMatchIdx);
+              currentIndexRef.current = matchIdx;
+
+              const m = matches[matchIdx];
               const matchIdToSave = m?.matchId ?? m?.id;
-              if (matchIdToSave && lastSavedCursorRef.current !== matchIdToSave) {
+              if (
+                indexChanged &&
+                matchIdToSave &&
+                lastSavedCursorRef.current !== matchIdToSave
+              ) {
                 saveCursor(matchIdToSave);
               }
-              // Only check paging when we actually swiped to a new card
-              ensurePreviousMatchesIfNeeded();
-              ensureMoreMatchesIfNeeded();
+
+              // Bidirectional paging: only after a scroll gesture ends (not on initial mount).
+              const nearTop = y <= 24;
+              const nearBottom = lh > 0 && ch > 0 && y + lh >= ch - 56;
+
+              if (nearTop && hasMorePrevRef.current) {
+                void ensurePreviousMatchesIfNeeded();
+              }
+              if (nearBottom && hasMoreNextRef.current) {
+                const atLastCard = currentIndexRef.current >= lastMatchIdx;
+                if (atLastCard) void ensureMoreMatchesIfNeeded();
+              }
             }}
           >
             {matches?.map((match, index) => (

@@ -7,8 +7,10 @@ export const H_PADDING = 16;
 const INPUT_PILL_BG = '#f3f3f3';
 const INPUT_RADIUS = 22;
 export const INPUT_BAR_HEIGHT = 56;
-// Maximum height for the growing text input (matches Figma multi-line spec more closely)
-const INPUT_MAX_HEIGHT = 120;
+/** Min/max for composer TextInput: grows with text, then scrolls inside at max. */
+export const CHAT_INPUT_MIN_HEIGHT = 40;
+export const CHAT_INPUT_MAX_HEIGHT = 120;
+const INPUT_MAX_HEIGHT = CHAT_INPUT_MAX_HEIGHT;
 const ATTACH_BUTTON_SIZE = 40;
 const IMAGE_BUBBLE_SIZE = 200;
 const SEND_BUTTON_SIZE = 40;
@@ -948,10 +950,7 @@ export const styles = StyleSheet.create({
     }),
   },
   input: {
-    flex: 1,
     minWidth: 100,
-    minHeight: 24,
-    // maxHeight: INPUT_MAX_HEIGHT - 16,
     paddingVertical: 8,
     paddingHorizontal: 10,
     fontSize: 16,

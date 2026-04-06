@@ -83,6 +83,15 @@ export const STRINGS = {
     SECONDARY_CTA: '',
   },
 
+  /** Profile tab: logout confirmation bottom sheet (Figma 3202-15209) */
+  PROFILE_TAB: {
+    LOGOUT_TITLE: 'Leaving so soon?',
+    LOGOUT_MESSAGE:
+      'Your matches and conversations will be right here when you return',
+    STAY: 'Stay',
+    LOGOUT: 'Logout',
+  },
+
   // Profile Setup Screens
   PROFILE_SETUP: {
     COMMON: {
@@ -451,6 +460,8 @@ export const STRINGS = {
     PREVIEW_HEY: 'Hey there!',
     DRAFT_PREFIX: 'Draft:',
     DRAFT_PREVIEW: 'He',
+    /** Chat list when the last message is a photo and there is no caption */
+    LAST_MESSAGE_PHOTO: 'Photo',
     JUST_NOW: 'Just Now',
     YESTERDAY: 'Yesterday',
     PIN_CHAT: 'Pin Chat',

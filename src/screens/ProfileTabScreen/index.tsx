@@ -9,7 +9,7 @@ import {
   Pressable,
   Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -18,7 +18,7 @@ import type { ProfileStackParamList } from '../../navigation/types';
 import { ProfileScreenGradient } from '../../components/ProfileScreenGradient';
 import { ProfileProgressRing } from '../../components/ProfileProgressRing';
 import { useAuthStore } from '../../store/auth.store';
-import { colors } from '../../theme';
+import { colors, spacing } from '../../theme';
 import {
   ProfileReferralIcon,
   ProfileSubscriptionIcon,
@@ -33,6 +33,8 @@ import { getPreferencesAndHydrateStore } from '../../modules/preferences/api';
 import { getProfileApi } from '../../modules/auth/api';
 
 import { styles } from './styles';
+import { ReusableBottomSheet } from '../../components/BottomSheet';
+import { LogoutExitIcon } from '../../assets/icons/common/LogoutExitIcon';
 import { HomeFilterIcon } from '../../assets/icons/home/HomeFilterIcon';
 import { GENDER_OPTIONS } from '../../constants/profile';
 import { STRINGS } from '../../constants/strings';
@@ -86,9 +88,11 @@ function getGalleryImageUrl(photo: unknown): string | null {
 }
 export const ProfileTabScreen = () => {
   const navigation = useNavigation<ProfileMainNav>();
+  const insets = useSafeAreaInsets();
   const { user, logout, setUser } = useAuthStore();
   const [profileImage, setProfileImage] = useState<ImageSourcePropType | null>(null);
   const [galleryCount, setGalleryCount] = useState(0);
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -287,19 +291,78 @@ export const ProfileTabScreen = () => {
               <LogoWordmarkGradient width={116} height={56} />
             </View>
             <Text style={styles.version}>{appVersionLabel}</Text>
-          <TouchableOpacity style={styles.logoutButton} onPress={logout} activeOpacity={0.9}>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={() => setLogoutConfirmVisible(true)}
+            activeOpacity={0.9}
+          >
               <LinearGradient
                 colors={[colors.secondary.lavender, colors.primary.purple] as [string, string]}
                 start={{ x: 0.2, y: 0 }}
                 end={{ x: 0.9, y: 1 }}
                 style={styles.logoutGradient}
               >
-                <Text style={styles.logoutText}>Logout</Text>
+                <Text style={styles.logoutText}>{STRINGS.PROFILE_TAB.LOGOUT}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      <ReusableBottomSheet
+        isOpen={logoutConfirmVisible}
+        onClose={() => setLogoutConfirmVisible(false)}
+        snapPoints={[380, 400]}
+        showDragHandle
+        showCloseButton={false}
+        enablePanDownToClose
+        scrollEnabled={false}
+        backdropStyle={styles.logoutSheetBackdrop}
+        backgroundStyle={[
+          styles.logoutSheetFloatingCard,
+          { marginBottom: spacing.md + insets.bottom },
+        ]}
+      >
+        <View
+          style={[
+            styles.logoutSheetBody,
+            { paddingBottom: spacing.lg + Math.max(insets.bottom, 0) },
+          ]}
+        >
+          <View style={styles.logoutSheetHeader}>
+            <View style={styles.logoutSheetIconCircle}>
+              <LogoutExitIcon size={40} color={colors.primary.purple} />
+            </View>
+            <Text style={styles.logoutSheetTitle}>{STRINGS.PROFILE_TAB.LOGOUT_TITLE}</Text>
+            <Text style={styles.logoutSheetMessage}>{STRINGS.PROFILE_TAB.LOGOUT_MESSAGE}</Text>
+          </View>
+          <View style={styles.logoutSheetActions}>
+            <TouchableOpacity
+              style={styles.logoutSheetStayButton}
+              activeOpacity={0.9}
+              onPress={() => setLogoutConfirmVisible(false)}
+            >
+              <LinearGradient
+                colors={[...colors.gradients.primary.colors]}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.logoutSheetStayGradient}
+              />
+              <Text style={styles.logoutSheetStayLabel}>{STRINGS.PROFILE_TAB.STAY}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.logoutSheetConfirmButton}
+              activeOpacity={0.85}
+              onPress={() => {
+                setLogoutConfirmVisible(false);
+                logout();
+              }}
+            >
+              <Text style={styles.logoutSheetConfirmLabel}>{STRINGS.PROFILE_TAB.LOGOUT}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ReusableBottomSheet>
     </View>
   );
 };

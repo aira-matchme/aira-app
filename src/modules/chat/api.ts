@@ -1,5 +1,6 @@
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
+import { STRINGS } from '../../constants/strings';
 
 /** Participant details from API */
 export type ChatParticipantDetails = {
@@ -36,7 +37,12 @@ export type LastMessageContent = {
 
 /** Last message from API */
 export type LastMessagePayload = {
-  content?: LastMessageContent;
+  content?: LastMessageContent | string;
+  messageType?: string;
+  type?: string;
+  files?: Array<{ url?: string; uri?: string }>;
+  url?: string;
+  uri?: string;
   senderId?: string;
   timestamp?: string;
   isDeleted?: boolean;
@@ -87,6 +93,75 @@ function toPreviewString(value: unknown): string {
   return String(value);
 }
 
+function normalizeMessageType(value: unknown): string {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+/**
+ * Derive list preview + optional thumbnail for last message (text vs image, etc.).
+ */
+function getLastMessageListPreview(lastMsg: LastMessagePayload | undefined): {
+  preview: string;
+  previewThumbUri?: string | null;
+} {
+  if (!lastMsg || typeof lastMsg !== 'object') {
+    return { preview: '' };
+  }
+
+  const raw = lastMsg as Record<string, unknown>;
+  const messageType = normalizeMessageType(raw.messageType ?? raw.type);
+  const content = raw.content;
+  const contentObj =
+    content && typeof content === 'object' && content !== null
+      ? (content as Record<string, unknown>)
+      : null;
+  const contentType = normalizeMessageType(contentObj?.type);
+  const effectiveType = messageType || contentType;
+
+  const files = Array.isArray(raw.files) ? raw.files : [];
+  const firstFile = files[0] as { url?: unknown; uri?: unknown } | undefined;
+  const fileUrl =
+    typeof firstFile?.url === 'string'
+      ? firstFile.url
+      : typeof firstFile?.uri === 'string'
+        ? firstFile.uri
+        : '';
+
+  const contentUrl =
+    contentObj &&
+    (typeof contentObj.url === 'string'
+      ? contentObj.url
+      : typeof contentObj.uri === 'string'
+        ? contentObj.uri
+        : '');
+
+  const topUrl =
+    typeof raw.url === 'string' ? raw.url : typeof raw.uri === 'string' ? raw.uri : '';
+
+  const imageUri =
+    [fileUrl, contentUrl, topUrl].find((u) => typeof u === 'string' && u.trim().length > 0) ?? '';
+
+  if (effectiveType === 'image') {
+    let caption = '';
+    if (contentObj && typeof contentObj.text === 'string') {
+      caption = contentObj.text.trim();
+    } else if (typeof content === 'string') {
+      caption = content.trim();
+    }
+    return {
+      preview: caption.length > 0 ? caption : STRINGS.CHAT.LAST_MESSAGE_PHOTO,
+      previewThumbUri: imageUri || null,
+    };
+  }
+
+  const previewSource =
+    lastMsg && typeof lastMsg === 'object'
+      ? (raw.content ?? (lastMsg as { text?: unknown }).text)
+      : undefined;
+  const preview = toPreviewString(previewSource);
+  return { preview };
+}
+
 function formatChatTime(isoOrDate?: string): string {
   if (!isoOrDate) return '';
   const date = new Date(isoOrDate);
@@ -114,6 +189,8 @@ export function mapChatResponseToItem(
   name: string;
   avatar: { uri: string } | null;
   preview: string;
+  /** When last message is an image, URL for a small list thumbnail (optional). */
+  previewThumbUri?: string | null;
   time: string;
   unreadCount?: number;
   pinned?: boolean;
@@ -123,12 +200,7 @@ export function mapChatResponseToItem(
   const participant = item.participantDetails ?? {};
   const name = participant.nickName ?? participant.name ?? 'Unknown';
   const lastMsg = item.lastMessage;
-  // API: lastMessage.content = { text: "Hi", type: "text" }; fallback to legacy lastMessage.text
-  const previewSource =
-    lastMsg && typeof lastMsg === 'object'
-      ? (lastMsg.content ?? (lastMsg as { text?: unknown }).text)
-      : undefined;
-  const preview = toPreviewString(previewSource);
+  const { preview, previewThumbUri } = getLastMessageListPreview(lastMsg);
   const time = formatChatTime(item.lastActivityAt || item.updatedAt);
   const photo = participant.profilePhoto as
     | string
@@ -158,6 +230,7 @@ export function mapChatResponseToItem(
     name,
     avatar,
     preview,
+    previewThumbUri,
     time,
     unreadCount: item.myUnreadCount,
     pinned: item.isPinnedForMe,

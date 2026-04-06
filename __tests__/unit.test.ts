@@ -400,6 +400,36 @@ describe('Chat mapChatResponseToItem', () => {
     };
     expect(mapChatResponseToItem(item, 0).avatar).toBeNull();
   });
+
+  it('maps image last message to Photo label and thumbnail URL', () => {
+    const item: ChatListItemResponse = {
+      _id: 'c-img',
+      participantDetails: { _id: 'u1', name: 'Jane' },
+      lastMessage: {
+        messageType: 'image',
+        files: [{ url: 'https://example.com/last.jpg' }],
+        content: { type: 'image', text: '' },
+      },
+    };
+    const result = mapChatResponseToItem(item, 0);
+    expect(result.preview).toBe('Photo');
+    expect(result.previewThumbUri).toBe('https://example.com/last.jpg');
+  });
+
+  it('uses image caption as preview when present', () => {
+    const item: ChatListItemResponse = {
+      _id: 'c-cap',
+      participantDetails: { _id: 'u1', name: 'Jane' },
+      lastMessage: {
+        messageType: 'image',
+        files: [{ url: 'https://example.com/p.jpg' }],
+        content: { type: 'image', text: 'Sunset 🌅' },
+      },
+    };
+    const result = mapChatResponseToItem(item, 0);
+    expect(result.preview).toBe('Sunset 🌅');
+    expect(result.previewThumbUri).toBe('https://example.com/p.jpg');
+  });
 });
 
 describe('Chat mapApiMessageToChatMessage', () => {
