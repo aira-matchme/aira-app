@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -355,6 +355,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const layoutHeightRef = useRef(0);
   const didInitialScrollToBottomRef = useRef(false);
   const pendingPrependScrollRef = useRef<{ prevScrollY: number; prevContentHeight: number } | null>(null);
+  /** Bumped after we append our own message(s) so we scroll once layout has the new content (refs in the other effect are often stale on that frame). */
+  const [scrollAfterLocalSendNonce, setScrollAfterLocalSendNonce] = useState(0);
+  const bumpScrollAfterLocalSend = useCallback(() => {
+    setScrollAfterLocalSendNonce((n) => n + 1);
+  }, []);
   const handleComposerLayout = useCallback((event: LayoutChangeEvent) => {
     const nextHeight = Math.round(event.nativeEvent.layout.height);
     if (nextHeight > 0) {
@@ -383,9 +388,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         setKeyboardHeight(overlap);
       }
     
-      requestAnimationFrame(() => {
-        scrollToEndAfterKeyboard(true);
-      });
+      // requestAnimationFrame(() => {
+      //   scrollToEndAfterKeyboard(true);
+      // });
+      setTimeout(() => {
+        scrollToBottom(true);
+      }, 150);
     };
   
     if (Platform.OS === 'ios') {
@@ -395,9 +403,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         setIsKeyboardVisible(false);
         setKeyboardHeight(0);
   
-        requestAnimationFrame(() => {
-          scrollToEndAfterKeyboard(true);
-        });
+        // requestAnimationFrame(() => {
+        //   scrollToEndAfterKeyboard(true);
+        // });
+        setTimeout(() => {
+          scrollToBottom(true);
+        }, 150);
       });
   
       return () => {
@@ -422,6 +433,18 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       hideSub.remove();
     };
   }, [windowHeight, scrollToEndAfterKeyboard, keyboardHeight]);
+  // const scrollToBottom = (animated = true) => {
+  //   requestAnimationFrame(() => {
+  //     requestAnimationFrame(() => {
+  //       scrollViewRef.current?.scrollToEnd({ animated });
+  //     });
+  //   });
+  // };
+  const scrollToBottom = (animated = true) => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated });
+    }, 50);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -873,19 +896,55 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
   }, [chatId, currentUserId, messagesHasMore, messagesLoading, messagesLoadingMore, messagesPage]);
 
+  // useEffect(() => {
+  //   if (messagesLoading || messages.length === 0) return;
+  //   if (isPrependingOlderMessagesRef.current) {
+  //     // We prepended older messages due to pagination; keep the current scroll position.
+  //     // Next message update (e.g. new incoming/append) can scroll as normal.
+  //     isPrependingOlderMessagesRef.current = false;
+  //     const pending = pendingPrependScrollRef.current;
+  //     pendingPrependScrollRef.current = null;
+  //     if (pending) {
+  //       // After React prepends content, adjust scrollY by the added content height.
+  //       requestAnimationFrame(() => {
+  //         const newContentHeight = contentHeightRef.current;
+  //         const delta = newContentHeight - pending.prevContentHeight;
+  //         if (delta > 0) {
+  //           scrollViewRef.current?.scrollTo({
+  //             y: pending.prevScrollY + delta,
+  //             animated: false,
+  //           });
+  //         }
+  //       });
+  //     }
+  //     return;
+  //   }
+  //   const distanceFromBottom =
+  //     (contentHeightRef.current ?? 0) -
+  //     ((scrollYRef.current ?? 0) + (layoutHeightRef.current ?? 0));
+  //   const isNearBottom = distanceFromBottom < 120;
+  //   const shouldScrollNow = !didInitialScrollToBottomRef.current || isNearBottom;
+  //   if (!shouldScrollNow) return;
+  //   didInitialScrollToBottomRef.current = true;
+  //   const id = setTimeout(() => {
+  //     scrollViewRef.current?.scrollToEnd({ animated: false });
+  //   }, 100);
+  //   return () => clearTimeout(id);
+  // }, [messagesLoading, messages.length]);
   useEffect(() => {
     if (messagesLoading || messages.length === 0) return;
+  
     if (isPrependingOlderMessagesRef.current) {
-      // We prepended older messages due to pagination; keep the current scroll position.
-      // Next message update (e.g. new incoming/append) can scroll as normal.
       isPrependingOlderMessagesRef.current = false;
+  
       const pending = pendingPrependScrollRef.current;
       pendingPrependScrollRef.current = null;
+  
       if (pending) {
-        // After React prepends content, adjust scrollY by the added content height.
         requestAnimationFrame(() => {
           const newContentHeight = contentHeightRef.current;
           const delta = newContentHeight - pending.prevContentHeight;
+  
           if (delta > 0) {
             scrollViewRef.current?.scrollTo({
               y: pending.prevScrollY + delta,
@@ -896,18 +955,23 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       }
       return;
     }
-    const distanceFromBottom =
-      (contentHeightRef.current ?? 0) -
-      ((scrollYRef.current ?? 0) + (layoutHeightRef.current ?? 0));
-    const isNearBottom = distanceFromBottom < 120;
-    const shouldScrollNow = !didInitialScrollToBottomRef.current || isNearBottom;
-    if (!shouldScrollNow) return;
-    didInitialScrollToBottomRef.current = true;
-    const id = setTimeout(() => {
+  
+    // ✅ ALWAYS scroll
+    setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: false });
-    }, 100);
-    return () => clearTimeout(id);
+    }, 80);
+  
   }, [messagesLoading, messages.length]);
+  useLayoutEffect(() => {
+    if (scrollAfterLocalSendNonce === 0 || messagesLoading) return;
+    const id = requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+      requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: false });
+      });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [scrollAfterLocalSendNonce, messagesLoading]);
 
   useEffect(() => {
     AsyncStorage.getItem(DONT_SHOW_ASK_AIRA_CONFIRM_KEY).then((value) => {
@@ -1153,7 +1217,13 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         const ui = mapApiMessageToChatMessage(apiMessage, currentUserId, {
           chatStatus: isRequest ? 'pending' : undefined,
         });
-        if (ui) setMessages((prev) => [...prev, ui as ChatMessage]);
+        if (ui) {
+          setMessages((prev) => [...prev, ui as ChatMessage]);
+          // setTimeout(() => {
+          //   scrollToBottom(true);
+          // }, 100);
+          bumpScrollAfterLocalSend();
+        }
         socketService.messageSendFromApi(
           currentUserId,
           otherUserId,
@@ -1335,6 +1405,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   };
 
   const handleSend = async () => {
+    
     const trimmed = inputText.trim();
     const hasAttachments = pendingAttachments.length > 0;
     if (!trimmed && !hasAttachments) return;
@@ -1342,6 +1413,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     setSendLoading(true);
     const replyToPayload = replyingTo?.messageId ?? null;
     try {
+      let appendedOutgoing = false;
       let effectiveChatId = chatId;
       let justCreatedChatViaAdd = false;
 
@@ -1358,6 +1430,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           setSendLoading(false);
           return;
         }
+        
 
         setChatId(effectiveChatId);
         // Update navigation params so future navigations have the chat id
@@ -1406,6 +1479,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   .reverse()
               : [];
             setMessages(list);
+            appendedOutgoing = list.length > 0;
             const meta = msgRes.data?.meta;
             const currentPage = meta?.currentPage ?? meta?.pageNo ?? 1;
             const totalPages = meta?.totalPages ?? 1;
@@ -1429,6 +1503,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             });
             if (ui) {
               setMessages((prev) => [...prev, ui as ChatMessage]);
+              appendedOutgoing = true;
+              setTimeout(() => {
+                scrollToBottom(true);
+              }, 100);
             }
             if (currentUserId && otherUserId) {
               socketService.messageSendFromApi(
@@ -1448,9 +1526,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         const fileName = att.type === 'image'
           ? firstNonEmptyString(att.name, `image_${Date.now()}.jpg`)!
           : att.name;
-          console.log('mimeType', mimeType);
-          console.log('fileName', fileName);
-          console.log('att.uri', att.uri);
         const { url, key } = await uploadChatFileApi(att.uri, { mimeType, fileName });
         const res = await sendMessageApi({
           chatId: effectiveChatId!,
@@ -1484,6 +1559,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           });
           if (ui) {
             setMessages((prev) => [...prev, ui]);
+            appendedOutgoing = true;
+            bumpScrollAfterLocalSend(); // ADD THIS
+            // setTimeout(() => {
+            //   scrollToBottom(true);
+            // }, 100);
+
           }
           if (currentUserId && otherUserId) {
             socketService.messageSendFromApi(
@@ -1501,6 +1582,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
       if (pendingAttachments.length > 0) {
         setPendingAttachments([]);
+      }
+
+      if (appendedOutgoing) {
+        bumpScrollAfterLocalSend();
       }
     } catch (err: unknown) {
       // Send failed
@@ -2328,6 +2413,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   style={styles.airaSuggestionsList}
                   contentContainerStyle={styles.airaSuggestionsListContent}
                   showsVerticalScrollIndicator={false}
+                  onContentSizeChange={() => {
+                    scrollViewRef.current?.scrollToEnd({ animated: true });
+                  }}
+                  // onContentSizeChange={() => scrollToBottom(false)}
                 >
                   {generatedReplies?.map((text, index) => {
                     const selected = index === selectedReplyIndex;
@@ -2543,11 +2632,19 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         onLayout={(e) => {
           layoutHeightRef.current = e.nativeEvent.layout.height;
         }}
+        // contentContainerStyle={{
+        //   ...styles.scrollContent,
+        //   paddingBottom:
+        //     (styles.scrollContent?.paddingBottom ?? 16) +
+        //     composerHeight +
+        //     12,
+        // }}
         contentContainerStyle={{
           ...styles.scrollContent,
           paddingBottom:
             (styles.scrollContent?.paddingBottom ?? 16) +
             composerHeight +
+            keyboardHeight + // ✅ THIS IS THE KEY
             12,
         }}
         keyboardShouldPersistTaps="handled"

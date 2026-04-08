@@ -23,6 +23,11 @@ export const loginApi = async (
   return data;
 };
 
+/** Ends server session. `apiClient` request interceptor adds `Authorization: Bearer <accessToken>`. */
+export const logoutApi = async (): Promise<void> => {
+  await apiClient.post(endpoints.auth.logout, {});
+};
+
 export const sendOtpApi = async (
   payload: SendOtpRequest
 ): Promise<SendOtpResponse> => {

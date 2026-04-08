@@ -48,6 +48,12 @@ export const setupInterceptors = () => {
     (response) => response,
     async (error) => {
       const originalRequest = error.config;
+      const requestUrl = String(originalRequest?.url ?? '');
+
+      // Logout failures should not trigger token refresh (avoids loops) or global error UI.
+      if (requestUrl.includes('/auth/logout')) {
+        return Promise.reject(error);
+      }
 
       if (error.response?.status === 401 && !originalRequest._retry) {
         originalRequest._retry = true;
