@@ -249,6 +249,7 @@ export const WelcomeScreen: React.FC = () => {
       const response = await sendOtpMutation.mutateAsync({ email });
       if (response.statusCode === 200) {
         setShowEmailLoginSheet(false);
+        void getDeviceToken().catch(() => {});
         navigation.navigate('OTPVerification', { email });
       }
     } catch {

@@ -117,7 +117,18 @@ export const LikesScreen = () => {
       </View>
         <View style={styles.headerRow}>
           <Text style={styles.title}>{STRINGS.LIKES.TITLE}</Text>
-          <TouchableOpacity style={styles.notifButton} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.notifButton}
+            activeOpacity={0.7}
+            onPress={() => {
+              const tabNav = navigation.getParent?.() as
+                | { navigate?: (name: string, params?: Record<string, unknown>) => void }
+                | undefined;
+              tabNav?.navigate?.('Home', { screen: 'Notifications' });
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+          >
             <BellIcon size={20} color={colors.black} />
           </TouchableOpacity>
         </View>

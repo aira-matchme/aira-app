@@ -52,6 +52,8 @@ export const OTPVerificationScreen: React.FC = () => {
   const [apiError, setApiError] = useState<string | undefined>();
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** Warm FCM token while the user waits for the email; avoids verify-time races on iOS APNs. */
+  const deviceTokenRef = useRef<string | null | undefined>(undefined);
 
   const verifyOtpMutation = useVerifyOtp();
   const sendOtpMutation = useSendOtp();
@@ -101,6 +103,38 @@ export const OTPVerificationScreen: React.FC = () => {
     };
   }, [resendTimer]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const token = await getDeviceToken();
+      if (!cancelled) {
+        deviceTokenRef.current = token;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const resolveDeviceTokenForVerify = async (): Promise<string | null> => {
+    const cached = deviceTokenRef.current;
+    if (typeof cached === 'string' && cached.trim() !== '') {
+      return cached.trim();
+    }
+    let token = (await getDeviceToken())?.trim() ?? null;
+    if (token) {
+      deviceTokenRef.current = token;
+      return token;
+    }
+    // Extra beat if the first run raced the in-flight prefetch or APNs was still registering.
+    await new Promise<void>((r) => setTimeout(r, 2500));
+    token = (await getDeviceToken())?.trim() ?? null;
+    if (token) {
+      deviceTokenRef.current = token;
+    }
+    return token;
+  };
+
   const formatTimer = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -132,10 +166,18 @@ export const OTPVerificationScreen: React.FC = () => {
     clearErrors('otp');
 
     try {
+      const deviceToken = (await resolveDeviceTokenForVerify())?.trim();
+      if (!deviceToken) {
+        const message = STRINGS.OTP_VERIFICATION.ERROR_DEVICE_TOKEN;
+        setApiError(message);
+        setError('otp', { type: 'manual', message });
+        return;
+      }
+
       const response = await verifyOtpMutation.mutateAsync({
         email,
         otp: data.otp,
-        deviceToken: await getDeviceToken() ?? '',
+        deviceToken,
         deviceId: await getNativeDeviceId(),
         deviceType: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web',
       });

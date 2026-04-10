@@ -95,21 +95,28 @@ export type AuthStackParamList = {
   Likes: undefined;
 };
 
+export type HomeStackParamList = {
+  Dashboard: undefined;
+  Notifications: undefined;
+};
+
 export type ChatStackParamList = {
   ChatList: undefined;
   ChatDetail: {
     chatId: string;
-    name: string;
+    /** Optional — ChatDetailScreen hydrates missing fields from APIs. */
     avatar?: number | { uri: string };
-    /** When true, show Accept / Decline / Block & Report (request mode) */
+    /** Optional — shown in header if provided; otherwise derived. */
+    name?: string;
+    /** Optional — when true, show Accept / Decline / Block & Report (request mode). */
     isRequest?: boolean;
-    /** Other user's id (for block API); required when isRequest is true */
+    /** Optional — used for block/report and profile navigation; otherwise derived. */
     otherUserId?: string;
   };
 };
 
 export type TabStackParamList = {
-  Home: undefined;
+  Home: NavigatorScreenParams<HomeStackParamList> | undefined;
   Chat: NavigatorScreenParams<ChatStackParamList> | undefined;
   Match: undefined; // Center "ai" tab
   Likes: undefined;

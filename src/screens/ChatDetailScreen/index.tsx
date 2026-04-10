@@ -264,13 +264,23 @@ function firstNonEmptyString(...values: Array<unknown>): string | undefined {
 }
 
 export const ChatDetailScreen = ({ route, navigation }: Props) => {
-  const { name, avatar, chatId: initialChatId, isRequest, otherUserId } = route.params;
+  const {
+    chatId: initialChatId,
+    avatar: initialAvatar,
+    name: initialName,
+    isRequest: initialIsRequest,
+    otherUserId: initialOtherUserId,
+  } = route.params;
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const bottomSafeInset = insets.bottom;
   const imageBubbleSize = Math.max(160, Math.min(Math.round(windowWidth * 0.75), 320));
   const currentUserId = useAuthStore((s) => s.user?.id);
   const [chatId, setChatId] = useState<string | null>(initialChatId ?? null);
+  const [name, setName] = useState<string>(initialName ?? 'Chat');
+  const [avatar, setAvatar] = useState<typeof initialAvatar | undefined>(initialAvatar);
+  const [isRequest, setIsRequest] = useState<boolean>(!!initialIsRequest);
+  const [otherUserId, setOtherUserId] = useState<string | undefined>(initialOtherUserId);
   const [requestActionLoading, setRequestActionLoading] = useState<'accept' | 'decline' | 'block' | null>(null);
   const [messagesLoading, setMessagesLoading] = useState(!!chatId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -661,6 +671,65 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     getChatMessagesApi({ chatId, page: 1, limit: MESSAGES_PAGE_SIZE })
       .then((res) => {
         if (cancelled) return;
+        // Hydrate header + otherUserId from chat payload when caller only passed chatId/avatar.
+        // Your API returns: data.chat.participants.{sender,receiver}
+        const chatPayload = res.data?.chat as Record<string, unknown> | undefined;
+        const participantsRaw =
+          chatPayload && typeof chatPayload.participants === 'object'
+            ? (chatPayload.participants as Record<string, unknown>)
+            : null;
+        const senderRaw =
+          participantsRaw && typeof participantsRaw.sender === 'object'
+            ? (participantsRaw.sender as Record<string, unknown>)
+            : null;
+        const receiverRaw =
+          participantsRaw && typeof participantsRaw.receiver === 'object'
+            ? (participantsRaw.receiver as Record<string, unknown>)
+            : null;
+
+        const pickOtherParticipant = (): Record<string, unknown> | null => {
+          const me = typeof currentUserId === 'string' && currentUserId.trim() ? currentUserId.trim() : null;
+          if (me && senderRaw && firstNonEmptyString(senderRaw._id, senderRaw.id) === me) return receiverRaw;
+          if (me && receiverRaw && firstNonEmptyString(receiverRaw._id, receiverRaw.id) === me) return senderRaw;
+          // Fallback: if we can't tell, prefer receiver as "other"
+          return receiverRaw ?? senderRaw;
+        };
+
+        const other = pickOtherParticipant();
+        if (other) {
+          const pid = firstNonEmptyString(other._id, other.id, other.userId);
+          if (!otherUserId && pid) setOtherUserId(pid);
+
+          const pname = firstNonEmptyString(other.nickName, other.name);
+          if ((name ?? '').trim().length === 0 || name === 'Chat') {
+            if (pname) setName(pname);
+          }
+
+          if (!avatar) {
+            const photo = other.profilePhoto;
+            let avatarUrl: string | undefined;
+            if (typeof photo === 'string') avatarUrl = photo;
+            if (photo && typeof photo === 'object') {
+              const u = (photo as { url?: Record<string, unknown> }).url as
+                | { medium?: unknown; thumb?: unknown; original?: unknown }
+                | undefined;
+              avatarUrl = firstNonEmptyString(u?.medium, u?.thumb, u?.original);
+            }
+            const pic = typeof other.profilePicture === 'string' ? other.profilePicture : undefined;
+            const picked = firstNonEmptyString(avatarUrl, pic);
+            if (picked) setAvatar({ uri: picked } as any);
+          }
+        }
+
+        // Derive request mode from chat status when not supplied.
+        if (!initialIsRequest && chatPayload) {
+          const status = String((chatPayload.status as unknown) ?? '').toLowerCase();
+          if (status.includes('pending') || status.includes('request')) {
+            setIsRequest(true);
+          } else {
+            setIsRequest(false);
+          }
+        }
         const raw = res.data?.list ?? res.data?.messages ?? [];
         const list = Array.isArray(raw)
           ? raw

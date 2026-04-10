@@ -510,10 +510,7 @@ export const MatchDetailsScreen: React.FC = () => {
         screen: 'ChatDetail',
         params: {
           chatId,
-          name,
           ...(firstPhoto?.url ? { avatar: { uri: String(firstPhoto.url) } } : {}),
-          isRequest: false,
-          otherUserId: userId,
         },
       },
     });

@@ -16,6 +16,7 @@ import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { useSendOtp } from '../../../modules/auth/hooks';
 import Toast from 'react-native-toast-message';
+import { getDeviceToken } from '../../../services/firebase/messaging';
 import { styles } from './styles';
 
 type EmailLoginNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'EmailLogin'>;
@@ -74,11 +75,8 @@ export const EmailLoginScreen: React.FC = () => {
       const response = await sendOtpMutation.mutateAsync({ email });
       
       if (response.statusCode === 200) {
-        // Toast.show({
-        //   type: 'success',
-        //   text1: 'OTP Sent',
-        //   text2: 'Please check your email for the verification code',
-        // });
+        // Start FCM while the user opens email — reduces “empty deviceToken” on Verify.
+        void getDeviceToken().catch(() => {});
         navigation.navigate('OTPVerification', { email });
       }
     } catch (error: any) {

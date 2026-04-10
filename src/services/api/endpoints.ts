@@ -4,6 +4,7 @@ export const endpoints = {
     register: '/auth/register',
     refresh: '/auth/refresh',
     logout: '/auth/logout',
+    deleteAccount: '/auth/account',
     sendOtp: '/auth/send-otp',
     verifyOtp: '/auth/verify-otp',
     resendOtp: '/auth/resend-otp',
@@ -67,5 +68,11 @@ export const endpoints = {
   chatbot: {
     getChatbotMessages: '/ai-chat-log/get-logs',
     postChatbotMessages: '/ai-chat-log/send',
+  },
+  notifications: {
+    list: '/notifications/list',
+    /** PATCH — mark single notification seen */
+    markSeen: (notificationId: string) =>
+      `/notifications/${encodeURIComponent(notificationId)}/seen`,
   },
 };

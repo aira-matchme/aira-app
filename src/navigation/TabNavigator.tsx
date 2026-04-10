@@ -5,7 +5,7 @@ import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { DashboardScreen } from '../screens/DashboardScreen';
+import { HomeStackNavigator } from './HomeStackNavigator';
 import { ChatStackNavigator } from './ChatStackNavigator';
 import { MatchScreen } from '../screens/MatchScreen';
 // import { LikesScreen } from '../screens/LikesScreen';
@@ -91,17 +91,22 @@ export const TabNavigator = () => {
     >
       <Tab.Screen
         name="Home"
-        component={DashboardScreen}
-        options={{
-          tabBarLabel: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <TabHomeIcon
-              color={color}
-              filled={focused}
-              width={TAB_ICON_SIZE}
-              height={TAB_ICON_SIZE}
-            />
-          ),
+        component={HomeStackNavigator}
+        options={({ route }) => {
+          const routeName = getFocusedRouteNameFromRoute(route) ?? 'Dashboard';
+          const hideTabBar = routeName === 'Notifications';
+          return {
+            tabBarLabel: 'Home',
+            tabBarIcon: ({ color, focused }) => (
+              <TabHomeIcon
+                color={color}
+                filled={focused}
+                width={TAB_ICON_SIZE}
+                height={TAB_ICON_SIZE}
+              />
+            ),
+            tabBarStyle: hideTabBar ? { display: 'none' } : tabBarStyle,
+          };
         }}
       />
       <Tab.Screen

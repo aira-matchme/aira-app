@@ -194,6 +194,19 @@ describe('Auth API (QA: request/response contract)', () => {
     expect(result.data.user).toBeDefined();
   });
 
+  it('POST /auth/verify-otp – rejects empty deviceToken before calling API', async () => {
+    await expect(
+      verifyOtpApi({
+        email: 'user@example.com',
+        otp: '123456',
+        deviceToken: '   ',
+        deviceId: 'device-id',
+      })
+    ).rejects.toThrow('deviceToken should not be empty');
+
+    expect(apiClient.post).not.toHaveBeenCalled();
+  });
+
   it('POST /auth/verify-otp – invalid OTP: propagates error', async () => {
     (apiClient.post as jest.Mock).mockRejectedValueOnce({ response: { status: 400, data: { message: 'Invalid OTP' } } });
 

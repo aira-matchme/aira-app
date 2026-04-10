@@ -63,6 +63,8 @@ export const STRINGS = {
     ERROR_REQUIRED: 'OTP is required',
     ERROR_INVALID_LENGTH: 'OTP must be 6 digits',
     ERROR_INVALID_OTP: 'Incorrect OTP',
+    ERROR_DEVICE_TOKEN:
+      'Please enable notifications so we can process your OTP request. Allow notifications for Aira in Settings, then tap Verify again.',
   },
 
   // Enable Notifications Screen
@@ -90,6 +92,13 @@ export const STRINGS = {
       'Your matches and conversations will be right here when you return',
     STAY: 'Stay',
     LOGOUT: 'Logout',
+    DELETE_ACCOUNT: 'Delete Account',
+    DELETE_ACCOUNT_TITLE: 'Delete account?',
+    DELETE_ACCOUNT_MESSAGE:
+      'This action is permanent. Your profile, matches, and conversations will be removed.',
+    DELETE_REASON_PLACEHOLDER: 'Tell us why you are leaving...',
+    CANCEL: 'Keep Account',
+    DELETE: 'Delete Account',
   },
 
   // Profile Setup Screens
@@ -450,6 +459,21 @@ export const STRINGS = {
     UNBLOCKED: 'User unblocked.',
     UNBLOCK_FAILED: 'Could not unblock. Try again.',
     LOAD_ERROR: 'Could not load the list. Try again.',
+  },
+  NOTIFICATIONS: {
+    TITLE: 'Notifications',
+    TAB_ALL: 'All',
+    TAB_UNREAD: 'Unread',
+    EMPTY_ALL: 'No notifications yet.',
+    EMPTY_UNREAD: "You're all caught up.",
+    LOAD_ERROR: 'Could not load notifications. Try again.',
+    OPEN_CHAT_FAILED: 'Could not open this chat. Try again from Messages.',
+    MATCH_OPEN_FAILED: 'Could not open this profile.',
+    /** Relative timestamps — match Figma 2586-6121 copy */
+    TIME_ONE_MIN_AGO: '1 min ago',
+    TIME_N_MINS_AGO: '{n} mins ago',
+    TIME_ONE_HOUR_AGO: '1 hour ago',
+    TIME_N_HOURS_AGO: '{n} hours ago',
   },
   CHAT: {
     TITLE: 'Messages',

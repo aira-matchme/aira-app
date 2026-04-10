@@ -8,6 +8,8 @@ import {
   ImageSourcePropType,
   Pressable,
   Linking,
+  ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -35,10 +37,13 @@ import { getProfileApi } from '../../modules/auth/api';
 import { styles } from './styles';
 import { ReusableBottomSheet } from '../../components/BottomSheet';
 import { LogoutExitIcon } from '../../assets/icons/common/LogoutExitIcon';
+import { DeleteIcon } from '../../assets/icons/common/DeleteIcon';
+import { InterestChipCheckIcon } from '../../assets/icons/common/InterestChipCheckIcon';
 import { HomeFilterIcon } from '../../assets/icons/home/HomeFilterIcon';
 import { GENDER_OPTIONS } from '../../constants/profile';
 import { STRINGS } from '../../constants/strings';
 import DeviceInfo from 'react-native-device-info';
+import { deleteAccountApi } from '../../modules/auth/api';
 
 const AIRA_PLUS_CARD_IMAGE = require('../../assets/images/AiraPlusCardBackground.png');
 const PRIVACY_POLICY_URL = 'https://airamatchme.com/privacy';
@@ -56,6 +61,7 @@ const MENU_ITEMS: Array<{
   screen?: keyof ProfileStackParamList;
   url?: string;
   iconColor?: string;
+  action?: 'deleteAccount';
 }> = [
   { id: 'preferences', label: 'Preferences', Icon: HomeFilterIcon, screen: 'PreferencesSummary', iconColor: colors.primary.purple },
   {
@@ -65,15 +71,29 @@ const MENU_ITEMS: Array<{
     screen: 'BlockedUsers',
     iconColor: colors.primary.purple,
   },
-  { id: 'referral', label: 'Referral Points', Icon: ProfileReferralIcon },
-  { id: 'subscription', label: 'My Subscription', Icon: ProfileSubscriptionIcon },
+  // { id: 'referral', label: 'Referral Points', Icon: ProfileReferralIcon },
+  // { id: 'subscription', label: 'My Subscription', Icon: ProfileSubscriptionIcon },
   { id: 'help', label: 'Help Center', Icon: ProfileHelpIcon, url: SUPPORT_EMAIL_URL },
   { id: 'privacy', label: 'Privacy & Terms', Icon: ProfileHelpIcon, url: PRIVACY_POLICY_URL },
+  // {
+  //   id: 'delete-account',
+  //   label: STRINGS.PROFILE_TAB.DELETE_ACCOUNT,
+  //   Icon: DeleteIcon,
+  //   iconColor: colors.semantic.error,
+  //   action: 'deleteAccount',
+  // },
 ];
 
 type ProfileMainNav = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
 const PHOTO_SLOTS = 6;
+const DELETE_REASON_OPTIONS = [
+  'I have privacy concerns',
+  'I am not getting good matches',
+  'I found someone',
+  'The app is hard to use',
+  'I get too many notifications',
+] as const;
 
 /** Extract display URL from API gallery image photo (object or string). */
 function getGalleryImageUrl(photo: unknown): string | null {
@@ -93,6 +113,10 @@ export const ProfileTabScreen = () => {
   const [profileImage, setProfileImage] = useState<ImageSourcePropType | null>(null);
   const [galleryCount, setGalleryCount] = useState(0);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [selectedDeleteReason, setSelectedDeleteReason] = useState<string | null>(null);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -168,6 +192,11 @@ export const ProfileTabScreen = () => {
   };
 
   const onMenuPress = async (menuItem: (typeof MENU_ITEMS)[number]) => {
+    if (menuItem.action === 'deleteAccount') {
+      setDeleteConfirmVisible(true);
+      return;
+    }
+
     if (menuItem.url) {
       try {
         // External links (privacy policy, support mail) should always open.
@@ -191,6 +220,30 @@ export const ProfileTabScreen = () => {
     if (screen) {
       navigation.navigate(screen as never);
     }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteLoading) return;
+    const picked = selectedDeleteReason ?? '';
+    const typed = deleteReason.trim();
+    const reason = picked && typed ? `${picked}. Other: ${typed}` : picked || typed;
+    if (!reason) return;
+    setDeleteLoading(true);
+    try {
+      await deleteAccountApi(reason);
+      setDeleteConfirmVisible(false);
+      setDeleteReason('');
+      setSelectedDeleteReason(null);
+      await logout();
+    } catch {
+      // API interceptor handles user-facing error.
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const toggleDeleteReason = (value: string) => {
+    setSelectedDeleteReason((prev) => (prev === value ? null : value));
   };
 
   return (
@@ -233,7 +286,7 @@ export const ProfileTabScreen = () => {
           </View>
 
           {/* Aira Plus card — Figma 2101-28021 */}
-          <TouchableOpacity style={styles.airaPlusCard} activeOpacity={0.95}>
+          {/* <TouchableOpacity style={styles.airaPlusCard} activeOpacity={0.95}>
             <Image
               source={AIRA_PLUS_CARD_IMAGE}
               style={styles.airaPlusBackgroundImage}
@@ -265,7 +318,7 @@ export const ProfileTabScreen = () => {
                 </Pressable>
               </View>
             </View>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           {/* Menu list */}
           <View style={styles.menuList}>
@@ -278,7 +331,14 @@ export const ProfileTabScreen = () => {
               >
                 <View style={styles.menuRowLeft}>
                   <menuItem.Icon width={20} height={20} color={menuItem.iconColor} />
-                  <Text style={styles.menuRowLabel}>{menuItem.label}</Text>
+                  <Text
+                    style={[
+                      styles.menuRowLabel,
+                      menuItem.action === 'deleteAccount' && styles.menuRowLabelDanger,
+                    ]}
+                  >
+                    {menuItem.label}
+                  </Text>
                 </View>
                 <ProfileChevronRightIcon width={24} height={24} />
               </TouchableOpacity>
@@ -291,20 +351,28 @@ export const ProfileTabScreen = () => {
               <LogoWordmarkGradient width={116} height={56} />
             </View>
             <Text style={styles.version}>{appVersionLabel}</Text>
-          <TouchableOpacity
-            style={styles.logoutButton}
-            onPress={() => setLogoutConfirmVisible(true)}
-            activeOpacity={0.9}
-          >
-              <LinearGradient
-                colors={[colors.secondary.lavender, colors.primary.purple] as [string, string]}
-                start={{ x: 0.2, y: 0 }}
-                end={{ x: 0.9, y: 1 }}
-                style={styles.logoutGradient}
+            <View style={styles.footerActions}>
+              <TouchableOpacity
+                style={styles.logoutButton}
+                onPress={() => setLogoutConfirmVisible(true)}
+                activeOpacity={0.9}
               >
-                <Text style={styles.logoutText}>{STRINGS.PROFILE_TAB.LOGOUT}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+                <View style={styles.logoutContent}>
+                  <LogoutExitIcon size={18} color={colors.semantic.error} />
+                  <Text style={styles.logoutText}>{STRINGS.PROFILE_TAB.LOGOUT}</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.deleteAccountButton}
+                onPress={() => setDeleteConfirmVisible(true)}
+                activeOpacity={0.9}
+              >
+                <View style={styles.deleteAccountContent}>
+                  <DeleteIcon size={18} color={colors.black} />
+                  <Text style={styles.deleteAccountText}>Delete Account</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -359,6 +427,135 @@ export const ProfileTabScreen = () => {
               }}
             >
               <Text style={styles.logoutSheetConfirmLabel}>{STRINGS.PROFILE_TAB.LOGOUT}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ReusableBottomSheet>
+
+      <ReusableBottomSheet
+        isOpen={deleteConfirmVisible}
+        onClose={() => {
+          setDeleteConfirmVisible(false);
+          setDeleteReason('');
+          setSelectedDeleteReason(null);
+        }}
+        snapPoints={['90%']}
+        showDragHandle
+        showCloseButton={false}
+        enablePanDownToClose={!deleteLoading}
+        scrollEnabled={false}
+        backdropStyle={styles.logoutSheetBackdrop}
+        backgroundStyle={[
+          styles.logoutSheetFloatingCard,
+          { marginBottom: spacing.md + insets.bottom },
+        ]}
+      >
+        <View
+          style={[
+            styles.deleteSheetBody,
+            { paddingBottom: spacing.lg + Math.max(insets.bottom, 0) },
+          ]}
+        >
+          <View style={styles.deleteSheetHeader}>
+            <View style={styles.deleteSheetIconCircle}>
+              <DeleteIcon size={40} color={colors.semantic.error} />
+            </View>
+            <Text style={styles.deleteSheetTitle}>{STRINGS.PROFILE_TAB.DELETE_ACCOUNT_TITLE}</Text>
+            <Text style={styles.deleteSheetMessage}>{STRINGS.PROFILE_TAB.DELETE_ACCOUNT_MESSAGE}</Text>
+            <View style={styles.deleteReasonList}>
+              {DELETE_REASON_OPTIONS.map((reason) => {
+                const selected = selectedDeleteReason === reason;
+                return (
+                  <Pressable
+                    key={reason}
+                    style={[
+                      styles.deleteReasonRow,
+                      selected && styles.deleteReasonRowSelected,
+                    ]}
+                    onPress={() => toggleDeleteReason(reason)}
+                    disabled={deleteLoading}
+                  >
+                    <View
+                      style={[
+                        styles.deleteReasonCheckbox,
+                        selected && styles.deleteReasonCheckboxSelected,
+                      ]}
+                    >
+                      {selected ? (
+                        <InterestChipCheckIcon size={12} color={colors.white} />
+                      ) : null}
+                    </View>
+                    <Text
+                      style={[
+                        styles.deleteReasonRowLabel,
+                        selected && styles.deleteReasonRowLabelSelected,
+                      ]}
+                    >
+                      {reason}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={styles.deleteReasonInputWrap}>
+              <TextInput
+                value={deleteReason}
+                onChangeText={setDeleteReason}
+                placeholder={STRINGS.PROFILE_TAB.DELETE_REASON_PLACEHOLDER}
+                placeholderTextColor={colors.neutral[400]}
+                style={styles.deleteReasonInput}
+                editable={!deleteLoading}
+                maxLength={240}
+                multiline
+                textAlignVertical="top"
+              />
+            </View>
+          </View>
+          <View style={styles.deleteSheetActions}>
+            <TouchableOpacity
+              style={styles.deleteSheetCancelButton}
+              activeOpacity={0.85}
+              onPress={() => {
+                setDeleteConfirmVisible(false);
+                setDeleteReason('');
+                setSelectedDeleteReason(null);
+              }}
+              disabled={deleteLoading}
+            >
+              <Text style={styles.deleteSheetCancelLabel}>{STRINGS.PROFILE_TAB.CANCEL}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.deleteSheetDeleteButton,
+                !selectedDeleteReason &&
+                  !deleteReason.trim() &&
+                  styles.deleteSheetDeleteButtonDisabled,
+              ]}
+              activeOpacity={0.9}
+              onPress={handleDeleteAccount}
+              disabled={
+                deleteLoading ||
+                (!selectedDeleteReason && !deleteReason.trim())
+              }
+            >
+              {!selectedDeleteReason && !deleteReason.trim() ? (
+                <View style={styles.deleteSheetDeleteGradient}>
+                  <Text style={styles.deleteSheetDeleteLabel}>{STRINGS.PROFILE_TAB.DELETE}</Text>
+                </View>
+              ) : (
+                <LinearGradient
+                  colors={[...colors.gradients.primary.colors]}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={styles.deleteSheetDeleteGradient}
+                >
+                  {deleteLoading ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Text style={styles.deleteSheetDeleteLabel}>{STRINGS.PROFILE_TAB.DELETE}</Text>
+                  )}
+                </LinearGradient>
+              )}
             </TouchableOpacity>
           </View>
         </View>

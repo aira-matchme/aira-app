@@ -260,9 +260,7 @@ export const ChatScreen = () => {
     (item: ChatItem, fromRequests: boolean) => {
       navigation.navigate('ChatDetail', {
         chatId: item.id,
-        name: item.name,
         avatar: item.avatar ?? undefined,
-        otherUserId: item.otherUserId,
         ...(fromRequests && { isRequest: true }),
       });
     },
@@ -347,7 +345,18 @@ export const ChatScreen = () => {
         <ProfileScreenGradient/>
           <View style={styles.headerRow}>
             <Text style={styles.title}>{STRINGS.CHAT.TITLE}</Text>
-            <TouchableOpacity style={styles.notifButton} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.notifButton}
+              activeOpacity={0.7}
+              onPress={() => {
+                const tabNav = navigation.getParent?.() as
+                  | { navigate?: (name: string, params?: Record<string, unknown>) => void }
+                  | undefined;
+                tabNav?.navigate?.('Home', { screen: 'Notifications' });
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Notifications"
+            >
               <BellIcon size={20} color={colors.black} />
             </TouchableOpacity>
           </View>

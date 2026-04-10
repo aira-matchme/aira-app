@@ -521,7 +521,13 @@ export const DashboardScreen = () => {
           {/* <TouchableOpacity style={styles.headerButton} activeOpacity={0.8}>
             <HomeFilterIcon />
           </TouchableOpacity> */}
-          <TouchableOpacity style={styles.headerButton} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('Notifications')}
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+          >
             <BellIcon color={colors.neutral[800]} size={20} />
           </TouchableOpacity>
         </View>
@@ -756,10 +762,7 @@ export const DashboardScreen = () => {
                               screen: 'ChatDetail',
                               params: {
                                 chatId: match.chatId,
-                                name: match.name,
                                 avatar: match.image,
-                                isRequest: false,
-                                otherUserId: match.id,
                               },
                             });
                           } else {
@@ -868,10 +871,7 @@ export const DashboardScreen = () => {
                       // If a chat already exists, use its id; otherwise let ChatDetail
                       // handle creating the chat on first send.
                       chatId: m.chatId ?? null,
-                      name: m.name,
                       avatar: m.image,
-                      isRequest: false,
-                      otherUserId: m.id,
                     },
                   });
                 }}

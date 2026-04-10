@@ -28,6 +28,14 @@ export const logoutApi = async (): Promise<void> => {
   await apiClient.post(endpoints.auth.logout, {});
 };
 
+/** Permanently delete current account. */
+export const deleteAccountApi = async (reason = ''): Promise<void> => {
+  console.log('reason', reason);
+  await apiClient.delete(endpoints.auth.deleteAccount, {
+    data: { reason: String(reason ?? '').trim() },
+  });
+};
+
 export const sendOtpApi = async (
   payload: SendOtpRequest
 ): Promise<SendOtpResponse> => {
@@ -51,9 +59,13 @@ export const resendOtpApi = async (
 export const verifyOtpApi = async (
   payload: VerifyOtpRequest
 ): Promise<AuthResponse> => {
+  const deviceToken = String(payload.deviceToken ?? '').trim();
+  if (!deviceToken) {
+    throw new Error('deviceToken should not be empty');
+  }
   const { data } = await apiClient.post<AuthResponse>(
     endpoints.auth.verifyOtp,
-    payload
+    { ...payload, deviceToken }
   );
   return data;
 };
