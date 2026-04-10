@@ -50,6 +50,34 @@ export const STRINGS = {
     GET_STARTED: 'Get Started',
   },
 
+  /** App walkthrough (react-native-copilot) — Home + main tabs (Figma frames 517–573). */
+  DASHBOARD_WALKTHROUGH: {
+    WELCOME_TITLE: 'Welcome to Aira',
+    WELCOME_BODY:
+      'Discover, connect, and explore profiles around you.',
+    /** Step 1: title + body for tooltip (split on \\n\\n in TabWalkthroughTooltip). */
+    WELCOME_COPILOT: `Welcome to Aira\n\nDiscover, connect, and explore profiles around you.`,
+    GET_STARTED: 'Get Started',
+    NEXT: 'Next',
+    SKIP: 'Skip',
+    PREVIOUS: 'Back',
+    STEP_PROFILE_TITLE: 'Your Profile',
+    STEP_PROFILE_TAB:
+      'Manage your profile, preferences, and showcase your personality.',
+    STEP_LIKES_TITLE: 'Your Liked Profiles',
+    STEP_LIKES_TAB:
+      "Here you can find all the profiles you've liked. Explore them anytime when you feel ready to connect.",
+    STEP_AI_TITLE: 'Talk to Aira AI',
+    STEP_AI_TAB:
+      "Hi, use this with one of its kind to get smart and helpful advice on effective matching, relationship advice and much more. To get Aira's help quickly, just tap the AI button and start a conversation instantly.",
+    STEP_CHAT_TITLE: 'Chat with Matches',
+    STEP_CHAT_TAB:
+      'Chat with your matches anytime and get to know each other better. Share conversations, share your thoughts, and build a real connection. Just open a chat and start talking instantly.',
+    STEP_HOME_TITLE: 'Home',
+    STEP_HOME_TAB:
+      'Explore profiles, discover new people, and find your next match right from home. Whenever you swipe through cards, you can find someone who matches your vibe — take your time, and pull down on the list anytime to refresh your matches.',
+  },
+
   // OTP Verification Screen
   OTP_VERIFICATION: {
     TITLE_LINE_1: 'Enter the verification',

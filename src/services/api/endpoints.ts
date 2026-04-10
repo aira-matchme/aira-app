@@ -12,6 +12,7 @@ export const endpoints = {
     liveness: '/auth/liveness-check',
     googleLogin: '/auth/google',
     appleLogin: '/auth/apple',
+    supportEmailChange: '/auth/support/email-change',
   },
   user: {
     profile: '/auth/profile',

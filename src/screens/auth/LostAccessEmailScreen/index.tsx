@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import axios from 'axios';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,6 +11,9 @@ import { TextInput } from '../../../components/TextInput';
 import { Button } from '../../../components/Button';
 import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
+import { appConfig } from '../../../config/app.config';
+import { env } from '../../../config/env';
+import { endpoints } from '../../../services/api/endpoints';
 import { styles } from './styles';
 
 type LostAccessEmailNavigationProp = NativeStackNavigationProp<
@@ -17,25 +21,35 @@ type LostAccessEmailNavigationProp = NativeStackNavigationProp<
   'LostAccessEmail'
 >;
 
-const lostAccessEmailSchema = z.object({
-  registeredEmail: z
-    .string()
-    .min(1, STRINGS.LOST_ACCESS_EMAIL.ERROR_REQUIRED)
-    .email(STRINGS.LOST_ACCESS_EMAIL.ERROR_INVALID_EMAIL),
-  phoneNumber: z
-    .string()
-    .min(1, STRINGS.LOST_ACCESS_EMAIL.ERROR_REQUIRED)
-    .regex(/^\+?[1-9]\d{1,14}$/, STRINGS.LOST_ACCESS_EMAIL.ERROR_INVALID_PHONE),
-  newEmail: z
-    .string()
-    .min(1, STRINGS.LOST_ACCESS_EMAIL.ERROR_REQUIRED)
-    .email(STRINGS.LOST_ACCESS_EMAIL.ERROR_INVALID_EMAIL),
-});
+const lostAccessEmailSchema = z
+  .object({
+    registeredEmail: z
+      .string()
+      .min(1, STRINGS.LOST_ACCESS_EMAIL.ERROR_REQUIRED)
+      .email(STRINGS.LOST_ACCESS_EMAIL.ERROR_INVALID_EMAIL),
+    phoneNumber: z
+      .string()
+      .min(1, STRINGS.LOST_ACCESS_EMAIL.ERROR_REQUIRED)
+      .regex(/^\+?[1-9]\d{1,14}$/, STRINGS.LOST_ACCESS_EMAIL.ERROR_INVALID_PHONE),
+    newEmail: z
+      .string()
+      .min(1, STRINGS.LOST_ACCESS_EMAIL.ERROR_REQUIRED)
+      .email(STRINGS.LOST_ACCESS_EMAIL.ERROR_INVALID_EMAIL),
+  })
+  .refine(
+    ({ registeredEmail, newEmail }) =>
+      registeredEmail.trim().toLowerCase() !== newEmail.trim().toLowerCase(),
+    {
+      path: ['newEmail'],
+      message: 'New email must be different from registered email',
+    },
+  );
 
 type LostAccessEmailFormData = z.infer<typeof lostAccessEmailSchema>;
 
 export const LostAccessEmailScreen: React.FC = () => {
   const navigation = useNavigation<LostAccessEmailNavigationProp>();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const {
     control,
@@ -51,8 +65,36 @@ export const LostAccessEmailScreen: React.FC = () => {
     },
   });
 
-  const onSubmit = (data: LostAccessEmailFormData) => {
-    // Form submission
+  const onSubmit = async (data: LostAccessEmailFormData) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await axios.post(
+        `${appConfig.apiBaseUrl}${endpoints.auth.supportEmailChange}`,
+        {
+          oldEmail: data.registeredEmail.trim().toLowerCase(),
+          newEmail: data.newEmail.trim().toLowerCase(),
+          phoneNumber: data.phoneNumber.trim(),
+        },
+        {
+          timeout: 30000,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(env.API_KEY ? { 'x-api-key': env.API_KEY } : {}),
+          },
+        },
+      );
+
+      navigation.navigate('OTPVerification', { email: data.newEmail.trim().toLowerCase() });
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ??
+        error?.message ??
+        STRINGS.GENERAL.ERROR_TRY_AGAIN;
+      Alert.alert('Unable to continue', String(message));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -93,6 +135,9 @@ export const LostAccessEmailScreen: React.FC = () => {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
                   error={errors.registeredEmail?.message || ''}
                 />
               )}
@@ -112,6 +157,9 @@ export const LostAccessEmailScreen: React.FC = () => {
                   keyboardType="phone-pad"
                   autoCapitalize="none"
                   autoCorrect={false}
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
                   error={errors.phoneNumber?.message || ''}
                 />
               )}
@@ -131,6 +179,9 @@ export const LostAccessEmailScreen: React.FC = () => {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
                   error={errors.newEmail?.message || ''}
                 />
               )}
@@ -145,6 +196,7 @@ export const LostAccessEmailScreen: React.FC = () => {
               onPress={handleSubmit(onSubmit)}
               variant="primary"
               disabled={false}
+              loading={isSubmitting}
               style={styles.continueButton}
             />
           ) : (

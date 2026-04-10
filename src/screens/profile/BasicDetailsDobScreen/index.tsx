@@ -168,7 +168,10 @@ export const BasicDetailsDobScreen: React.FC = () => {
                     showsVerticalScrollIndicator={false}
                     snapToInterval={ROW_HEIGHT}
                     // Match year column for smoother scrolling
-                    decelerationRate="normal"
+                    decelerationRate="fast"
+                    snapToAlignment='center'
+                    scrollEventThrottle={16}
+                    bounces={false}
                     contentContainerStyle={styles.scrollContent}
                     onMomentumScrollEnd={(e) => {
                       const offsetY = e.nativeEvent.contentOffset.y;
@@ -177,10 +180,10 @@ export const BasicDetailsDobScreen: React.FC = () => {
                       if (index >= DOB_DAYS.length) index = DOB_DAYS.length - 1;
                       const snappedDay = DOB_DAYS[index]!;
                       setValue('day', snappedDay, { shouldValidate: true });
-                      dayScrollRef.current?.scrollTo({
-                        y: TOP_BOTTOM_SPACER + index * ROW_HEIGHT,
-                        animated: true,
-                      });
+                      // dayScrollRef.current?.scrollTo({
+                      //   y: TOP_BOTTOM_SPACER + index * ROW_HEIGHT,
+                      //   animated: true,
+                      // });
                     }}
                   >
                     <View style={{ height: TOP_BOTTOM_SPACER }} />
@@ -232,7 +235,10 @@ export const BasicDetailsDobScreen: React.FC = () => {
                     showsVerticalScrollIndicator={false}
                     snapToInterval={ROW_HEIGHT}
                     // Match day/year columns for consistent feel
-                    decelerationRate="normal"
+                    decelerationRate="fast"
+                    snapToAlignment='center'
+                    scrollEventThrottle={16}
+                    bounces={false}
                     contentContainerStyle={styles.scrollContent}
                     onMomentumScrollEnd={(e) => {
                       const offsetY = e.nativeEvent.contentOffset.y;
@@ -243,10 +249,10 @@ export const BasicDetailsDobScreen: React.FC = () => {
                       setValue('month', snappedMonthValue, {
                         shouldValidate: true,
                       });
-                      monthScrollRef.current?.scrollTo({
-                        y: TOP_BOTTOM_SPACER + index * ROW_HEIGHT,
-                        animated: true,
-                      });
+                      // monthScrollRef.current?.scrollTo({
+                      //   y: TOP_BOTTOM_SPACER + index * ROW_HEIGHT,
+                      //   animated: true,
+                      // });
                     }}
                   >
                     <View style={{ height: TOP_BOTTOM_SPACER }} />
@@ -301,7 +307,10 @@ export const BasicDetailsDobScreen: React.FC = () => {
                     showsVerticalScrollIndicator={false}
                     snapToInterval={ROW_HEIGHT}
                     // Slightly slower deceleration for smoother year scrolling
-                    decelerationRate="normal"
+                    decelerationRate="fast"
+                    snapToAlignment='center'
+                    scrollEventThrottle={16}
+                    bounces={false}
                     contentContainerStyle={styles.scrollContent}
                     onMomentumScrollEnd={(e) => {
                       const offsetY = e.nativeEvent.contentOffset.y;
@@ -310,11 +319,11 @@ export const BasicDetailsDobScreen: React.FC = () => {
                       if (index >= DOB_YEARS.length) index = DOB_YEARS.length - 1;
                       const snappedYear = DOB_YEARS[index]!;
                       setValue('year', snappedYear, { shouldValidate: true });
-                      yearScrollRef.current?.scrollTo({
-                        y: TOP_BOTTOM_SPACER + index * ROW_HEIGHT,
-                        // Use a small animation so the final snap feels less jerky
-                        animated: true,
-                      });
+                      // yearScrollRef.current?.scrollTo({
+                      //   y: TOP_BOTTOM_SPACER + index * ROW_HEIGHT,
+                      //   // Use a small animation so the final snap feels less jerky
+                      //   animated: true,
+                      // });
                     }}
                   >
                     <View style={{ height: TOP_BOTTOM_SPACER }} />

@@ -39,8 +39,12 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { postAIMessagesApi, blockUserApi, reportUserApi } from '../../modules/chat/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCopilot } from 'react-native-copilot';
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
+import { STRINGS } from '../../constants/strings';
+import { DASHBOARD_WALKTHROUGH_STORAGE_KEY } from '../../constants/dashboardWalkthroughStorage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -119,7 +123,11 @@ type CursorPageResult = {
 export const DashboardScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const { start, copilotEvents, visible: copilotTourVisible } = useCopilot();
   const scrollRef = useRef<ScrollView | null>(null);
+  /** Prevents calling start() again when the copilot modal causes a focus/blur cycle (resets tour to step 1). */
+  const walkthroughAutoStartLockRef = useRef(false);
+  const [showWalkthroughWelcome, setShowWalkthroughWelcome] = useState(false);
   const [showFirstMovePopup, setShowFirstMovePopup] = useState(false);
   const [firstMoveStep, setFirstMoveStep] = useState<'choose' | 'sent'>('choose');
   const [firstMoveLoading, setFirstMoveLoading] = useState(false);
@@ -449,6 +457,48 @@ export const DashboardScreen = () => {
     }, [bootstrapMatches]),
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      if (copilotTourVisible) {
+        return;
+      }
+      let cancelled = false;
+      const run = async () => {
+        try {
+          const seen = await AsyncStorage.getItem(DASHBOARD_WALKTHROUGH_STORAGE_KEY);
+          if (cancelled || seen === 'true') return;
+          if (walkthroughAutoStartLockRef.current) return;
+          walkthroughAutoStartLockRef.current = true;
+
+          await new Promise<void>((resolve) => setTimeout(resolve, 700));
+          if (cancelled) {
+            walkthroughAutoStartLockRef.current = false;
+            return;
+          }
+          setShowWalkthroughWelcome(true);
+        } catch {
+          walkthroughAutoStartLockRef.current = false;
+        }
+      };
+      void run();
+      return () => {
+        cancelled = true;
+      };
+    }, [start, copilotTourVisible]),
+  );
+
+  useEffect(() => {
+    const persist = () => {
+      setShowWalkthroughWelcome(false);
+      walkthroughAutoStartLockRef.current = false;
+      void AsyncStorage.setItem(DASHBOARD_WALKTHROUGH_STORAGE_KEY, 'true');
+    };
+    copilotEvents.on('stop', persist);
+    return () => {
+      copilotEvents.off('stop', persist);
+    };
+  }, [copilotEvents]);
+
   useEffect(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -515,6 +565,17 @@ export const DashboardScreen = () => {
     navigation.navigate('MatchDetails', { userId: match.id });
   };
 
+  const handleWalkthroughSkip = useCallback(() => {
+    setShowWalkthroughWelcome(false);
+    walkthroughAutoStartLockRef.current = false;
+    void AsyncStorage.setItem(DASHBOARD_WALKTHROUGH_STORAGE_KEY, 'true');
+  }, []);
+
+  const handleWalkthroughGetStarted = useCallback(() => {
+    setShowWalkthroughWelcome(false);
+    void start('tab_profile');
+  }, [start]);
+
   return (
     
     <View style={styles.container}>
@@ -526,9 +587,6 @@ export const DashboardScreen = () => {
           <LogoWordmarkGradient />
         </View>
         <View style={styles.headerButtons}>
-          {/* <TouchableOpacity style={styles.headerButton} activeOpacity={0.8}>
-            <HomeFilterIcon />
-          </TouchableOpacity> */}
           <TouchableOpacity
             style={styles.headerButton}
             activeOpacity={0.8}
@@ -540,6 +598,41 @@ export const DashboardScreen = () => {
           </TouchableOpacity>
         </View>
       </View>
+      <Modal
+        visible={showWalkthroughWelcome}
+        transparent
+        animationType="fade"
+        onRequestClose={handleWalkthroughSkip}
+      >
+        <View style={styles.walkthroughWelcomeBackdrop}>
+          <View style={styles.walkthroughWelcomeCard}>
+            <Text style={styles.walkthroughWelcomeTitle}>
+              {STRINGS.DASHBOARD_WALKTHROUGH.WELCOME_TITLE}
+            </Text>
+            <Text style={styles.walkthroughWelcomeBody}>
+              {STRINGS.DASHBOARD_WALKTHROUGH.WELCOME_BODY}
+            </Text>
+            <View style={styles.walkthroughWelcomeActions}>
+              <TouchableOpacity
+                style={styles.walkthroughSkipButton}
+                onPress={handleWalkthroughSkip}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.walkthroughSkipText}>{STRINGS.DASHBOARD_WALKTHROUGH.SKIP}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.walkthroughGetStartedButton}
+                onPress={handleWalkthroughGetStarted}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.walkthroughGetStartedText}>
+                  {STRINGS.DASHBOARD_WALKTHROUGH.GET_STARTED}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.cardContainer}>
         {emptyState ? (
@@ -759,7 +852,6 @@ export const DashboardScreen = () => {
                         <Text style={styles.knowMoreText}>Know More</Text>
                         <Text style={styles.knowMoreArrow}>→</Text>
                       </TouchableOpacity>
-                    
                     </View>
                     <View style={styles.matchActionsContainer}>
                       <TouchableOpacity
@@ -801,7 +893,12 @@ export const DashboardScreen = () => {
                         <View
                           style={[
                             StyleSheet.absoluteFill,
-                            { backgroundColor: match.isLiked ? 'rgba(0,0,0,0.2)' : 'white', borderRadius: 24 },
+                            {
+                              backgroundColor: match.isLiked
+                                ? 'rgba(0,0,0,0.2)'
+                                : 'white',
+                              borderRadius: 24,
+                            },
                           ]}
                         />
                         {match.isLiked ? (
