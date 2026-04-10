@@ -59,6 +59,8 @@ export const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.20)',
     gap: 8,
     marginTop: 14,
+    zIndex: 2,
+    elevation: 4,
   },
   matchActionButton: {
     width: 44,

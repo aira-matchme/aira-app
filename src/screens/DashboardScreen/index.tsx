@@ -484,21 +484,29 @@ export const DashboardScreen = () => {
       await apiClient.post(endpoints.matches.addLike, {
         likedUserId: id,
       });
-      await bootstrapMatches();
-    } catch {
-      // Keep card state on failure
-    }
+  
+      // ✅ Update UI without reloading
+      setMatches((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, isLiked: true } : item
+        )
+      );
+    } catch {}
   };
-
+  
   const handleUnlike = async (id: string) => {
     try {
       await apiClient.post(endpoints.matches.removeLike, {
         likedUserId: id,
       });
-      await bootstrapMatches();
-    } catch {
-      // Keep card state on failure
-    }
+  
+      // ✅ Update UI without reloading
+      setMatches((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, isLiked: false } : item
+        )
+      );
+    } catch {}
   };
 
   const emptyState = matches.length === 0;

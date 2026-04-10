@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logoutApi } from '../modules/auth/api';
+import { syncSentryUser } from '../services/sentry/userContext';
 import { useProfileStore } from './profile.store';
 import { usePreferencesStore } from './preferences.store';
 import { useOnboardingStore } from './onboarding.store';
@@ -81,6 +82,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (typeof (user as any)?.profileCompleted === 'boolean') {
       normalized.isProfileComplete = (user as any).profileCompleted;
     }
+    syncSentryUser(normalized);
     set({ user: normalized, isAuthenticated: true });
   },
 
@@ -109,6 +111,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     usePreferencesStore.getState().reset();
     useOnboardingStore.getState().clearOnboarding();
     useUserStore.getState().clearUser();
+    syncSentryUser(null);
     set({
       accessToken: null,
       refreshToken: null,
