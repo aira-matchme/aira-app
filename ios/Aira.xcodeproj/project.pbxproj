@@ -16,6 +16,12 @@
 		53A50EA41FCB8A58D8FBBFCC /* Pods_Aira.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D0259364D1F773FFA54CDAFA /* Pods_Aira.framework */; };
 		77FB6810AB5E9C14356EB2E7 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		54C66BE17E0A4350A5481740 /* ClashGrotesk-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 8908B46B184F4EC980A3574E /* ClashGrotesk-Bold.otf */; };
+		7C5E8D2DA5CA401F9F2C23A6 /* ClashGrotesk-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = B724CCA9645C48A6955B8FC0 /* ClashGrotesk-Regular.otf */; };
+		A7ABC387C2A64541A52C91A5 /* ClashGrotesk-Semibold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 6F01AC92D5C74A7F94CC24F8 /* ClashGrotesk-Semibold.otf */; };
+		9B37D91AACDB4E9DB25EA7F7 /* ClashGrotesk-Extralight.otf in Resources */ = {isa = PBXBuildFile; fileRef = 8610B4DA8A334C58B25384A4 /* ClashGrotesk-Extralight.otf */; };
+		E521EC4A98EC42E38A31C66B /* ClashGrotesk-Light.otf in Resources */ = {isa = PBXBuildFile; fileRef = 259664964E7240BE9BE99154 /* ClashGrotesk-Light.otf */; };
+		0E0D1482ECD948A6B08566FC /* ClashGrotesk-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = FF9A657735F7448EA96A1152 /* ClashGrotesk-Medium.otf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +41,12 @@
 		E575963CBDA7899227BA3787 /* Pods-Aira.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Aira.debug.xcconfig"; path = "Target Support Files/Pods-Aira/Pods-Aira.debug.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		ED53260D0F1C8DAC26E7FCDE /* Pods-Aira.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Aira.release.xcconfig"; path = "Target Support Files/Pods-Aira/Pods-Aira.release.xcconfig"; sourceTree = "<group>"; };
+		8908B46B184F4EC980A3574E /* ClashGrotesk-Bold.otf */ = {isa = PBXFileReference; name = "ClashGrotesk-Bold.otf"; path = "../src/assets/fonts/ClashGrotesk-Bold.otf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		B724CCA9645C48A6955B8FC0 /* ClashGrotesk-Regular.otf */ = {isa = PBXFileReference; name = "ClashGrotesk-Regular.otf"; path = "../src/assets/fonts/ClashGrotesk-Regular.otf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		6F01AC92D5C74A7F94CC24F8 /* ClashGrotesk-Semibold.otf */ = {isa = PBXFileReference; name = "ClashGrotesk-Semibold.otf"; path = "../src/assets/fonts/ClashGrotesk-Semibold.otf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		8610B4DA8A334C58B25384A4 /* ClashGrotesk-Extralight.otf */ = {isa = PBXFileReference; name = "ClashGrotesk-Extralight.otf"; path = "../src/assets/fonts/ClashGrotesk-Extralight.otf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		259664964E7240BE9BE99154 /* ClashGrotesk-Light.otf */ = {isa = PBXFileReference; name = "ClashGrotesk-Light.otf"; path = "../src/assets/fonts/ClashGrotesk-Light.otf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		FF9A657735F7448EA96A1152 /* ClashGrotesk-Medium.otf */ = {isa = PBXFileReference; name = "ClashGrotesk-Medium.otf"; path = "../src/assets/fonts/ClashGrotesk-Medium.otf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,6 +103,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				D5285603F14F48A2A2828199 /* Resources */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -113,6 +126,20 @@
 			);
 			path = Pods;
 			sourceTree = "<group>";
+		};
+		D5285603F14F48A2A2828199 /* Resources */ = {
+			isa = "PBXGroup";
+			children = (
+				8908B46B184F4EC980A3574E /* ClashGrotesk-Bold.otf */,
+				B724CCA9645C48A6955B8FC0 /* ClashGrotesk-Regular.otf */,
+				6F01AC92D5C74A7F94CC24F8 /* ClashGrotesk-Semibold.otf */,
+				8610B4DA8A334C58B25384A4 /* ClashGrotesk-Extralight.otf */,
+				259664964E7240BE9BE99154 /* ClashGrotesk-Light.otf */,
+				FF9A657735F7448EA96A1152 /* ClashGrotesk-Medium.otf */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+			path = "";
 		};
 /* End PBXGroup section */
 
@@ -180,6 +207,12 @@
 				1883EABF2F48585600E4C3DB /* GoogleService-Info.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				77FB6810AB5E9C14356EB2E7 /* PrivacyInfo.xcprivacy in Resources */,
+				54C66BE17E0A4350A5481740 /* ClashGrotesk-Bold.otf in Resources */,
+				7C5E8D2DA5CA401F9F2C23A6 /* ClashGrotesk-Regular.otf in Resources */,
+				A7ABC387C2A64541A52C91A5 /* ClashGrotesk-Semibold.otf in Resources */,
+				9B37D91AACDB4E9DB25EA7F7 /* ClashGrotesk-Extralight.otf in Resources */,
+				E521EC4A98EC42E38A31C66B /* ClashGrotesk-Light.otf in Resources */,
+				0E0D1482ECD948A6B08566FC /* ClashGrotesk-Medium.otf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

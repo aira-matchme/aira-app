@@ -149,10 +149,12 @@ export const WelcomeScreen: React.FC = () => {
         iosClientId: env.IOS_CLIENT_ID || undefined,
         offlineAccess: true,
       });
+      console.log('Checking Google Play Services...');
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      await GoogleSignin.signOut().catch(() => {});
-      await GoogleSignin.revokeAccess().catch(() => {});
+      // await GoogleSignin.signOut().catch(() => {});
+      // await GoogleSignin.revokeAccess().catch(() => {});
       const userInfo = await GoogleSignin.signIn();
+      console.log('Google Sign-In successful, user info:', userInfo);
 
       const { idToken } = userInfo;
       if (!idToken) return;
@@ -175,7 +177,10 @@ export const WelcomeScreen: React.FC = () => {
         return;
       }
       navigation.navigate('EnableNotifications');
-    } catch {
+    } catch(e) {
+      console.log('Google Sign-In error:', e);
+      console.log('Google Sign-In failed');
+
       // Google login error
     }
   };

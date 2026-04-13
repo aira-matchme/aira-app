@@ -103,7 +103,8 @@ export type HomeStackParamList = {
 export type ChatStackParamList = {
   ChatList: undefined;
   ChatDetail: {
-    chatId: string;
+    /** Existing thread; omit or null for new thread (created on first send). */
+    chatId?: string | null;
     /** Optional — ChatDetailScreen hydrates missing fields from APIs. */
     avatar?: number | { uri: string };
     /** Optional — shown in header if provided; otherwise derived. */

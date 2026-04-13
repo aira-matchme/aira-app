@@ -88,11 +88,15 @@ export const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
   },
   grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
     gap: GRID_GAP,
     marginBottom: 32,
     width: SCREEN_WIDTH - HORIZONTAL_PADDING * 2,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    gap: GRID_GAP,
+    width: '100%',
   },
   photoCard: {
     width: CARD_WIDTH,

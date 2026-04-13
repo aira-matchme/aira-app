@@ -40,7 +40,7 @@ import { styles } from './styles';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { postAIMessagesApi, blockUserApi, reportUserApi } from '../../modules/chat/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCopilot } from 'react-native-copilot';
+import { useTabWalkthrough } from '../../navigation/TabWalkthroughContext';
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
 import { STRINGS } from '../../constants/strings';
@@ -123,9 +123,9 @@ type CursorPageResult = {
 export const DashboardScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { start, copilotEvents, visible: copilotTourVisible } = useCopilot();
+  const { active: tabWalkthroughActive, startFromProfile } = useTabWalkthrough();
   const scrollRef = useRef<ScrollView | null>(null);
-  /** Prevents calling start() again when the copilot modal causes a focus/blur cycle (resets tour to step 1). */
+  /** Prevents calling start() again when the tab walkthrough modal causes a focus/blur cycle (resets welcome to step 1). */
   const walkthroughAutoStartLockRef = useRef(false);
   const [showWalkthroughWelcome, setShowWalkthroughWelcome] = useState(false);
   const [showFirstMovePopup, setShowFirstMovePopup] = useState(false);
@@ -459,7 +459,7 @@ export const DashboardScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      if (copilotTourVisible) {
+      if (tabWalkthroughActive) {
         return;
       }
       let cancelled = false;
@@ -484,20 +484,8 @@ export const DashboardScreen = () => {
       return () => {
         cancelled = true;
       };
-    }, [start, copilotTourVisible]),
+    }, [tabWalkthroughActive]),
   );
-
-  useEffect(() => {
-    const persist = () => {
-      setShowWalkthroughWelcome(false);
-      walkthroughAutoStartLockRef.current = false;
-      void AsyncStorage.setItem(DASHBOARD_WALKTHROUGH_STORAGE_KEY, 'true');
-    };
-    copilotEvents.on('stop', persist);
-    return () => {
-      copilotEvents.off('stop', persist);
-    };
-  }, [copilotEvents]);
 
   useEffect(() => {
     if (intervalRef.current) {
@@ -573,8 +561,8 @@ export const DashboardScreen = () => {
 
   const handleWalkthroughGetStarted = useCallback(() => {
     setShowWalkthroughWelcome(false);
-    void start('tab_profile');
-  }, [start]);
+    startFromProfile();
+  }, [startFromProfile]);
 
   return (
     
@@ -863,6 +851,8 @@ export const DashboardScreen = () => {
                               params: {
                                 chatId: match.chatId,
                                 avatar: match.image,
+                                name: match.name,
+                                otherUserId: match.id,
                               },
                             });
                           } else {
@@ -973,10 +963,13 @@ export const DashboardScreen = () => {
                   navigation.navigate('Chat', {
                     screen: 'ChatDetail',
                     params: {
+                      
                       // If a chat already exists, use its id; otherwise let ChatDetail
                       // handle creating the chat on first send.
                       chatId: m.chatId ?? null,
                       avatar: m.image,
+                      name: m.name,
+                      otherUserId: m.id,
                     },
                   });
                 }}

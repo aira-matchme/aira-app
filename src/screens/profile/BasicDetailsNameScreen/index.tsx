@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -105,11 +106,16 @@ export const BasicDetailsNameScreen: React.FC = () => {
   };
 
   return (
+    // <KeyboardAvoidingView
+    //   style={styles.wrapper}
+    //   behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    //   keyboardVerticalOffset={0}
+    // >
     <KeyboardAvoidingView
-      style={styles.wrapper}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
-    >
+  style={styles.wrapper}
+  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+  keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+>
       <ProfileScreenGradient />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
@@ -125,7 +131,13 @@ export const BasicDetailsNameScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.mainColumn}>
+        <ScrollView
+          style={styles.mainScroll}
+          contentContainerStyle={styles.mainScrollContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.formSection}>
             <Text style={styles.title}>
               {STRINGS.PROFILE_SETUP.NAME.TITLE}
@@ -168,7 +180,7 @@ export const BasicDetailsNameScreen: React.FC = () => {
               style={styles.button}
             />
           </View>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </KeyboardAvoidingView>
   );

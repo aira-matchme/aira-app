@@ -13,6 +13,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { ScrollView } from 'react-native';
 import { z } from 'zod';
 import LinearGradient from 'react-native-linear-gradient';
 
@@ -175,7 +176,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
   return (
     <KeyboardAvoidingView
       style={styles.wrapper}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
       <ProfileScreenGradient />
@@ -204,8 +205,16 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
             <BackArrowIcon size={48} />
           </TouchableOpacity>
         </View>
-
-        <View style={styles.mainColumn}>
+        <ScrollView
+  contentContainerStyle={{
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    paddingBottom: 40,
+  }}
+  keyboardShouldPersistTaps="handled"
+  showsVerticalScrollIndicator={false}
+>
+        {/* <View style={styles.mainColumn}> */}
           <View style={styles.formSection}>
             <Text style={styles.title}>
               {STRINGS.PROFILE_SETUP.PINCODE?.TITLE || "Let's find people around you"}
@@ -252,7 +261,7 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
               style={styles.button}
             />
           </View>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </KeyboardAvoidingView>
   );

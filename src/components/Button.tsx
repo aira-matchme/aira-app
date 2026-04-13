@@ -28,6 +28,8 @@ interface ButtonProps {
 const HEIGHT = 54;
 const RADIUS = 100;
 const SIDE_SLOT = 24;
+/** Figma primary CTA: 2px stroke, white @ 20% (inner-aligned) */
+const PRIMARY_BORDER_WIDTH = 2;
 
 export const Button: React.FC<ButtonProps> = ({
   title,
@@ -64,36 +66,59 @@ export const Button: React.FC<ButtonProps> = ({
       );
     }
 
-    // 🔥 NORMAL PRIMARY
-    return (
-      <Pressable
-        onPress={onPress}
-        disabled={isDisabled}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        style={({ pressed }) => [
-          styles.wrapper,
-          pressed && styles.pressed,
-          isDisabled && styles.disabled,
-          style,
-        ]}
-      >
-        <LinearGradient
-          colors={[...colors.gradients.primary.colors]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0.88, y: 1 }}
-          style={styles.gradient}
+    // Figma 213:849 — disabled / loading: neutral/50 fill, neutral/300 label, no gradient
+    if (isDisabled) {
+      return (
+        <Pressable
+          disabled
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={[styles.wrapper, styles.primaryDisabled, style]}
         >
           <View style={styles.contentRow}>
             <View style={styles.sideSlot} pointerEvents="none">
               {loading ? (
-                <ActivityIndicator size="small" color={colors.white} />
+                <ActivityIndicator size="small" color={colors.neutral[300]} />
               ) : (
                 leftIcon ?? null
               )}
             </View>
-            <Text style={[styles.text, textStyle]}>{title}</Text>
+            <Text style={[styles.primaryDisabledText, textStyle]}>{title}</Text>
             <View style={styles.sideSlot} pointerEvents="none">
               {loading ? null : rightIcon ?? null}
+            </View>
+          </View>
+        </Pressable>
+      );
+    }
+
+    return (
+      <Pressable
+        onPress={onPress}
+        disabled={false}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        style={({ pressed }) => [styles.wrapper, pressed && styles.pressed, style]}
+      >
+        <LinearGradient
+          colors={[...colors.gradients.primary.colors]}
+          start={colors.gradients.primary.start}
+          end={colors.gradients.primary.end}
+          style={styles.gradient}
+        >
+          <LinearGradient
+            colors={[...colors.gradients.primaryButtonSheen.colors]}
+            locations={[...colors.gradients.primaryButtonSheen.locations]}
+            start={colors.gradients.primaryButtonSheen.start}
+            end={colors.gradients.primaryButtonSheen.end}
+            style={styles.sheen}
+            pointerEvents="none"
+          />
+          <View style={styles.contentRow}>
+            <View style={styles.sideSlot} pointerEvents="none">
+              {leftIcon ?? null}
+            </View>
+            <Text style={[styles.text, textStyle]}>{title}</Text>
+            <View style={styles.sideSlot} pointerEvents="none">
+              {rightIcon ?? null}
             </View>
           </View>
         </LinearGradient>
@@ -113,12 +138,18 @@ export const Button: React.FC<ButtonProps> = ({
       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       style={({ pressed }) => [
         styles.secondary,
-        pressed && styles.pressed,
-        isDisabled && styles.disabled,
+        isDisabled && styles.secondaryDisabled,
+        pressed && !isDisabled && styles.pressed,
         style,
       ]}
     >
-      <Text style={[styles.text, styles.secondaryText, textStyle]}>
+      <Text
+        style={[
+          styles.text,
+          isDisabled ? styles.secondaryDisabledText : styles.secondaryText,
+          textStyle,
+        ]}
+      >
         {title}
       </Text>
     </Pressable>
@@ -129,8 +160,9 @@ const styles = StyleSheet.create({
   wrapper: {
     height: HEIGHT,
     borderRadius: RADIUS,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderWidth: PRIMARY_BORDER_WIDTH,
+    borderColor: colors.border.primaryButton,
+    overflow: 'hidden',
   },
 
   gradient: {
@@ -138,7 +170,12 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden', // ✅ safe clipping
+    overflow: 'hidden',
+  },
+
+  sheen: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: RADIUS,
   },
 
   contentRow: {
@@ -173,12 +210,28 @@ const styles = StyleSheet.create({
     color: colors.primary.purple,
   },
 
-  pressed: {
-    opacity: 0.85,
+  /** Figma component set — disabled (213:849) */
+  primaryDisabled: {
+    backgroundColor: colors.neutral[50],
+    borderWidth: 0,
+    justifyContent: 'center',
   },
 
-  disabled: {
-    opacity: 0.5,
+  primaryDisabledText: {
+    ...typography.button,
+    color: colors.neutral[300],
+  },
+
+  secondaryDisabled: {
+    backgroundColor: colors.neutral[50],
+  },
+
+  secondaryDisabledText: {
+    color: colors.neutral[300],
+  },
+
+  pressed: {
+    opacity: 0.85,
   },
 
   successButton: {

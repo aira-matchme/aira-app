@@ -1,10 +1,17 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import {
+  View,
+  Pressable,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CopilotProvider, CopilotStep, walkthroughable, useCopilot } from 'react-native-copilot';
 
 import { HomeStackNavigator } from './HomeStackNavigator';
 import { ChatStackNavigator } from './ChatStackNavigator';
@@ -13,8 +20,12 @@ import { LikesScreen } from '../screens/LikesScreen/index';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { TabStackParamList } from './types';
 import { colors } from '../theme';
-import { STRINGS } from '../constants/strings';
-import { TabWalkthroughTooltip } from '../components/TabWalkthroughTooltip';
+import {
+  TabWalkthroughProvider,
+  TabWalkthroughMeasuringView,
+  useTabWalkthrough,
+  type TabWalkthroughStepId,
+} from './TabWalkthroughContext';
 
 import { TabHomeIcon } from '../assets/icons/tabs/TabHomeIcon';
 import { TabChatIcon } from '../assets/icons/tabs/TabChatIcon';
@@ -24,24 +35,27 @@ import { TabAICenterIcon } from '../assets/icons/tabs/TabAICenterIcon';
 
 const Tab = createBottomTabNavigator<TabStackParamList>();
 
-const w = STRINGS.DASHBOARD_WALKTHROUGH;
+/** Spotlight measures the glyph only; the press target stays the full tab cell. */
+function WalkthroughTabIcon({
+  id,
+  children,
+}: {
+  id: TabWalkthroughStepId;
+  children: React.ReactNode;
+}) {
+  return (
+    <TabWalkthroughMeasuringView id={id} style={styles.tabIconWalkthroughHost}>
+      {children}
+    </TabWalkthroughMeasuringView>
+  );
+}
 
-const COPILOT_TAB_PROFILE = `${w.STEP_PROFILE_TITLE}\n\n${w.STEP_PROFILE_TAB}`;
-const COPILOT_TAB_LIKES = `${w.STEP_LIKES_TITLE}\n\n${w.STEP_LIKES_TAB}`;
-const COPILOT_TAB_AI = `${w.STEP_AI_TITLE}\n\n${w.STEP_AI_TAB}`;
-const COPILOT_TAB_CHAT = `${w.STEP_CHAT_TITLE}\n\n${w.STEP_CHAT_TAB}`;
-const COPILOT_TAB_HOME = `${w.STEP_HOME_TITLE}\n\n${w.STEP_HOME_TAB}`;
-
-const CopilotTouchableOpacity = walkthroughable(TouchableOpacity);
-
-const EmptyStepNumber = () => null;
-
-function copilotTabButton(order: number, name: string, text: string) {
-  return (props: BottomTabBarButtonProps) => (
-    <CopilotStep order={order} name={name} text={text}>
-      {/* Tab bar passes Pressable-shaped props; TouchableOpacity is compatible at runtime. */}
-      <CopilotTouchableOpacity {...(props as object)} />
-    </CopilotStep>
+function renderTabBarPressable(props: BottomTabBarButtonProps) {
+  return (
+    <Pressable
+      {...(props as React.ComponentProps<typeof Pressable>)}
+      style={[styles.tabMeasureCell, props.style, styles.tabPressable]}
+    />
   );
 }
 
@@ -66,8 +80,8 @@ function CenterTabButton({
 }: BottomTabBarButtonProps) {
   return (
     <View style={styles.centerButtonWrapper}>
-      <CopilotStep order={4} name="tab_ai" text={COPILOT_TAB_AI}>
-        <CopilotTouchableOpacity
+      <TabWalkthroughMeasuringView id="tab_ai" style={styles.centerAiWalkthroughHost}>
+        <TouchableOpacity
           style={styles.centerButton}
           onPress={onPress}
           onLongPress={onLongPress ?? undefined}
@@ -80,17 +94,17 @@ function CenterTabButton({
           activeOpacity={0.85}
         >
           <TabAICenterIcon />
-        </CopilotTouchableOpacity>
-      </CopilotStep>
+        </TouchableOpacity>
+      </TabWalkthroughMeasuringView>
     </View>
   );
 }
 
 function TabNavigatorInner() {
-  const { visible: isWalkthroughVisible } = useCopilot();
+  const { visibleForTabBar: isWalkthroughVisible } = useTabWalkthrough();
   const insets = useSafeAreaInsets();
   const bottomPadding = TAB_BAR_PADDING_BOTTOM + insets.bottom;
-  const tabBarStyle = [
+  const tabBarStyle: StyleProp<ViewStyle> = [
     styles.tabBar,
     {
       height: TAB_BAR_CONTENT_HEIGHT + bottomPadding,
@@ -124,15 +138,17 @@ function TabNavigatorInner() {
           return {
             tabBarLabel: 'Home',
             tabBarIcon: ({ color, focused }) => (
-              <TabHomeIcon
-                color={color}
-                filled={focused}
-                width={TAB_ICON_SIZE}
-                height={TAB_ICON_SIZE}
-              />
+              <WalkthroughTabIcon id="tab_home">
+                <TabHomeIcon
+                  color={color}
+                  filled={focused}
+                  width={TAB_ICON_SIZE}
+                  height={TAB_ICON_SIZE}
+                />
+              </WalkthroughTabIcon>
             ),
             tabBarStyle: hideTabBar ? { display: 'none' } : tabBarStyle,
-            tabBarButton: copilotTabButton(6, 'tab_home', COPILOT_TAB_HOME),
+            tabBarButton: renderTabBarPressable,
           };
         }}
       />
@@ -146,10 +162,12 @@ function TabNavigatorInner() {
             tabBarLabel: 'Chat',
             sceneStyle: { backgroundColor: colors.neutral[50] },
             tabBarIcon: ({ color }) => (
-              <TabChatIcon color={color} width={TAB_ICON_SIZE} height={TAB_ICON_SIZE} />
+              <WalkthroughTabIcon id="tab_chat">
+                <TabChatIcon color={color} width={TAB_ICON_SIZE} height={TAB_ICON_SIZE} />
+              </WalkthroughTabIcon>
             ),
             tabBarStyle: isChatDetail ? { display: 'none' } : tabBarStyle,
-            tabBarButton: copilotTabButton(5, 'tab_chat', COPILOT_TAB_CHAT),
+            tabBarButton: renderTabBarPressable,
           };
         }}
       />
@@ -160,7 +178,6 @@ function TabNavigatorInner() {
           tabBarLabel: '',
           tabBarIcon: () => null,
           tabBarButton: (props) => <CenterTabButton {...props} />,
-          // Keep tab bar visible during walkthrough so AI step target behaves like other tab steps.
           tabBarStyle: isWalkthroughVisible ? tabBarStyle : { display: 'none' },
         }}
       />
@@ -171,14 +188,16 @@ function TabNavigatorInner() {
           tabBarLabel: 'Likes',
           sceneStyle: { backgroundColor: colors.neutral[50] },
           tabBarIcon: ({ color, focused }) => (
-            <TabLikesIcon
-              color={color}
-              filled={focused}
-              width={TAB_ICON_SIZE}
-              height={TAB_ICON_SIZE}
-            />
+            <WalkthroughTabIcon id="tab_likes">
+              <TabLikesIcon
+                color={color}
+                filled={focused}
+                width={TAB_ICON_SIZE}
+                height={TAB_ICON_SIZE}
+              />
+            </WalkthroughTabIcon>
           ),
-          tabBarButton: copilotTabButton(3, 'tab_likes', COPILOT_TAB_LIKES),
+          tabBarButton: renderTabBarPressable,
         }}
       />
       <Tab.Screen
@@ -190,10 +209,12 @@ function TabNavigatorInner() {
           return {
             tabBarLabel: 'Profile',
             tabBarIcon: ({ color }) => (
-              <TabProfileIcon color={color} width={TAB_ICON_SIZE} height={TAB_ICON_SIZE} />
+              <WalkthroughTabIcon id="tab_profile">
+                <TabProfileIcon color={color} width={TAB_ICON_SIZE} height={TAB_ICON_SIZE} />
+              </WalkthroughTabIcon>
             ),
             tabBarStyle: hideTabBar ? { display: 'none' } : tabBarStyle,
-            tabBarButton: copilotTabButton(2, 'tab_profile', COPILOT_TAB_PROFILE),
+            tabBarButton: renderTabBarPressable,
           };
         }}
       />
@@ -202,27 +223,9 @@ function TabNavigatorInner() {
 }
 
 export const TabNavigator = () => (
-  <CopilotProvider
-    overlay="svg"
-    tooltipComponent={TabWalkthroughTooltip}
-    stepNumberComponent={EmptyStepNumber}
-    backdropColor="rgba(0, 0, 0, 0.45)"
-    arrowColor={colors.white}
-    tooltipStyle={{
-      backgroundColor: colors.white,
-      borderRadius: 16,
-      paddingHorizontal: 18,
-      paddingVertical: 14,
-    }}
-    labels={{
-      skip: w.SKIP,
-      previous: w.PREVIOUS,
-      next: w.NEXT,
-      finish: w.NEXT,
-    }}
-  >
+  <TabWalkthroughProvider>
     <TabNavigatorInner />
-  </CopilotProvider>
+  </TabWalkthroughProvider>
 );
 
 const styles = StyleSheet.create({
@@ -263,5 +266,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: CENTER_BUTTON_DIAMETER,
     height: CENTER_BUTTON_DIAMETER,
+  },
+  tabMeasureCell: {
+    flex: 1,
+    minWidth: 0,
+    alignSelf: 'stretch',
+    alignItems: 'stretch',
+    justifyContent: 'center',
+  },
+  tabPressable: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabIconWalkthroughHost: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerAiWalkthroughHost: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

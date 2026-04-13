@@ -57,7 +57,7 @@ export function getPostAuthScreen(
   if (!user.preferenceIsCompleted && !user.PreferenceIsCompleted) return 'PreferencesStart';
   if (!user.onboardingVisualAttributesCompleted) return 'ReferenceImageIntro';
 
-
+// return 'EnableNotifications'
   // Show main app with bottom tabs; RootNavigator shows TabNavigator and initial tab is Home (Dashboard)
   return 'Likes';
 // return 'ProfileIntro'
@@ -65,6 +65,7 @@ export function getPostAuthScreen(
   // return 'ReferenceImageIntro';
   // return 'FaceVerification';
   // return 'OnboardingIntro'
+  // return 'PreferencesStart'
   // return 'PreferencesSummary';
 
 }

@@ -386,25 +386,19 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   }, []);
 
   useEffect(() => {
-    const applyOverlap = (e: KeyboardEvent) => {
-      const overlap = keyboardOverlapFromEvent(windowHeight, e);
-    
-      if (Math.abs(overlap - keyboardHeight) < 10) return;
-    
-      setIsKeyboardVisible(overlap > 0);
-    
-      // ✅ ALWAYS update height (THIS FIXES YOUR ISSUE)
-      if (overlap > 0) {
-        setKeyboardHeight(overlap);
-      }
-    
-      // requestAnimationFrame(() => {
-      //   scrollToEndAfterKeyboard(true);
-      // });
-      setTimeout(() => {
-        scrollToBottom(true);
-      }, 150);
-    };
+const applyOverlap = (e: KeyboardEvent) => {
+  const overlap = keyboardOverlapFromEvent(windowHeight, e);
+
+  setIsKeyboardVisible(overlap > 0);
+  setKeyboardHeight(overlap);
+
+  // ✅ FIX: double frame sync (not timeout)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    });
+  });
+};
   
     if (Platform.OS === 'ios') {
       const frameSub = Keyboard.addListener('keyboardWillChangeFrame', applyOverlap);
@@ -517,8 +511,14 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   //   : isKeyboardHandledBySystem
   //   ? 0
   //   : keyboardHeight;
+  // const composerBottomOffset =
+  // Platform.OS === 'ios' ? keyboardHeight : 0;
   const composerBottomOffset =
-  Platform.OS === 'ios' ? keyboardHeight : 0;
+  Platform.OS === 'ios'
+    ? keyboardHeight
+    : isKeyboardHandledBySystem
+    ? 0
+    : keyboardHeight;
 
   const isOtherUserOnlineFromPayload = useCallback(
     (payload: unknown): boolean | null => {
@@ -721,11 +721,27 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           }
         }
 
+        const receiverParticipantId = receiverRaw
+          ? firstNonEmptyString(receiverRaw._id, receiverRaw.id, receiverRaw.userId)
+          : undefined;
+        const senderParticipantId = senderRaw
+          ? firstNonEmptyString(senderRaw._id, senderRaw.id, senderRaw.userId)
+          : undefined;
+
         // Derive request mode from chat status when not supplied.
+        // addChat uses senderId = initiator and receiverId = person who must accept.
+        // Only the receiver should see Accept / Decline, not the sender.
         if (!initialIsRequest && chatPayload) {
           const status = String((chatPayload.status as unknown) ?? '').toLowerCase();
-          if (status.includes('pending') || status.includes('request')) {
+          const isPendingStatus = status.includes('pending') || status.includes('request');
+          const me =
+            typeof currentUserId === 'string' && currentUserId.trim() ? currentUserId.trim() : '';
+          if (!isPendingStatus) {
+            setIsRequest(false);
+          } else if (receiverParticipantId && me && me === receiverParticipantId) {
             setIsRequest(true);
+          } else if (senderParticipantId && me && me === senderParticipantId) {
+            setIsRequest(false);
           } else {
             setIsRequest(false);
           }
@@ -1669,6 +1685,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     try {
       await setChatRequestActionApi({ chatId, action: 'accept' });
       navigation.setParams({ isRequest: false } as any);
+      setIsRequest(false);
       setMessagesLoading(true);
       const res = await getChatMessagesApi({
         chatId,
@@ -2191,7 +2208,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                     activeOpacity={0.7}
                   >
                     <View style={[styles.moreMenuIconWrap]}>
-                      <ReportIcon size={20} color={colors.semantic.error} />
+                      <ReportIcon size={20} color={colors.black} />
                     </View>
                     <Text style={styles.moreMenuLabelReport}>Report</Text>
                   </TouchableOpacity>
@@ -2904,7 +2921,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             )}
             <View style={styles.inputRow}>
               <TouchableOpacity style={styles.attachButton} activeOpacity={0.7} onPress={() => setAttachmentSheetOpen(true)}>
-                <PlusIcon size={18} color={colors.black} />
+                <PlusIcon size={20} color={colors.black} />
               </TouchableOpacity>
               <TextInput
                 ref={inputRef}
@@ -2981,28 +2998,13 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             )}
             <View style={styles.inputRow}>
               <TouchableOpacity style={styles.attachButton} activeOpacity={0.7} onPress={() => setAttachmentSheetOpen(true)}>
-                <PlusIcon size={18} color={colors.black} />
+                <PlusIcon size={20} color={colors.black}  />
               </TouchableOpacity>
-              <View
-                style={{
-                  flex: 1,
-                  minHeight: CHAT_INPUT_MIN_HEIGHT,
-                  position: 'relative',
-                  justifyContent: 'flex-start',
-                }}
-              >
+              <View style={styles.composerInputOuter}>
                 {inputText.length === 0 && (
                   <Text
                     pointerEvents="none"
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      right: 0,
-                      top: Platform.OS === 'ios' ? 8 : 10,
-                      color: colors.neutral[600],
-                      fontFamily: typography.fontFamily.regular,
-                      fontSize: 16,
-                    }}
+                    style={styles.composerPlaceholder}
                     numberOfLines={1}
                   >
                     {otherUserTyping ? 'typing…' : STRINGS.CHAT.START_CHAT_PLACEHOLDER}
@@ -3042,7 +3044,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   multiline
                   scrollEnabled={composerInputHeight >= CHAT_INPUT_MAX_HEIGHT}
                   underlineColorAndroid="transparent"
-                  textAlignVertical="top"
+                  textAlignVertical={
+                    inputText.trim().length > 0 || composerInputHeight > CHAT_INPUT_MIN_HEIGHT + 4
+                      ? 'top'
+                      : 'center'
+                  }
+                  {...(Platform.OS === 'android' ? { includeFontPadding: false } : {})}
                   disableFullscreenUI
                   returnKeyType="default"
                   cursorColor={colors.primary.purple}
@@ -3051,7 +3058,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               </View>
             </View>
           </View>
-                    <TouchableOpacity
+          <TouchableOpacity
             style={[
               styles.sendButton,
               !inputText.trim() && pendingAttachments.length === 0 && styles.sendButtonMic,
@@ -3074,7 +3081,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               <ForwardArrowIcon size={22} color={colors.white} />
             )}
           </TouchableOpacity>
-          </View>
+        </View>
         </View>
       )}
       </View>

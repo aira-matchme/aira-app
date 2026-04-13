@@ -73,6 +73,8 @@ export const colors = {
   
   // Border colors
   border: {
+    /** Primary CTA — Figma: 2px inner stroke, white @ 20% */
+    primaryButton: 'rgba(255, 255, 255, 0.2)',
     white: 'rgba(255, 255, 255, 0.1)',
     light: '#E6E6E6', // neutral.100
     default: '#CCCCCC', // neutral.200
@@ -85,6 +87,18 @@ export const colors = {
   gradients: {
     primary: {
       colors: ['#CB7BF5', '#7742F0'] as const,
+      start: { x: 0, y: 0 } as const,
+      end: { x: 1, y: 0 } as const,
+    },
+    /** Primary pill / Button — approximates Figma inner shadow (white 60%, blur 20) */
+    primaryButtonSheen: {
+      colors: [
+        'rgba(255, 255, 255, 0.36)',
+        'rgba(255, 255, 255, 0)',
+        'rgba(255, 255, 255, 0)',
+        'rgba(255, 255, 255, 0.16)',
+      ] as const,
+      locations: [0, 0.22, 0.78, 1] as const,
       start: { x: 0.5, y: 0 } as const,
       end: { x: 0.5, y: 1 } as const,
     },

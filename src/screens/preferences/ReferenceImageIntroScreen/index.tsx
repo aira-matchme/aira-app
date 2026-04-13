@@ -12,7 +12,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 
 import { Button } from '../../../components/Button';
-import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
 import type {
   AuthStackParamList,
   ProfileStackParamList,
@@ -62,33 +61,31 @@ export const ReferenceImageIntroScreen: React.FC = () => {
 
   return (
     <View style={styles.wrapper}>
-      {/* <ProfileScreenGradient /> */}
       <StatusBar
         barStyle="dark-content"
         translucent
         backgroundColor="transparent"
       />
-            <View style={styles.gradientBackground}>
-  <Svg height="100%" width="100%" style={{ position: 'absolute' }}>
-    <Defs>
-      <RadialGradient
-        id="grad"
-        cx="50%"
-        cy="35%"
-        rx="70%"
-        ry="50%"
-        fx="40%"
-        fy="32%"
-      >
-        <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="1" />
-        <Stop offset="0%" stopColor="#C87BF5" stopOpacity="0.7" />
-        <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="1" />
-      </RadialGradient>
-    </Defs>
-    {/* Full-size rect filled with the radial gradient */}
-    <Rect width="100%" height="100%" fill="url(#grad)" />
-  </Svg>
-</View>
+      <View style={styles.gradientBackground}>
+        <Svg height="100%" width="100%" style={styles.gradientSvg}>
+          <Defs>
+            <RadialGradient
+              id="grad"
+              cx="50%"
+              cy="35%"
+              rx="70%"
+              ry="50%"
+              fx="40%"
+              fy="32%"
+            >
+              <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="1" />
+              <Stop offset="0%" stopColor="#C87BF5" stopOpacity="0.7" />
+              <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="1" />
+            </RadialGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#grad)" />
+        </Svg>
+      </View>
       <SafeAreaView
         style={styles.safeArea}
         edges={['left', 'right', 'top', 'bottom']}

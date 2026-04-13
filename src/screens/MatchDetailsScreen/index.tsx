@@ -501,7 +501,7 @@ export const MatchDetailsScreen: React.FC = () => {
     const d = details as Record<string, any> | null | undefined;
     const rawChatId = d?.chatId ?? d?.match?.chatId ?? d?.existingChatId ?? d?.profile?.chatId;
     const chatId =
-      typeof rawChatId === 'string' && rawChatId.length > 0 ? rawChatId : '';
+      typeof rawChatId === 'string' && rawChatId.length > 0 ? rawChatId : null;
     const firstPhoto = galleryPhotos.find((p: { url?: string }) => Boolean(p?.url));
     setShowFirstMovePopup(false);
     navigation.navigate('Tabs', {
@@ -510,6 +510,8 @@ export const MatchDetailsScreen: React.FC = () => {
         screen: 'ChatDetail',
         params: {
           chatId,
+          name,
+          otherUserId: userId,
           ...(firstPhoto?.url ? { avatar: { uri: String(firstPhoto.url) } } : {}),
         },
       },

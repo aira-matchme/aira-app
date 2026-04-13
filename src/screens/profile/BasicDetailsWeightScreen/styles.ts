@@ -90,8 +90,9 @@ export const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.medium,
     color: colors.black,
   },
+  /** Figma Basic Details — Gender (3312:15172): selected label = violet/400 */
   optionTextSelected: {
-    color: colors.black,
+    color: colors.primary.purple,
   },
   buttonContainer: {
     paddingHorizontal: spacing.lg,

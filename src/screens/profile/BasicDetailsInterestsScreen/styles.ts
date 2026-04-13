@@ -57,11 +57,6 @@ export const styles = StyleSheet.create({
     borderColor: colors.neutral[200],
     marginBottom: spacing.sm,
     overflow: 'hidden',
-    shadowColor: colors.neutral[900],
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
   },
   categoryHeader: {
     flexDirection: 'row',

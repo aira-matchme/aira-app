@@ -33,14 +33,11 @@ export const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.white,
     borderRadius: 32,
+    borderWidth: 1,
+    borderColor: colors.neutral[50],
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg * 1.5,
     paddingBottom: spacing.lg,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 28,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 4,
   },
   stepRow: {
     flexDirection: 'row',
@@ -127,11 +124,6 @@ export const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
   },
   circularButtonGradient: {
     width: '100%',

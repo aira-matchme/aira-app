@@ -14,18 +14,23 @@ export const styles = StyleSheet.create({
   gradientBackground: {
     ...StyleSheet.absoluteFillObject,
   },
+  gradientSvg: {
+    ...StyleSheet.absoluteFillObject,
+  },
   safeArea: {
     flex: 1,
   },
   content: {
     flex: 1,
     paddingHorizontal: HORIZONTAL_PADDING,
-    paddingTop: spacing.xl,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   gridRow: {
     flexDirection: 'row',
     gap: GRID_GAP,
     marginBottom: GRID_GAP,
+    alignSelf: 'center',
   },
   gridCell: {
     width: CARD_SIZE,
@@ -44,6 +49,9 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     gap: 12,
     alignItems: 'center',
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 320,
   },
   title: {
     ...typography.h2,

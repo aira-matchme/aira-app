@@ -39,10 +39,15 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.white,
   },
-  mainColumn: {
+  /** Fills space under header; scrolls when keyboard shrinks viewport so CTA stays reachable */
+  mainScroll: {
     flex: 1,
     minHeight: 0,
+  },
+  mainScrollContent: {
+    flexGrow: 1,
     justifyContent: 'space-between',
+    paddingBottom: 40, // 👈 ADD THIS
   },
   formSection: {
     flexShrink: 0,

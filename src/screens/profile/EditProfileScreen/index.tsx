@@ -476,41 +476,52 @@ export const EditProfileScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.grid}>
-            {photoSlots.map((slot, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.photoCard, slot ? styles.photoCardFilled : null]}
-                activeOpacity={0.8}
-                onPress={() => openActionSheet(index)}
-                disabled={uploadingSlot === index}
-              >
-                {slot?.uri ? (
-                  <>
-                    <Image source={{ uri: slot.uri }} style={styles.photoImage} resizeMode="cover" />
-                    <View style={styles.photoOverlay} pointerEvents="none" />
+            {[0, 3].map((rowStart) => (
+              <View key={rowStart} style={styles.gridRow}>
+                {photoSlots.slice(rowStart, rowStart + 3).map((slot, i) => {
+                  const index = rowStart + i;
+                  return (
                     <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        setSelectedPhotoIndex(index);
-                        setShowActionSheet(true);
-                      }}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      key={index}
+                      style={[styles.photoCard, slot ? styles.photoCardFilled : null]}
+                      activeOpacity={0.8}
+                      onPress={() => openActionSheet(index)}
+                      disabled={uploadingSlot === index}
                     >
-                      <CloseIcon size={14} color={colors.white} />
+                      {slot?.uri ? (
+                        <>
+                          <Image
+                            source={{ uri: slot.uri }}
+                            style={styles.photoImage}
+                            resizeMode="cover"
+                          />
+                          <View style={styles.photoOverlay} pointerEvents="none" />
+                          <TouchableOpacity
+                            style={styles.removeButton}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              setSelectedPhotoIndex(index);
+                              setShowActionSheet(true);
+                            }}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <CloseIcon size={14} color={colors.white} />
+                          </TouchableOpacity>
+                        </>
+                      ) : (
+                        <View style={styles.placeholder}>
+                          <AddPhotoIcon stroke={colors.neutral[300]} />
+                        </View>
+                      )}
+                      {uploadingSlot === index && (
+                        <View style={styles.uploadingOverlay}>
+                          <ActivityIndicator size="large" color={colors.white} />
+                        </View>
+                      )}
                     </TouchableOpacity>
-                  </>
-                ) : (
-                  <View style={styles.placeholder}>
-                    <AddPhotoIcon stroke={colors.neutral[300]} />
-                  </View>
-                )}
-                {uploadingSlot === index && (
-                  <View style={styles.uploadingOverlay}>
-                    <ActivityIndicator size="large" color={colors.white} />
-                  </View>
-                )}
-              </TouchableOpacity>
+                  );
+                })}
+              </View>
             ))}
           </View>
 

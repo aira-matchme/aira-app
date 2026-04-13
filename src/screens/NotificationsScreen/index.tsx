@@ -132,6 +132,29 @@ function pickChatId(o: Record<string, unknown>): string | null {
   return from(o.options) ?? from(o.data);
 }
 
+/** Other user id for chat deep-links when `sender` is only under options/data. */
+function pickSenderIdFromPayload(o: Record<string, unknown>): string | null {
+  const from = (obj: unknown): string | null => {
+    if (!obj || typeof obj !== 'object') return null;
+    const x = obj as Record<string, unknown>;
+    const senderObj =
+      x.sender && typeof x.sender === 'object'
+        ? (x.sender as Record<string, unknown>)
+        : null;
+    return (
+      firstNonEmptyString(
+        x.senderId,
+        x.fromUserId,
+        typeof x.sender === 'string' ? x.sender : undefined,
+        senderObj?._id,
+        senderObj?.id,
+        senderObj?.userId
+      ) ?? null
+    );
+  };
+  return from(o.options) ?? from(o.data);
+}
+
 function pickNotificationType(o: Record<string, unknown>): string {
   if (typeof o.type === 'string' && o.type.trim()) return o.type.trim();
   const d = o.data;
@@ -387,12 +410,14 @@ export const NotificationsScreen = () => {
           showErrorToast(STRINGS.NOTIFICATIONS.OPEN_CHAT_FAILED);
           return;
         }
+        const otherUserId = firstNonEmptyString(item.senderId, item.matchUserId);
         navigation.navigate('Chat', {
           screen: 'ChatDetail',
           params: {
             chatId: item.chatId,
+            name: item.contactName,
+            ...(otherUserId ? { otherUserId } : {}),
             avatar: item.avatarUri ? { uri: item.avatarUri } : undefined,
-          
           },
         });
       }

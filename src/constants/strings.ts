@@ -50,12 +50,12 @@ export const STRINGS = {
     GET_STARTED: 'Get Started',
   },
 
-  /** App walkthrough (react-native-copilot) — Home + main tabs (Figma frames 517–573). */
+  /** App tab walkthrough — Home + main tabs (Figma frames 517–573). */
   DASHBOARD_WALKTHROUGH: {
     WELCOME_TITLE: 'Welcome to Aira',
     WELCOME_BODY:
       'Discover, connect, and explore profiles around you.',
-    /** Step 1: title + body for tooltip (split on \\n\\n in TabWalkthroughTooltip). */
+    /** Legacy: title + body (walkthrough UI uses STEP_*_TITLE / TAB separately). */
     WELCOME_COPILOT: `Welcome to Aira\n\nDiscover, connect, and explore profiles around you.`,
     GET_STARTED: 'Get Started',
     NEXT: 'Next',
@@ -102,6 +102,11 @@ export const STRINGS = {
       'Aira uses notifications to keep you updated on matches, messages, and meaningful moments - without unnecessary noise.',
     PRIMARY_CTA: 'Enable Notifications',
     SECONDARY_CTA: 'May Be Later',
+    SHEET_TITLE: 'Aira would like to send you notifications',
+    SHEET_DESCRIPTION:
+      'Notifications may include alerts, sounds, and icon badges. These can be configured in Settings.',
+    SHEET_ALLOW: 'Allow',
+    SHEET_DONT_ALLOW: "Don't Allow",
   },
 
   // Profile Intro Screen
@@ -368,6 +373,13 @@ export const STRINGS = {
     DESCRIPTION:
       'Set your preferences to get started. You can fine-tune them anytime.',
     PRIMARY_CTA: 'Proceed',
+  },
+  /** Reference image taste test — Figma 3339:6759 */
+  REFERENCE_IMAGE_INTRO: {
+    TITLE: "Now let's see what you're drawn to",
+    SUBTITLE:
+      "You'll be shown pairs of photos. Just tap the one that appeals to you more — there's no right answer.",
+    PRIMARY_CTA: 'Start',
   },
   PREFERENCES_GENDER: {
     TITLE: 'Who would you like to meet?',

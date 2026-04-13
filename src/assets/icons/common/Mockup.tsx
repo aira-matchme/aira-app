@@ -13,10 +13,11 @@ import Svg, {
   Image,
 } from "react-native-svg";
 /* SVGR has dropped some elements not supported by react-native-svg: div */
+/** Figma lock-screen mockup — viewBox 316×613; use these defaults for Enable Notifications (3312:14880). */
 const Mockup = (props: any) => (
   <Svg
     width={316}
-    height={520}
+    height={613}
     viewBox="0 0 316 613"
     fill="none"
     {...props}

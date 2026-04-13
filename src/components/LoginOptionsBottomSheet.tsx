@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Platform,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -128,6 +129,7 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
 
     navigation.navigate('AuthStack', { screen: 'EnableNotifications' });
   } catch (error: any) {
+    Alert.alert('Google login error', error.message || 'Unknown error');
     // Google login error
   }
 };

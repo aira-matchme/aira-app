@@ -8,12 +8,15 @@ const INPUT_PILL_BG = '#f3f3f3';
 const INPUT_RADIUS = 22;
 export const INPUT_BAR_HEIGHT = 56;
 /** Min/max for composer TextInput: grows with text, then scrolls inside at max. */
-export const CHAT_INPUT_MIN_HEIGHT = 40;
+export const CHAT_INPUT_MIN_HEIGHT = 36;
 export const CHAT_INPUT_MAX_HEIGHT = 120;
 const INPUT_MAX_HEIGHT = CHAT_INPUT_MAX_HEIGHT;
-const ATTACH_BUTTON_SIZE = 40;
+/** Figma 3339-7411 / Match AI composer: 48px circular actions + 12px row inset */
+const MESSAGE_COMPOSER_ACTION_SIZE = 48;
+const MESSAGE_COMPOSER_ROW_PADDING_H = 12;
+const ATTACH_BUTTON_SIZE = MESSAGE_COMPOSER_ACTION_SIZE;
 const IMAGE_BUBBLE_SIZE = 200;
-const SEND_BUTTON_SIZE = 40;
+const SEND_BUTTON_SIZE = MESSAGE_COMPOSER_ACTION_SIZE;
 export const BUBBLE_MAX_WIDTH = SCREEN_WIDTH * 0.75;
 // Figma 1690-7152: generating bar and cancel (height must fit icon + text + padding)
 const GENERATING_BAR_HEIGHT = 44;
@@ -143,7 +146,7 @@ export const styles = StyleSheet.create({
     ...typography.bodyMedium,
     fontSize: 16,
     fontWeight: '500',
-    color: colors.semantic.error,
+    color: colors.black,
   },
   messageContextBackdrop: {
     flex: 1,
@@ -887,10 +890,10 @@ export const styles = StyleSheet.create({
   },
   inputBar: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: H_PADDING,
-    paddingTop: 8,
-    paddingBottom: 8,
+    alignItems: 'center',
+    paddingHorizontal: MESSAGE_COMPOSER_ROW_PADDING_H,
+    paddingTop: 12,
+    paddingBottom: 12,
     backgroundColor: colors.white,
   },
   inputBarContent: {
@@ -910,17 +913,34 @@ export const styles = StyleSheet.create({
     flexDirection: 'column',
     backgroundColor: INPUT_PILL_BG,
     borderRadius: INPUT_RADIUS,
-    paddingLeft: 12,
-    paddingRight: 12,
-    paddingTop: 8,
-    paddingBottom: 8,
+    paddingLeft: 16,
+    paddingRight: 16,
+    paddingVertical: 0,
     minHeight: INPUT_BAR_HEIGHT,
     maxHeight: INPUT_MAX_HEIGHT + 80,
+    justifyContent: 'center',
   },
   inputRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    minHeight: 40,
+    alignItems: 'center',
+    minHeight: MESSAGE_COMPOSER_ACTION_SIZE,
+  },
+  /** Wraps TextInput + placeholder; centers short field with attach + send. */
+  composerInputOuter: {
+    flex: 1,
+    minHeight: CHAT_INPUT_MIN_HEIGHT,
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  composerPlaceholder: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: Platform.OS === 'ios' ? 12 : 11,
+    ...typography.body,
+    letterSpacing: 0.32,
+    lineHeight: 22,
+    color: colors.neutral[600],
   },
   attachmentsInsidePill: {
     flexDirection: 'row',
@@ -929,33 +949,26 @@ export const styles = StyleSheet.create({
     paddingBottom: 8,
     overflow: 'visible',
   },
+  /** Plus sits on pill surface — no nested ring (Figma 3339-7411 / Match composer) */
   attachButton: {
     width: ATTACH_BUTTON_SIZE,
     height: ATTACH_BUTTON_SIZE,
     borderRadius: ATTACH_BUTTON_SIZE / 2,
-    backgroundColor: INPUT_PILL_BG,
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
+    backgroundColor: colors.white,
+    // borderWidth: 1,
+    // borderColor: colors.neutral[200],
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 16,
-      },
-      android: { elevation: 2 },
-    }),
+    marginRight: 8,
   },
   input: {
+    ...typography.body,
     minWidth: 100,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    fontSize: 16,
-    fontWeight: '400',
     color: colors.black,
+    letterSpacing: 0.32,
+    lineHeight: 22,
+    paddingVertical: 13,
+    paddingHorizontal: 0,
     margin: 0,
   },
   askAiraChipGradientWrap: {
@@ -1080,8 +1093,9 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
-    marginBottom: 0,
+    alignSelf: 'center',
   },
+  /** Mic / idle — same treatment as MatchScreen sendButtonDisabled */
   sendButtonMic: {
     backgroundColor: INPUT_PILL_BG,
     borderWidth: 1,
@@ -1094,8 +1108,9 @@ export const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    // bottom :composerBottomOffset,
     backgroundColor: colors.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.neutral[200],
     zIndex: 10,
   },
   replyToBar: {
@@ -1257,9 +1272,9 @@ borderRadius: 16,
     minWidth: 36,
   },
   voiceBarSend: {
-    width: SEND_BUTTON_SIZE,
-    height: SEND_BUTTON_SIZE,
-    borderRadius: SEND_BUTTON_SIZE / 2,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.black,
     justifyContent: 'center',
     alignItems: 'center',

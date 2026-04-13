@@ -62,7 +62,7 @@ export const BasicDetailsEthnicityScreen: React.FC = () => {
     control,
     handleSubmit,
     setValue,
-    formState: { isValid },
+    watch,
   } = useForm<EthnicityFormData>({
     resolver: zodResolver(ethnicitySchema),
     mode: 'onChange',
@@ -74,6 +74,9 @@ export const BasicDetailsEthnicityScreen: React.FC = () => {
   useEffect(() => {
     setValue('ethnicity', initialEthnicity);
   }, [initialEthnicity, setValue]);
+
+  const selectedEthnicity = watch('ethnicity');
+  const hasEthnicitySelection = Boolean(selectedEthnicity?.trim());
 
   const onSubmit = async (data: EthnicityFormData) => {
     const selected = ETHNICITY_OPTIONS.find((o) => o.key === data.ethnicity);
@@ -121,7 +124,7 @@ export const BasicDetailsEthnicityScreen: React.FC = () => {
 
           <View style={styles.header}>
             <Text style={styles.title}>What&apos;s your ethnicity?</Text>
-            <Text style={styles.subtitle}>Optional – you can skip this for now.</Text>
+            <Text style={styles.subtitle}>Select an option to continue.</Text>
           </View>
 
           <ScrollView
@@ -172,7 +175,7 @@ export const BasicDetailsEthnicityScreen: React.FC = () => {
             title="Continue"
             onPress={handleSubmit(onSubmit)}
             variant="primary"
-            disabled={!isValid || (fromEditProfile && isSaving)}
+            disabled={!hasEthnicitySelection || (fromEditProfile && isSaving)}
             loading={fromEditProfile && isSaving}
             style={styles.button}
           />

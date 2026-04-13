@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StatusBar, Platform, TouchableOpacity, Linking, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StatusBar, TouchableOpacity, Pressable, useWindowDimensions } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import LinearGradient from 'react-native-linear-gradient';
-import { GradientBackground } from '../../../components/GradientBackground';
 import { ReusableBottomSheet } from '../../../components/BottomSheet';
 import { Button } from '../../../components/Button';
 import { STRINGS } from '../../../constants/strings';
@@ -12,15 +10,35 @@ import { requestNotificationPermission } from '../../../config/permissions';
 import { useAuthStore } from '../../../store/auth.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import Mockup from '../../../assets/icons/common/Mockup';
-import { styles } from './styles';
+import { FIGMA_ENABLE_NOTIFICATIONS, styles } from './styles';
+import { GradientBackground } from '../../../components/GradientBackground';
 
 type EnableNotificationsNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'EnableNotifications'>;
 
+/** Figma Y is from frame top; `figmaCanvas` starts at safe-area top, so absolute top = figmaY − insets.top. */
+function figmaYToLayoutTop(figmaY: number, safeTop: number): number {
+  return Math.max(0, figmaY - safeTop);
+}
+
 export const EnableNotificationsScreen = () => {
   const navigation = useNavigation<EnableNotificationsNavigationProp>();
+  const insets = useSafeAreaInsets();
+  const { width: winW } = useWindowDimensions();
   const setShouldShowEnableNotifications = useAuthStore((s) => s.setShouldShowEnableNotifications);
   const [isRequesting, setIsRequesting] = useState(false);
   const [showPermissionSheet, setShowPermissionSheet] = useState(false);
+
+  const { TITLE_TOP, PRIMARY_BUTTON_TOP, GAP_PRIMARY_SECONDARY, PRIMARY_H, HORIZONTAL_INSET, CONTENT_W } =
+    FIGMA_ENABLE_NOTIFICATIONS;
+
+  const contentW = Math.min(CONTENT_W, winW - HORIZONTAL_INSET * 2);
+  const contentLeft = (winW - contentW) / 2;
+
+  const copyTop = figmaYToLayoutTop(TITLE_TOP, insets.top);
+  const primaryTop = figmaYToLayoutTop(PRIMARY_BUTTON_TOP, insets.top);
+  const secondaryTop = primaryTop + PRIMARY_H + GAP_PRIMARY_SECONDARY;
+
+  const absContentStyle = { left: contentLeft, width: contentW } as const;
 
   const handleEnableNotifications = async () => {
     setShowPermissionSheet(true);
@@ -37,7 +55,7 @@ export const EnableNotificationsScreen = () => {
       } else if (status === 'denied') {
         // User denied - no action
       }
-    } catch (error) {
+    } catch {
       // Request failed
     } finally {
       setIsRequesting(false);
@@ -46,8 +64,6 @@ export const EnableNotificationsScreen = () => {
 
   const handleDontAllow = () => {
     setShowPermissionSheet(false);
-    // setShouldShowEnableNotifications(false);
-    // navigation.navigate('ProfileIntro');
   };
 
   const handleMayBeLater = () => {
@@ -61,46 +77,48 @@ export const EnableNotificationsScreen = () => {
 
   return (
     <View style={styles.wrapper}>
-      <GradientBackground style={styles.gradientBackground}>
-        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
-          <View style={styles.container} pointerEvents="box-none">
-            <View style={styles.mockupContainer} pointerEvents="none">
-              <Mockup />
-            </View>
-            <View style={styles.content}>
-              <Text style={styles.title}>
-                {STRINGS.ENABLE_NOTIFICATIONS.TITLE}
-              </Text>
-              <Text style={styles.subtitle}>
-                {STRINGS.ENABLE_NOTIFICATIONS.SUBTITLE}
-              </Text>
+       <GradientBackground style={styles.gradientBackground}>
+      {/* <View style={styles.orbLeft} pointerEvents="none" />
+      <View style={styles.orbRight} pointerEvents="none" /> */}
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.figmaCanvas}>
+          <View style={styles.mockupPad} pointerEvents="none">
+            <Mockup />
+          </View>
 
-              <View style={styles.actions}>
-                <Button
-                  title={STRINGS.ENABLE_NOTIFICATIONS.PRIMARY_CTA}
-                  onPress={handleEnableNotifications}
-                  variant="primary"
-                  disabled={isRequesting}
-                  loading={isRequesting}
-                  style={styles.primaryButton}
-                />
-                <Pressable
-                  onPress={handleMayBeLater}
-                  hitSlop={{ top: 25, bottom: 25, left: 25, right: 25 }}
-                  style={({ pressed }) => [
-                    styles.maybeLaterButton,
-                    pressed && { opacity: 0.7 }
-                  ]}
-                >
-                  <Text style={styles.secondaryText}>
-                    {STRINGS.ENABLE_NOTIFICATIONS.SECONDARY_CTA}
-                  </Text>
-                </Pressable>
-              </View>
+          <View style={[styles.absBlock, absContentStyle, { top: copyTop }]}>
+            <View style={styles.copyBlock}>
+              <Text style={styles.title}>{STRINGS.ENABLE_NOTIFICATIONS.TITLE}</Text>
+              <Text style={styles.subtitle}>{STRINGS.ENABLE_NOTIFICATIONS.SUBTITLE}</Text>
             </View>
           </View>
-        </SafeAreaView>
+
+          <View style={[styles.absBlock, styles.bottomSafePad, absContentStyle, { top: primaryTop }]}>
+            <View style={styles.actions}>
+              <Button
+                title={STRINGS.ENABLE_NOTIFICATIONS.PRIMARY_CTA}
+                onPress={handleEnableNotifications}
+                variant="primary"
+                disabled={isRequesting}
+                loading={isRequesting}
+                style={styles.primaryButton}
+              />
+            </View>
+          </View>
+
+          <View style={[styles.absBlock, styles.bottomSafePad, absContentStyle, { top: secondaryTop }]}>
+            <Pressable
+              onPress={handleMayBeLater}
+              hitSlop={{ top: 25, bottom: 25, left: 25, right: 25 }}
+              style={({ pressed }) => [styles.maybeLaterButton, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={styles.secondaryText}>{STRINGS.ENABLE_NOTIFICATIONS.SECONDARY_CTA}</Text>
+            </Pressable>
+          </View>
+
+        </View>
+      </SafeAreaView>
       </GradientBackground>
 
       <ReusableBottomSheet
@@ -114,32 +132,14 @@ export const EnableNotificationsScreen = () => {
         scrollEnabled={false}
       >
         <View style={styles.permissionSheetContent}>
-          <Text style={styles.permissionTitle}>
-            Aira would like to send you notifications
-          </Text>
-          
-          <Text style={styles.permissionDescription}>
-            Notifications may include alerts, sounds, and icon badges. These can be configured in Settings.
-          </Text>
+          <Text style={styles.permissionTitle}>{STRINGS.ENABLE_NOTIFICATIONS.SHEET_TITLE}</Text>
+
+          <Text style={styles.permissionDescription}>{STRINGS.ENABLE_NOTIFICATIONS.SHEET_DESCRIPTION}</Text>
 
           <View style={styles.permissionButtons}>
-            <TouchableOpacity
-              onPress={handleAllow}
-              activeOpacity={0.8}
-              style={styles.allowButtonWrapper}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <LinearGradient
-                colors={['#C671F4', '#7640F0']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.allowButton}
-              >
-                <View style={styles.allowButtonInner}>
-                  <Text style={styles.allowButtonText}>Allow</Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
+            <View style={styles.allowButtonWrap}>
+              <Button title={STRINGS.ENABLE_NOTIFICATIONS.SHEET_ALLOW} onPress={handleAllow} variant="primary" />
+            </View>
 
             <TouchableOpacity
               onPress={handleDontAllow}
@@ -147,7 +147,7 @@ export const EnableNotificationsScreen = () => {
               style={styles.dontAllowButton}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.dontAllowButtonText}>Don't Allow</Text>
+              <Text style={styles.dontAllowButtonText}>{STRINGS.ENABLE_NOTIFICATIONS.SHEET_DONT_ALLOW}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -155,4 +155,3 @@ export const EnableNotificationsScreen = () => {
     </View>
   );
 };
-

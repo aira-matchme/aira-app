@@ -81,7 +81,7 @@ export const styles = StyleSheet.create({
     color: colors.black,
   },
   optionTextSelected: {
-    color: colors.black,
+    color: colors.primary.purple,
   },
   buttonContainer: {
     paddingHorizontal: spacing.lg,
