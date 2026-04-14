@@ -8,11 +8,6 @@ import React, {
   useState,
 } from 'react';
 import {
-  Dimensions,
-  InteractionManager,
-  Modal,
-  Platform,
-  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -60,6 +55,7 @@ type TabWalkthroughContextValue = {
   /** True while any tab tour step is showing — used to keep Match tab bar visible. */
   visibleForTabBar: boolean;
   setTargetRef: (id: TabWalkthroughStepId, node: View | null) => void;
+  measureTargetFromNode: (id: TabWalkthroughStepId, node: View | null) => void;
   /** Active tour target id (for measuring views). */
   currentStepId: TabWalkthroughStepId | null;
   /** Pushes window rect for the active step when tab cells lay out. */
@@ -77,42 +73,6 @@ async function persistWalkthroughDone() {
   await AsyncStorage.setItem(DASHBOARD_WALKTHROUGH_STORAGE_KEY, 'true');
 }
 
-/**
- * Android: tab targets are measured with `measureInWindow` in the **application window**
- * coordinate system (origin typically below the status bar). A `Modal` with
- * `transparent` + `statusBarTranslucent` draws from the **physical screen** top, so the
- * spotlight appears shifted up unless we translate Y by the same inset.
- */
-function useMeasureWindowToOverlayDY(): number {
-  const insets = useSafeAreaInsets();
-  return useMemo(() => {
-    if (Platform.OS !== 'android') {
-      return 0;
-    }
-    return Math.max(insets.top, StatusBar.currentHeight ?? 0);
-  }, [insets.top]);
-}
-
-/** Modal + measureInWindow use screen coordinates; canvas must cover full physical screen. */
-function useOverlayCanvasSize() {
-  const read = useCallback(() => {
-    const win = Dimensions.get('window');
-    const scr = Dimensions.get('screen');
-    return {
-      width: Math.max(win.width, scr.width),
-      height: Math.max(win.height, scr.height),
-    };
-  }, []);
-  const [dims, setDims] = useState(read);
-  useEffect(() => {
-    const sub = Dimensions.addEventListener('change', () => {
-      setDims(read());
-    });
-    return () => sub.remove();
-  }, [read]);
-  return dims;
-}
-
 const HOLE_VISUAL_PADDING = 0;
 
 /** Padding is 0 so the cutout matches the measured tab (no outer frame from inflation). Then clamp to the screen. */
@@ -127,233 +87,180 @@ function clampHole(hole: HoleRect, sw: number, sh: number): HoleRect | null {
   const y = Math.max(0, Math.min(inflated.y, sh - 1));
   const width = Math.max(0, Math.min(inflated.width, sw - x));
   const height = Math.max(0, Math.min(inflated.height, sh - y));
-  if (width < 16 || height < 16) {
+  if (width < 2 || height < 2) {
     return null;
   }
   return { x, y, width, height };
-}
-
-function DimmingRects({
-  hole,
-  sw,
-  sh,
-  color,
-}: {
-  hole: HoleRect;
-  sw: number;
-  sh: number;
-  color: string;
-}) {
-  const { x, y, width, height } = hole;
-  return (
-    <>
-      <View
-        pointerEvents="auto"
-        style={[styles.dim, { left: 0, top: 0, width: sw, height: y, backgroundColor: color }]}
-      />
-      <View
-        pointerEvents="auto"
-        style={[styles.dim, { left: 0, top: y, width: x, height, backgroundColor: color }]}
-      />
-      <View
-        pointerEvents="auto"
-        style={[
-          styles.dim,
-          { left: x + width, top: y, width: sw - x - width, height, backgroundColor: color },
-        ]}
-      />
-      <View
-        pointerEvents="auto"
-        style={[
-          styles.dim,
-          { left: 0, top: y + height, width: sw, height: sh - y - height, backgroundColor: color },
-        ]}
-      />
-    </>
-  );
 }
 
 function TabWalkthroughOverlay({
   active,
   stepIndex,
   hole,
-  setHole,
+  overlayRootRef,
+  overlaySize,
   targetsRef,
   onSkip,
   onNext,
-  onPrev,
+  updateHole,
 }: {
   active: boolean;
   stepIndex: number;
   hole: HoleRect | null;
-  setHole: React.Dispatch<React.SetStateAction<HoleRect | null>>;
+  overlayRootRef: React.MutableRefObject<View | null>;
+  overlaySize: { width: number; height: number };
   targetsRef: React.MutableRefObject<Partial<Record<TabWalkthroughStepId, View | null>>>;
   onSkip: () => void;
   onNext: () => void;
-  onPrev: () => void;
+  updateHole: (rect: HoleRect | null) => void;
 }) {
-  const { width: sw, height: sh } = useOverlayCanvasSize();
-  const measureToOverlayDY = useMeasureWindowToOverlayDY();
-  const holeForOverlay = useMemo(() => {
-    if (hole == null) {
-      return null;
-    }
-    if (measureToOverlayDY === 0) {
-      return hole;
-    }
-    return { ...hole, y: hole.y + measureToOverlayDY };
-  }, [hole, measureToOverlayDY]);
+  const { width: sw, height: sh } = overlaySize;
+  const insets = useSafeAreaInsets();
+  const [tooltipCardHeight, setTooltipCardHeight] = useState(0);
   const holeClamped = useMemo(
-    () => (holeForOverlay != null ? clampHole(holeForOverlay, sw, sh) : null),
-    [holeForOverlay, sw, sh]
+    () => (hole != null ? clampHole(hole, sw, sh) : null),
+    [hole, sw, sh]
   );
 
   const stepId = STEP_ORDER[stepIndex];
   const copy = stepId ? STEP_COPY[stepId] : null;
-  const isFirst = stepIndex <= 0;
-  const isLast = stepIndex >= STEP_ORDER.length - 1;
 
   const remeasure = useCallback(() => {
     if (!active || !stepId) {
-      setHole(null);
+      updateHole(null);
       return;
     }
     const node = targetsRef.current[stepId];
-    if (!node) {
-      setHole(null);
+    const root = overlayRootRef.current;
+    if (!node || !root) {
+      updateHole(null);
       return;
     }
-    InteractionManager.runAfterInteractions(() => {
-      requestAnimationFrame(() => {
-        node.measureInWindow((x, y, width, height) => {
+    requestAnimationFrame(() => {
+      node.measureLayout(
+        root as never,
+        (x, y, width, height) => {
           if (width <= 0 || height <= 0) {
-            setHole(null);
+            updateHole(null);
             return;
           }
-          setHole({ x, y, width, height });
-        });
-      });
+          updateHole({ x, y, width, height });
+        },
+        () => {
+          updateHole(null);
+        }
+      );
     });
-  }, [active, stepId, targetsRef]);
+  }, [active, overlayRootRef, stepId, targetsRef, updateHole]);
 
   useEffect(() => {
-    if (!active) {
-      setHole(null);
+    if (!active || sw <= 0 || sh <= 0) {
+      updateHole(null);
       return;
     }
     remeasure();
-    const t1 = requestAnimationFrame(() => remeasure());
-    const t2 = setTimeout(() => remeasure(), 160);
-    const t3 = setTimeout(() => remeasure(), 400);
-    const t4 = setTimeout(() => remeasure(), 700);
-    return () => {
-      cancelAnimationFrame(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-      clearTimeout(t4);
-    };
-  }, [active, stepIndex, remeasure, sw, sh]);
+  }, [active, remeasure, sh, stepIndex, sw, updateHole]);
 
-  const tooltipAbove =
-    holeClamped != null && holeClamped.y + holeClamped.height > sh * 0.52;
+  const tooltipGeometry = useMemo(() => {
+    const compact = sw <= 360 || sh <= 700;
+    const sideGutter = compact ? 10 : 12;
+    const cardWidth = Math.min(compact ? 360 : 420, Math.max(280, sw - sideGutter * 2));
+    const holeCx = holeClamped != null ? holeClamped.x + holeClamped.width / 2 : sw / 2;
+    const left = Math.max(sideGutter, Math.min(sw - sideGutter - cardWidth, holeCx - cardWidth / 2));
+    const minBottom = insets.bottom + (compact ? 6 : 10);
+    const preferredBottom = holeClamped != null ? Math.max(minBottom, sh - holeClamped.y + 24) : minBottom + 24;
+    const maxBottom =
+      tooltipCardHeight > 0
+        ? Math.max(minBottom, sh - insets.top - tooltipCardHeight - (compact ? 14 : 20) - 24)
+        : Number.POSITIVE_INFINITY;
+    const bottom = Math.max(minBottom, Math.min(preferredBottom, maxBottom));
+    const tailLeft = Math.max(18, Math.min(cardWidth - 42, holeCx - left - 12));
+    return { left, width: cardWidth, bottom, tailLeft, compact };
+  }, [holeClamped, insets.bottom, insets.top, sh, sw, tooltipCardHeight]);
 
-  const tooltipHorizontal = useMemo(() => {
-    if (holeClamped == null) {
-      return { left: 16 as const, right: 16 as const };
-    }
-    const cx = holeClamped.x + holeClamped.width / 2;
-    const cardW = Math.min(400, sw - 32);
-    const left = Math.max(16, Math.min(sw - 16 - cardW, cx - cardW / 2));
-    return { left, width: cardW };
-  }, [holeClamped, sw]);
-
-  if (!active || !copy) {
+  if (!active || !copy || sw <= 0 || sh <= 0) {
     return null;
   }
 
   return (
-    <Modal
-      visible
-      transparent
-      animationType="none"
-      statusBarTranslucent
-      presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
-      onRequestClose={onSkip}
-    >
-      <View style={[styles.modalRoot, { width: sw, height: sh }]} pointerEvents="box-none">
-        {holeClamped != null ? (
-          <DimmingRects hole={holeClamped} sw={sw} sh={sh} color="rgba(0,0,0,0.48)" />
-        ) : (
-          <View
-            pointerEvents="auto"
-            style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.4)' }]}
-          />
-        )}
+    <View style={[styles.overlayRoot, { width: sw, height: sh }]} pointerEvents="box-none">
+      <View
+        pointerEvents="auto"
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.48)' }]}
+      />
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.tooltipWrap,
+          {
+            left: tooltipGeometry.left,
+            width: tooltipGeometry.width,
+            bottom: tooltipGeometry.bottom,
+          },
+        ]}
+      >
         <View
-          pointerEvents="box-none"
-          style={[
-            styles.tooltipWrap,
-            tooltipHorizontal,
-            tooltipAbove
-              ? {
-                  bottom:
-                    holeClamped != null
-                      ? Math.max(24, sh - holeClamped.y + 12)
-                      : Math.max(120, sh * 0.22),
-                }
-              : {
-                  top:
-                    holeClamped != null
-                      ? holeClamped.y + holeClamped.height + 12
-                      : Math.max(120, sh * 0.22),
-                },
-          ]}
+          style={[styles.tooltipCard, tooltipGeometry.compact && styles.tooltipCardCompact]}
+          pointerEvents="auto"
+          onLayout={(e) => setTooltipCardHeight(e.nativeEvent.layout.height)}
         >
-          <View style={styles.tooltipCard} pointerEvents="auto">
-            <Text style={styles.tooltipTitle}>{copy.title}</Text>
-            <Text style={styles.tooltipBody}>{copy.body}</Text>
-            <View style={styles.tooltipBar}>
-              <TouchableOpacity onPress={onSkip} hitSlop={8} activeOpacity={0.7}>
-                <Text style={styles.skipTxt}>{w.SKIP}</Text>
-              </TouchableOpacity>
-              <View style={styles.tooltipBarRight}>
-                {!isFirst ? (
-                  <TouchableOpacity onPress={onPrev} hitSlop={8} activeOpacity={0.7}>
-                    <Text style={styles.backTxt}>{w.PREVIOUS}</Text>
-                  </TouchableOpacity>
-                ) : null}
-                <TouchableOpacity
-                  onPress={onNext}
-                  activeOpacity={0.85}
-                  style={styles.primaryWrap}
+          <Text style={[styles.tooltipTitle, tooltipGeometry.compact && styles.tooltipTitleCompact]}>
+            {copy.title}
+          </Text>
+          <Text style={[styles.tooltipBody, tooltipGeometry.compact && styles.tooltipBodyCompact]}>
+            {copy.body}
+          </Text>
+          <View style={styles.tooltipBar}>
+            <View style={[styles.actionColumn, styles.actionColumnLeft]} />
+            <View style={[styles.actionColumn, styles.actionColumnCenter]}>
+              <TouchableOpacity
+                onPress={onNext}
+                activeOpacity={0.85}
+                style={[styles.primaryWrap, tooltipGeometry.compact && styles.primaryWrapCompact]}
+              >
+                <LinearGradient
+                  colors={[colors.secondary.lavender, colors.primary.purple] as [string, string]}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={[styles.primaryBtn, tooltipGeometry.compact && styles.primaryBtnCompact]}
                 >
-                  <LinearGradient
-                    colors={[colors.secondary.lavender, colors.primary.purple] as [string, string]}
-                    start={{ x: 0, y: 0.5 }}
-                    end={{ x: 1, y: 0.5 }}
-                    style={styles.primaryBtn}
+                  <Text
+                    allowFontScaling={false}
+                    numberOfLines={1}
+                    style={[styles.primaryTxt, tooltipGeometry.compact && styles.primaryTxtCompact]}
                   >
-                    <Text style={styles.primaryTxt}>
-                      {isLast ? w.NEXT : isFirst ? w.GET_STARTED : w.NEXT}
-                    </Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
+                    {w.NEXT}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+            <View style={[styles.actionColumn, styles.actionColumnRight]}>
+              <TouchableOpacity onPress={onSkip} hitSlop={8} activeOpacity={0.75}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.skipTxt, tooltipGeometry.compact && styles.skipTxtCompact]}
+                >
+                  {w.SKIP}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
+        <View style={[styles.tooltipTail, { left: tooltipGeometry.tailLeft }]} />
       </View>
-    </Modal>
+    </View>
   );
 }
 
 export function TabWalkthroughProvider({ children }: { children: React.ReactNode }) {
+  const overlayRootRef = useRef<View | null>(null);
   const targetsRef = useRef<Partial<Record<TabWalkthroughStepId, View | null>>>({});
   const stepIndexRef = useRef(0);
   const activeRef = useRef(false);
   const [active, setActive] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [hole, setHole] = useState<HoleRect | null>(null);
+  const [overlaySize, setOverlaySize] = useState({ width: 0, height: 0 });
 
   const currentStepId = active ? STEP_ORDER[stepIndex] ?? null : null;
 
@@ -368,6 +275,29 @@ export function TabWalkthroughProvider({ children }: { children: React.ReactNode
   const setTargetRef = useCallback((id: TabWalkthroughStepId, node: View | null) => {
     targetsRef.current[id] = node;
   }, []);
+
+  const measureTargetFromNode = useCallback(
+    (id: TabWalkthroughStepId, node: View | null) => {
+      if (!activeRef.current || STEP_ORDER[stepIndexRef.current] !== id) return;
+      const root = overlayRootRef.current;
+      if (!node || !root) return;
+      requestAnimationFrame(() => {
+        node.measureLayout(
+          root as never,
+          (x, y, width, height) => {
+            if (width <= 0 || height <= 0) {
+              return;
+            }
+            setHole({ x, y, width, height });
+          },
+          () => {
+            // Keep previous position if one transient measure call fails.
+          }
+        );
+      });
+    },
+    []
+  );
 
   const updateHoleFromGeometry = useCallback((id: TabWalkthroughStepId, rect: HoleRect | null) => {
     if (!activeRef.current) return;
@@ -427,11 +357,20 @@ export function TabWalkthroughProvider({ children }: { children: React.ReactNode
     setActive(true);
   }, []);
 
+  const onRootLayout = useCallback((event: { nativeEvent: { layout: { width: number; height: number } } }) => {
+    const { width, height } = event.nativeEvent.layout;
+    if (width <= 0 || height <= 0) return;
+    setOverlaySize((prev) =>
+      prev.width === width && prev.height === height ? prev : { width, height }
+    );
+  }, []);
+
   const value = useMemo<TabWalkthroughContextValue>(
     () => ({
       active,
       visibleForTabBar: active,
       setTargetRef,
+      measureTargetFromNode,
       currentStepId,
       updateHoleFromGeometry,
       startFromProfile,
@@ -442,6 +381,7 @@ export function TabWalkthroughProvider({ children }: { children: React.ReactNode
     [
       active,
       setTargetRef,
+      measureTargetFromNode,
       currentStepId,
       updateHoleFromGeometry,
       startFromProfile,
@@ -453,17 +393,20 @@ export function TabWalkthroughProvider({ children }: { children: React.ReactNode
 
   return (
     <TabWalkthroughContext.Provider value={value}>
-      {children}
-      <TabWalkthroughOverlay
-        active={active}
-        stepIndex={stepIndex}
-        hole={hole}
-        setHole={setHole}
-        targetsRef={targetsRef}
-        onSkip={skip}
-        onNext={goNext}
-        onPrev={goPrev}
-      />
+      <View ref={overlayRootRef} style={styles.providerRoot} onLayout={onRootLayout} collapsable={false}>
+        {children}
+        <TabWalkthroughOverlay
+          active={active}
+          stepIndex={stepIndex}
+          hole={hole}
+          overlayRootRef={overlayRootRef}
+          overlaySize={overlaySize}
+          targetsRef={targetsRef}
+          onSkip={skip}
+          onNext={goNext}
+          updateHole={setHole}
+        />
+      </View>
     </TabWalkthroughContext.Provider>
   );
 }
@@ -485,12 +428,7 @@ export function TabWalkthroughMeasuringView({
     if (!ctx?.active || ctx.currentStepId !== id) return;
     const node = hostRef.current;
     if (!node) return;
-    requestAnimationFrame(() => {
-      node.measureInWindow((x, y, width, height) => {
-        if (width <= 0 || height <= 0) return;
-        ctx.updateHoleFromGeometry(id, { x, y, width, height });
-      });
-    });
+    ctx.measureTargetFromNode(id, node);
   }, [ctx, id]);
 
   const onLayout = useCallback(() => {
@@ -500,8 +438,6 @@ export function TabWalkthroughMeasuringView({
   useEffect(() => {
     if (!ctx?.active || ctx.currentStepId !== id) return;
     measureAndReport();
-    const t = setTimeout(measureAndReport, 80);
-    return () => clearTimeout(t);
   }, [ctx?.active, ctx?.currentStepId, id, measureAndReport]);
 
   if (!ctx) {
@@ -536,70 +472,122 @@ export function useTabWalkthrough(): TabWalkthroughContextValue {
 }
 
 const styles = StyleSheet.create({
-  dim: {
-    position: 'absolute',
+  providerRoot: {
+    flex: 1,
   },
-  modalRoot: {
+  overlayRoot: {
     position: 'absolute',
     left: 0,
     top: 0,
+    zIndex: 9999,
   },
   tooltipWrap: {
     position: 'absolute',
   },
   tooltipCard: {
     backgroundColor: colors.white,
-    borderRadius: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
+    borderRadius: 24,
+    paddingHorizontal: 22,
+    paddingTop: 24,
+    paddingBottom: 18,
     maxWidth: '100%',
+  },
+  tooltipCardCompact: {
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 14,
   },
   tooltipTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.neutral[900],
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  tooltipTitleCompact: {
+    fontSize: 16,
     marginBottom: 8,
   },
   tooltipBody: {
     fontSize: 15,
-    lineHeight: 22,
-    color: colors.neutral[800],
-    marginBottom: 4,
+    lineHeight: 24,
+    color: colors.neutral[700],
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  tooltipBodyCompact: {
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 14,
   },
   tooltipBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 8,
+    justifyContent: 'center',
+    minHeight: 50,
   },
-  tooltipBarRight: {
-    flexDirection: 'row',
+  actionColumn: {
+    flex: 1,
+    minHeight: 32,
+    justifyContent: 'center',
+  },
+  actionColumnLeft: {
+    alignItems: 'flex-start',
+  },
+  actionColumnCenter: {
     alignItems: 'center',
+  },
+  actionColumnRight: {
+    alignItems: 'flex-end',
+    paddingRight: 2,
   },
   skipTxt: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '500',
     color: colors.neutral[500],
   },
-  backTxt: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.neutral[600],
-    marginRight: 10,
+  skipTxtCompact: {
+    fontSize: 16,
   },
   primaryWrap: {
-    borderRadius: 100,
-    overflow: 'hidden',
-    minWidth: 96,
+    flexShrink: 0,
+    alignSelf: 'center',
+    width: 128,
+  },
+  primaryWrapCompact: {
+    width: 112,
   },
   primaryBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 18,
+    width: '100%',
+    minHeight: 44,
+    paddingHorizontal: 0,
+    borderRadius: 999,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryBtnCompact: {
+    minHeight: 40,
+    paddingHorizontal: 28,
   },
   primaryTxt: {
-    fontSize: 15,
+    fontSize: 16,
+    lineHeight: 18,
     fontWeight: '600',
     color: colors.white,
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+  primaryTxtCompact: {
+    fontSize: 15,
+  },
+  tooltipTail: {
+    position: 'absolute',
+    bottom: -10,
+    width: 24,
+    height: 24,
+    backgroundColor: colors.white,
+    borderRadius: 4,
+    transform: [{ rotate: '45deg' }],
   },
 });

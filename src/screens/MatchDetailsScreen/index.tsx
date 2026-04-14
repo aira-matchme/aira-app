@@ -615,12 +615,12 @@ export const MatchDetailsScreen: React.FC = () => {
     return ['Pets', 'Fashion', 'Travelling', 'Gym', 'Foodie', 'Gamer', 'Photography'];
   }, [profile?.hobbies]);
 
-  const personalityKey = getPersonalityKey(
-    details?.primaryPersonality?.matchFinder as PersonalityType | undefined,
-    details?.primaryPersonality?.matchUser as PersonalityType | undefined,
-  );
+  // const personalityKey = getPersonalityKey(
+  //   details?.primaryPersonality?.matchFinder as PersonalityType | undefined,
+  //   details?.primaryPersonality?.matchUser as PersonalityType | undefined,
+  // );
 
-  const personalityCopy = personalityKey ? PERSONALITY_CONFIG[personalityKey] : undefined;
+  const personalityCopy = details?.personalityTemplate ? details?.personalityTemplate?.template : undefined;
 
   if (loading) {
     return (

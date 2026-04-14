@@ -65,6 +65,7 @@ import { styles, H_PADDING, CHAT_INPUT_MIN_HEIGHT, CHAT_INPUT_MAX_HEIGHT } from 
 import { TabAICenterIcon } from '../../assets/icons/tabs/TabAICenterIcon';
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
+import { showErrorToast, showSuccessToast } from '../../services/toast.srvice';
 import {
   startRecording as startAudioRecording,
   stopRecording as stopAudioRecording,
@@ -2302,10 +2303,11 @@ const applyOverlap = (e: KeyboardEvent) => {
                     blockUserApi({ blockUserId: otherUserId, type: 'block' })
                       .then(() => {
                         setBlockConfirmVisible(false);
-                        navigation.goBack();
+                        showSuccessToast(STRINGS.CHAT.BLOCK_SUCCESS);
+                        setTimeout(() => navigation.goBack(), 400);
                       })
                       .catch(() => {
-                        // Block failed
+                        showErrorToast(STRINGS.CHAT.BLOCK_FAILED);
                       })
                       .finally(() => setBlockConfirmLoading(false));
                   }}
@@ -3330,13 +3332,14 @@ const applyOverlap = (e: KeyboardEvent) => {
               style={reportSheetStyles.submitButton}
               onPress={() => {
                 if (!selectedReportReason || !otherUserId) return;
+                const mode = reportSheetMode;
                 const reasonLabel = REPORT_REASONS.find((r) => r.value === selectedReportReason)?.label ?? selectedReportReason;
                 const reportMessage = reportMessageInput.trim()
                   ? `${reasonLabel}\n${reportMessageInput.trim()}`
                   : reasonLabel;
                 setReportSubmitting(true);
                 const submitPromise =
-                  reportSheetMode === 'blockReport'
+                  mode === 'blockReport'
                     ? apiClient.post(endpoints.chat.blockreportUser, {
                         targetUserId: otherUserId,
                         reportMessage,
@@ -3348,12 +3351,19 @@ const applyOverlap = (e: KeyboardEvent) => {
                     setReportSheetMode('report');
                     setReportMessageInput('');
                     setSelectedReportReason(null);
-                    if (reportSheetMode === 'blockReport') {
-                      navigation.goBack();
+                    if (mode === 'blockReport') {
+                      showSuccessToast(STRINGS.CHAT.BLOCK_REPORT_SUBMITTED);
+                      setTimeout(() => navigation.goBack(), 400);
+                    } else {
+                      showSuccessToast(STRINGS.CHAT.REPORT_SUBMITTED);
                     }
                   })
                   .catch(() => {
-                    // Report failed
+                    showErrorToast(
+                      mode === 'blockReport'
+                        ? STRINGS.CHAT.BLOCK_REPORT_FAILED
+                        : STRINGS.CHAT.REPORT_FAILED
+                    );
                   })
                   .finally(() => setReportSubmitting(false));
               }}

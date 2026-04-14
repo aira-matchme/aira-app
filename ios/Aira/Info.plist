@@ -25,9 +25,13 @@
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>google</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.948934490836-3k7rs2p8hp5r6ub41e8e5hbt2stciv1q</string>
+				<string>com.googleusercontent.apps.303092384223-kc77u6bvlvbiqcif7kub6itc2ac70kru</string>
 			</array>
 		</dict>
 	</array>
@@ -52,6 +56,15 @@
 	<string>AIRA uses your photos to let you upload images to your profile. These can be managed in Settings.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>ClashGrotesk-Bold.otf</string>
+		<string>ClashGrotesk-Regular.otf</string>
+		<string>ClashGrotesk-Semibold.otf</string>
+		<string>ClashGrotesk-Extralight.otf</string>
+		<string>ClashGrotesk-Light.otf</string>
+		<string>ClashGrotesk-Medium.otf</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
@@ -70,14 +83,5 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
-	<key>UIAppFonts</key>
-	<array>
-		<string>ClashGrotesk-Bold.otf</string>
-		<string>ClashGrotesk-Regular.otf</string>
-		<string>ClashGrotesk-Semibold.otf</string>
-		<string>ClashGrotesk-Extralight.otf</string>
-		<string>ClashGrotesk-Light.otf</string>
-		<string>ClashGrotesk-Medium.otf</string>
-	</array>
 </dict>
 </plist>

@@ -563,6 +563,15 @@ export const STRINGS = {
     ACCEPT: 'Accept',
     DECLINE: 'Decline',
     BLOCK_AND_REPORT: 'Block & Report',
+    BLOCK_SUCCESS:
+      'Blocked. They can no longer message you or see your profile.',
+    BLOCK_FAILED: 'Could not block this person. Try again.',
+    REPORT_SUBMITTED:
+      'Report sent. Our team will review it. You will not see case updates here for privacy reasons.',
+    REPORT_FAILED: 'Could not send your report. Try again.',
+    BLOCK_REPORT_SUBMITTED:
+      'They have been blocked and your report was sent. Our team will review it.',
+    BLOCK_REPORT_FAILED: 'Could not block and report. Try again.',
     LOADING_MESSAGES: 'Loading messages...',
     TYPING_INDICATOR: 'typing...',
     MICROPHONE_PERMISSION_TITLE: 'AIRA Would Like To Access The Microphone',
