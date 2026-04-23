@@ -35,6 +35,24 @@ import {
 } from '../../config/permissions';
 import { BackArrowIcon } from '../../assets/icons/common/BackArrowIcon';
 import { MoreVertIcon } from '../../assets/icons/common/MoreVertIcon';
+import { ChatHeaderVideoCallIcon } from '../../assets/icons/common/ChatHeaderVideoCallIcon';
+import { ChatHeaderVoiceCallIcon } from '../../assets/icons/common/ChatHeaderVoiceCallIcon';
+import { CallVideoIncomingIcon } from '../../assets/icons/common/CallVideoIncomingIcon';
+import { CallVideoOutgoingIcon } from '../../assets/icons/common/CallVideoOutgoingIcon';
+import { CallVideoMissedIcon } from '../../assets/icons/common/CallVideoMissedIcon';
+import { CallVoiceIncomingIcon } from '../../assets/icons/common/CallVoiceIncomingIcon';
+import { CallVoiceOutgoingIcon } from '../../assets/icons/common/CallVoiceOutgoingIcon';
+import { CallVoiceDeclinedIcon } from '../../assets/icons/common/CallVoiceDeclinedIcon';
+import { VoiceControlEndIcon } from '../../assets/icons/common/VoiceControlEndIcon';
+import { VoiceControlSpeakerIcon } from '../../assets/icons/common/VoiceControlSpeakerIcon';
+import { VoiceControlVideoOffIcon } from '../../assets/icons/common/VoiceControlVideoOffIcon';
+import { VoiceControlMicIcon } from '../../assets/icons/common/VoiceControlMicIcon';
+import { VoiceControlMicOffIcon } from '../../assets/icons/common/VoiceControlMicOffIcon';
+import { VoiceControlMessageIcon } from '../../assets/icons/common/VoiceControlMessageIcon';
+import { AudioBluetoothIcon } from '../../assets/icons/common/AudioBluetoothIcon';
+import { AudioEarpieceIcon } from '../../assets/icons/common/AudioEarpieceIcon';
+import { AudioOptionCheckIcon } from '../../assets/icons/common/AudioOptionCheckIcon';
+import { CameraIcon } from '../../assets/icons/common/CameraIcon';
 import { BlockIcon } from '../../assets/icons/common/BlockIcon';
 import { ReportIcon } from '../../assets/icons/common/ReportIcon';
 import { InterestChipCheckIcon } from '../../assets/icons/common/InterestChipCheckIcon';
@@ -60,7 +78,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { setChatRequestActionApi, blockUserApi, reportUserApi, getChatMessagesApi, mapApiMessageToChatMessage, markChatSeenApi, sendMessageApi, uploadChatFileApi, postAIMessagesApi, getAiSuggestionsApi, deleteMessageApi, extractChatMessageFromSendResponse, type ChatMessageApiItem } from '../../modules/chat/api';
 import { useAuthStore } from '../../store/auth.store';
-import socketService, { type MessageReceivePayload, type MessageDeletePayload, type TypingPayload } from '../../services/socket/socketService';   
+import socketService, {
+  type MessageReceivePayload,
+  type MessageDeletePayload,
+  type TypingPayload,
+  type IncomingCallPayload,
+  type CallLifecyclePayload,
+  type CallPartnerAudioPayload,
+  type CallPartnerVideoPayload,
+} from '../../services/socket/socketService';
 import { styles, H_PADDING, CHAT_INPUT_MIN_HEIGHT, CHAT_INPUT_MAX_HEIGHT } from './styles';
 import { TabAICenterIcon } from '../../assets/icons/tabs/TabAICenterIcon';
 import { apiClient } from '../../services/api/client';
@@ -88,6 +114,13 @@ const MORE_MENU_GAP = 8;
 const APPROX_MESSAGE_CONTEXT_HEIGHT = 132;
 const MESSAGE_CONTEXT_GAP = 8;
 const MESSAGE_CONTEXT_MIN_WIDTH = 172;
+type ActiveCallMode = 'voice' | 'video';
+type IncomingCallPrompt = {
+  callerName: string;
+  mode: ActiveCallMode;
+  callId?: string;
+};
+type AudioDevice = 'speaker' | 'earpiece' | 'bluetooth' | 'wired';
 
 const REPORT_REASONS: { value: string; label: string }[] = [
   { value: 'inappropriate_messages', label: 'Inappropriate messages' },
@@ -152,6 +185,35 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   } | null>(null);
   const messageBubbleRefsRef = useRef<Map<number, View>>(new Map());
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
+  const [activeCallMode, setActiveCallMode] = useState<ActiveCallMode>('voice');
+  const [callStateVisible, setCallStateVisible] = useState(false);
+  const [callAudioEnabled, setCallAudioEnabled] = useState(true);
+  const [callVideoEnabled, setCallVideoEnabled] = useState(true);
+  const [partnerAudioEnabled, setPartnerAudioEnabled] = useState(true);
+  const [partnerVideoEnabled, setPartnerVideoEnabled] = useState(true);
+  const [videoCallUiHidden, setVideoCallUiHidden] = useState(false);
+  const [incomingVoiceCallVisible, setIncomingVoiceCallVisible] = useState(false);
+  const [incomingVoiceCallerName, setIncomingVoiceCallerName] = useState('');
+  const [incomingVoiceCallId, setIncomingVoiceCallId] = useState<string | null>(null);
+  const [incomingVideoCallVisible, setIncomingVideoCallVisible] = useState(false);
+  const [incomingVideoCallerName, setIncomingVideoCallerName] = useState('');
+  const [incomingVideoCallId, setIncomingVideoCallId] = useState<string | null>(null);
+  const [activeCallId, setActiveCallId] = useState<string | null>(null);
+  const [isOutgoingVoiceRinging, setIsOutgoingVoiceRinging] = useState(false);
+  const [isSwitchingVoiceToVideo, setIsSwitchingVoiceToVideo] = useState(false);
+  const [callConnectedAtMs, setCallConnectedAtMs] = useState<number | null>(null);
+  const [callDurationSec, setCallDurationSec] = useState(0);
+  const [audioDeviceSheetVisible, setAudioDeviceSheetVisible] = useState(false);
+  const [selectedAudioDevice, setSelectedAudioDevice] = useState<AudioDevice>('speaker');
+  const [switchToVideoPopupVisible, setSwitchToVideoPopupVisible] = useState(false);
+  const videoLocalPreviewTop = Math.round((500 / 812) * windowHeight);
+  const videoLocalPreviewHiddenTop = Math.round((580 / 812) * windowHeight);
+  const videoControlsTop = Math.round((716 / 812) * windowHeight);
+  const incomingVoiceActionsBottomInset = Math.max(22, bottomSafeInset + 8);
+  const incomingVoiceCenterBottomInset = Math.max(
+    34,
+    Math.min(62, Math.round((46 * windowHeight) / 812)),
+  );
 
   const showSettingsAlert = (permissionName: 'camera' | 'photos' | 'microphone') => {
     const titleMap = {
@@ -391,6 +453,19 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       return null;
     },
     [otherUserId]
+  );
+
+  const parseIncomingCallPayload = useCallback(
+    (data: IncomingCallPayload): IncomingCallPrompt | null => {
+      if (otherUserId && data.senderId && data.senderId !== otherUserId) {
+        return null;
+      }
+      const mode: ActiveCallMode = data.callType === 'video' ? 'video' : 'voice';
+      const callerName =
+        String(data.callerName ?? name ?? '').trim() || 'Incoming call';
+      return { callerName, mode, callId: data.callId };
+    },
+    [name, otherUserId]
   );
 
 
@@ -679,14 +754,100 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           .catch(() => {});
       }
     });
+    const showIncomingCallPrompt = (payload: IncomingCallPayload) => {
+      const parsed = parseIncomingCallPayload(payload);
+      if (!parsed) return;
+      if (parsed.mode === 'video') {
+        setIncomingVideoCallerName(parsed.callerName);
+        setIncomingVideoCallId(parsed.callId ?? null);
+        setIncomingVideoCallVisible(true);
+        return;
+      }
+      setIncomingVoiceCallerName(parsed.callerName);
+      setIncomingVoiceCallId(parsed.callId ?? null);
+      setIncomingVoiceCallVisible(true);
+    };
+    const onCallAccepted = (payload: CallLifecyclePayload) => {
+      if (!payload.callId) return;
+      setActiveCallId(payload.callId);
+      if (isSwitchingVoiceToVideo) {
+        setActiveCallMode('video');
+        setCallVideoEnabled(true);
+        setVideoCallUiHidden(false);
+      }
+      setIsSwitchingVoiceToVideo(false);
+      setAudioDeviceSheetVisible(false);
+      setPartnerAudioEnabled(true);
+      setPartnerVideoEnabled(true);
+      setIsOutgoingVoiceRinging(false);
+      setCallConnectedAtMs(Date.now());
+      setCallStateVisible(true);
+      setIncomingVoiceCallVisible(false);
+      setIncomingVideoCallVisible(false);
+      setSwitchToVideoPopupVisible(false);
+    };
+    const onCallRejected = (payload: CallLifecyclePayload) => {
+      if (!payload.callId) return;
+      if (activeCallId && payload.callId !== activeCallId) return;
+      setIncomingVoiceCallVisible(false);
+      setIncomingVideoCallVisible(false);
+      setCallStateVisible(false);
+      setActiveCallId(null);
+      setPartnerAudioEnabled(true);
+      setPartnerVideoEnabled(true);
+      setIsOutgoingVoiceRinging(false);
+      setIsSwitchingVoiceToVideo(false);
+      setSwitchToVideoPopupVisible(false);
+      setCallConnectedAtMs(null);
+      setCallDurationSec(0);
+      showErrorToast('Call was declined.');
+    };
+    const onCallEnded = (payload: CallLifecyclePayload) => {
+      if (!payload.callId) return;
+      if (activeCallId && payload.callId !== activeCallId) return;
+      setIncomingVoiceCallVisible(false);
+      setIncomingVideoCallVisible(false);
+      setCallStateVisible(false);
+      setActiveCallId(null);
+      setPartnerAudioEnabled(true);
+      setPartnerVideoEnabled(true);
+      setIsOutgoingVoiceRinging(false);
+      setIsSwitchingVoiceToVideo(false);
+      setSwitchToVideoPopupVisible(false);
+      setCallConnectedAtMs(null);
+      setCallDurationSec(0);
+      showSuccessToast('Call ended.');
+    };
+    const onCallPartnerAudio = (payload: CallPartnerAudioPayload) => {
+      if (!payload.userId || payload.userId !== otherUserId) return;
+      if (activeCallId && payload.callId && payload.callId !== activeCallId) return;
+      setPartnerAudioEnabled(payload.enabled);
+    };
+    const onCallPartnerVideo = (payload: CallPartnerVideoPayload) => {
+      if (!payload.userId || payload.userId !== otherUserId) return;
+      if (activeCallId && payload.callId && payload.callId !== activeCallId) return;
+      setPartnerVideoEnabled(payload.enabled);
+    };
+    const unsubIncomingCall = socketService.on<IncomingCallPayload>('incoming_call', showIncomingCallPrompt);
+    const unsubCallAccepted = socketService.on<CallLifecyclePayload>('call_accepted', onCallAccepted);
+    const unsubCallRejected = socketService.on<CallLifecyclePayload>('call_rejected', onCallRejected);
+    const unsubCallEnded = socketService.on<CallLifecyclePayload>('call_ended', onCallEnded);
+    const unsubCallPartnerAudio = socketService.on<CallPartnerAudioPayload>('call_partner_audio', onCallPartnerAudio);
+    const unsubCallPartnerVideo = socketService.on<CallPartnerVideoPayload>('call_partner_video', onCallPartnerVideo);
     return () => {
       unsubMessage();
       unsubDelete();
       unsubTyping();
       unsubJoinSuccess();
       unsubConnection();
+      unsubIncomingCall();
+      unsubCallAccepted();
+      unsubCallRejected();
+      unsubCallEnded();
+      unsubCallPartnerAudio();
+      unsubCallPartnerVideo();
     };
-  }, [chatId, currentUserId, otherUserId, isOtherUserOnlineFromPayload]);
+  }, [activeCallId, chatId, currentUserId, isOtherUserOnlineFromPayload, isSwitchingVoiceToVideo, otherUserId, parseIncomingCallPayload]);
 
   useEffect(() => {
     return () => {
@@ -1350,7 +1511,156 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   );
 
   const renderMessage = (msg: ChatMessage, index: number) => {
+    const parseCallStateText = (text: string): {
+      title: string;
+      subtitle: string;
+      variant: 'sent' | 'received' | 'missed';
+      bubbleWidth: number;
+      icon:
+        | 'videoOutgoing'
+        | 'videoIncoming'
+        | 'videoMissed'
+        | 'voiceOutgoing'
+        | 'voiceIncoming'
+        | 'voiceMissed';
+    } | null => {
+      const raw = text.trim();
+      if (!raw) return null;
+      const lower = raw.toLowerCase();
+      const durationMatch = raw.match(/\b\d+\s*(secs?|mins?|minutes?)\b/i);
+      const agoMatch = raw.match(/\b\d+\s*(mins?|minutes?)\s*ago\b/i);
+
+      if (lower.includes('missed video call')) {
+        return {
+          title: 'Missed Video Call',
+          subtitle: 'Tap to call back',
+          variant: 'missed',
+          bubbleWidth: 190,
+          icon: 'videoMissed',
+        };
+      }
+      if (lower.includes('missed voice call')) {
+        return {
+          title: 'Missed Voice Call',
+          subtitle: 'Tap to call back',
+          variant: 'missed',
+          bubbleWidth: 188,
+          icon: 'voiceMissed',
+        };
+      }
+      if (lower.includes('incoming voice call')) {
+        return {
+          title: 'Incoming Voice Call',
+          subtitle: 'Tap to receive',
+          variant: 'received',
+          bubbleWidth: 172,
+          icon: 'voiceIncoming',
+        };
+      }
+      if (lower.includes('incoming video call')) {
+        return {
+          title: 'Incoming Video Call',
+          subtitle: 'Tap to receive',
+          variant: 'received',
+          bubbleWidth: 170,
+          icon: 'videoIncoming',
+        };
+      }
+      if (lower.includes('voice call') && lower.includes('ring')) {
+        return {
+          title: 'Voice Call',
+          subtitle: 'Ringing..',
+          variant: 'sent',
+          bubbleWidth: 146,
+          icon: 'voiceOutgoing',
+        };
+      }
+      if (lower.includes('video call')) {
+        return {
+          title: 'Video Call',
+          subtitle: durationMatch?.[0] ?? agoMatch?.[0] ?? (msg.sent ? '6 Secs' : '1 Min ago'),
+          variant: msg.sent ? 'sent' : 'received',
+          bubbleWidth: 144,
+          icon: msg.sent ? 'videoOutgoing' : 'videoIncoming',
+        };
+      }
+      if (lower.includes('voice call')) {
+        return {
+          title: 'Voice Call',
+          subtitle: durationMatch?.[0] ?? agoMatch?.[0] ?? '6 Secs',
+          variant: msg.sent ? 'sent' : 'received',
+          bubbleWidth: 146,
+          icon: msg.sent ? 'voiceOutgoing' : 'voiceIncoming',
+        };
+      }
+      return null;
+    };
+
+    const renderCallStateIcon = (
+      icon: 'videoOutgoing' | 'videoIncoming' | 'videoMissed' | 'voiceOutgoing' | 'voiceIncoming' | 'voiceMissed',
+    ) => {
+      if (icon === 'videoOutgoing') return <CallVideoOutgoingIcon size={20} color={colors.primary.purple} />;
+      if (icon === 'videoIncoming') return <CallVideoIncomingIcon size={20} color={colors.primary.purple} />;
+      if (icon === 'videoMissed') return <CallVideoMissedIcon size={20} color={colors.semantic.error} />;
+      if (icon === 'voiceOutgoing') return <CallVoiceOutgoingIcon size={20} color={colors.primary.purple} />;
+      if (icon === 'voiceIncoming') return <CallVoiceIncomingIcon size={20} color={colors.primary.purple} />;
+      return <CallVoiceDeclinedIcon size={20} color={colors.semantic.error} />;
+    };
+
     if (msg.type === 'text') {
+      const callState = parseCallStateText(msg.text);
+      if (callState) {
+        return (
+          <React.Fragment key={index}>
+            <View style={[styles.messageRow, msg.sent ? undefined : styles.messageRowReceived]}>
+              <View ref={(r) => setMessageBubbleRef(index, r)} collapsable={false}>
+                <TouchableOpacity
+                  style={[
+                    styles.chatCallBubble,
+                    { width: callState.bubbleWidth },
+                    callState.variant === 'sent'
+                      ? styles.chatCallBubbleSent
+                      : callState.variant === 'missed'
+                      ? styles.chatCallBubbleMissed
+                      : styles.chatCallBubbleReceived,
+                  ]}
+                  activeOpacity={0.9}
+                  onLongPress={() => handleMessageLongPress(index)}
+                >
+                  <View style={styles.chatCallBubbleIconWrap}>{renderCallStateIcon(callState.icon)}</View>
+                  <View style={styles.chatCallBubbleTextWrap}>
+                    <Text
+                      style={[
+                        styles.chatCallBubbleTitle,
+                        callState.variant === 'sent'
+                          ? styles.chatCallBubbleTitleSent
+                          : callState.variant === 'missed'
+                          ? styles.chatCallBubbleTitleMissed
+                          : styles.chatCallBubbleTitleReceived,
+                      ]}
+                    >
+                      {callState.title}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.chatCallBubbleSubtitle,
+                        callState.variant === 'sent'
+                          ? styles.chatCallBubbleSubtitleSent
+                          : styles.chatCallBubbleSubtitleReceived,
+                      ]}
+                    >
+                      {callState.subtitle}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View style={[styles.timeRow, msg.sent ? undefined : styles.timeRowReceived]}>
+              <Text style={styles.timeText}>{msg.timestamp}</Text>
+            </View>
+          </React.Fragment>
+        );
+      }
       return (
         <React.Fragment key={index}>
           <View style={[styles.messageRow, msg.sent ? undefined : styles.messageRowReceived]}>
@@ -1659,6 +1969,280 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     [],
   );
 
+  const handleHeaderVideoCallPress = useCallback(() => {
+    if (chatId && otherUserId) {
+      socketService.callRequest(otherUserId, chatId, 'video');
+    }
+    setActiveCallId(null);
+    setActiveCallMode('video');
+    setCallAudioEnabled(true);
+    setCallVideoEnabled(true);
+    setPartnerAudioEnabled(true);
+    setPartnerVideoEnabled(true);
+    setIsOutgoingVoiceRinging(false);
+    setIsSwitchingVoiceToVideo(false);
+      setAudioDeviceSheetVisible(false);
+    setCallConnectedAtMs(null);
+    setCallDurationSec(0);
+    setVideoCallUiHidden(false);
+    setCallStateVisible(true);
+  }, [chatId, otherUserId]);
+
+  const handleHeaderVoiceCallPress = useCallback(() => {
+    if (chatId && otherUserId) {
+      socketService.callRequest(otherUserId, chatId, 'audio');
+    }
+    setActiveCallId(null);
+    setActiveCallMode('voice');
+    setCallAudioEnabled(true);
+    setCallVideoEnabled(false);
+    setPartnerAudioEnabled(true);
+    setPartnerVideoEnabled(true);
+    setIsOutgoingVoiceRinging(true);
+    setIsSwitchingVoiceToVideo(false);
+      setAudioDeviceSheetVisible(false);
+    setCallConnectedAtMs(null);
+    setCallDurationSec(0);
+    setCallStateVisible(true);
+  }, [chatId, otherUserId]);
+
+  const toggleCallAudio = useCallback(() => {
+    setCallAudioEnabled((prev) => !prev);
+  }, []);
+
+  const toggleCallVideo = useCallback(() => {
+    setCallVideoEnabled((prev) => !prev);
+  }, []);
+
+  const closeCallState = useCallback(() => {
+    if (activeCallId) {
+      socketService.callEnd(activeCallId);
+      setActiveCallId(null);
+    }
+    setCallStateVisible(false);
+    setVideoCallUiHidden(false);
+    setPartnerAudioEnabled(true);
+    setPartnerVideoEnabled(true);
+    setIsOutgoingVoiceRinging(false);
+    setIsSwitchingVoiceToVideo(false);
+    setAudioDeviceSheetVisible(false);
+    setSwitchToVideoPopupVisible(false);
+    setCallConnectedAtMs(null);
+    setCallDurationSec(0);
+  }, [activeCallId]);
+
+  const acceptIncomingVoiceCall = useCallback(() => {
+    if (incomingVoiceCallId) {
+      socketService.callAccept(incomingVoiceCallId);
+      setActiveCallId(incomingVoiceCallId);
+    }
+    setIncomingVoiceCallVisible(false);
+    setActiveCallMode('voice');
+    setCallAudioEnabled(true);
+    setCallVideoEnabled(false);
+    setPartnerAudioEnabled(true);
+    setPartnerVideoEnabled(true);
+    setIsOutgoingVoiceRinging(false);
+    setIsSwitchingVoiceToVideo(false);
+    setSwitchToVideoPopupVisible(false);
+    setCallConnectedAtMs(Date.now());
+    setCallDurationSec(0);
+    setCallStateVisible(true);
+  }, [incomingVoiceCallId]);
+
+  const declineIncomingVoiceCall = useCallback(() => {
+    if (incomingVoiceCallId) {
+      socketService.callReject(incomingVoiceCallId);
+    }
+    setIncomingVoiceCallVisible(false);
+    setIncomingVoiceCallId(null);
+  }, [incomingVoiceCallId]);
+
+  const acceptIncomingVideoCall = useCallback(() => {
+    if (incomingVideoCallId) {
+      socketService.callAccept(incomingVideoCallId);
+      setActiveCallId(incomingVideoCallId);
+    }
+    setIncomingVideoCallVisible(false);
+    setActiveCallMode('video');
+    setCallAudioEnabled(true);
+    setCallVideoEnabled(true);
+    setPartnerAudioEnabled(true);
+    setPartnerVideoEnabled(true);
+    setIsOutgoingVoiceRinging(false);
+    setIsSwitchingVoiceToVideo(false);
+    setCallConnectedAtMs(Date.now());
+    setCallDurationSec(0);
+    setVideoCallUiHidden(false);
+    setCallStateVisible(true);
+  }, [incomingVideoCallId]);
+
+  const declineIncomingVideoCall = useCallback(() => {
+    if (incomingVideoCallId) {
+      socketService.callReject(incomingVideoCallId);
+    }
+    setIncomingVideoCallVisible(false);
+    setIncomingVideoCallId(null);
+  }, [incomingVideoCallId]);
+
+  const toggleVideoCallUiHidden = useCallback(() => {
+    setVideoCallUiHidden((prev) => !prev);
+  }, []);
+
+  const openAudioDeviceSheet = useCallback(() => {
+    setAudioDeviceSheetVisible((prev) => !prev);
+  }, []);
+
+  const selectAudioDevice = useCallback((device: AudioDevice) => {
+    setSelectedAudioDevice(device);
+    setAudioDeviceSheetVisible(false);
+  }, []);
+
+  const requestSwitchVoiceToVideo = useCallback(() => {
+    if (!chatId || !otherUserId) return;
+    setSwitchToVideoPopupVisible(false);
+    socketService.callRequest(otherUserId, chatId, 'video');
+    setIsSwitchingVoiceToVideo(true);
+  }, [chatId, otherUserId]);
+
+  const openSwitchToVideoPopup = useCallback(() => {
+    if (isOutgoingVoiceRinging || isSwitchingVoiceToVideo) return;
+    setAudioDeviceSheetVisible(false);
+    setSwitchToVideoPopupVisible(true);
+  }, [isOutgoingVoiceRinging, isSwitchingVoiceToVideo]);
+
+  useEffect(() => {
+    if (!callStateVisible || !callConnectedAtMs || isOutgoingVoiceRinging) {
+      return;
+    }
+    const tick = () => {
+      setCallDurationSec(Math.max(0, Math.floor((Date.now() - callConnectedAtMs) / 1000)));
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [callStateVisible, callConnectedAtMs, isOutgoingVoiceRinging]);
+
+  const callDurationLabel = `${String(Math.floor(callDurationSec / 60)).padStart(2, '0')}:${String(
+    callDurationSec % 60
+  ).padStart(2, '0')}`;
+  const pickedVoiceDurationLabel = `${Math.floor(callDurationSec / 60)}:${String(callDurationSec % 60).padStart(
+    2,
+    '0',
+  )}`;
+  const audioDeviceLabel =
+    selectedAudioDevice === 'speaker'
+      ? 'Speaker'
+      : selectedAudioDevice === 'earpiece'
+      ? 'Earpiece'
+      : selectedAudioDevice === 'bluetooth'
+      ? 'Bluetooth'
+      : 'Wired';
+  const audioRouteStatusText =
+    selectedAudioDevice === 'speaker'
+      ? 'Audio on speaker'
+      : selectedAudioDevice === 'earpiece'
+      ? 'Audio on earpiece'
+      : selectedAudioDevice === 'bluetooth'
+      ? 'Audio on bluetooth'
+      : 'Audio on wired headset';
+  const isPartnerFullyOff = !partnerAudioEnabled && !partnerVideoEnabled;
+  const showVideoPreviewOffSurface = !callVideoEnabled || !partnerVideoEnabled;
+  const renderAudioDevicePopoverOptions = () => (
+    <View style={styles.callStateAudioDevicePopoverList}>
+      <TouchableOpacity
+        style={[
+          styles.callStateAudioDeviceOption,
+          selectedAudioDevice === 'bluetooth' && styles.callStateAudioDeviceOptionActive,
+        ]}
+        activeOpacity={0.8}
+        onPress={() => selectAudioDevice('bluetooth')}
+      >
+        <View style={styles.callStateAudioDeviceOptionLeft}>
+          <AudioBluetoothIcon
+            size={20}
+            color={
+              selectedAudioDevice === 'bluetooth'
+                ? colors.primary.purple
+                : colors.neutral[600]
+            }
+          />
+          <Text
+            style={[
+              styles.callStateAudioDeviceOptionText,
+              selectedAudioDevice === 'bluetooth' && styles.callStateAudioDeviceOptionTextActive,
+            ]}
+          >
+            Bluetooth
+          </Text>
+        </View>
+        {selectedAudioDevice === 'bluetooth' ? (
+          <AudioOptionCheckIcon size={16} color={colors.primary.purple} />
+        ) : null}
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.callStateAudioDeviceOption,
+          selectedAudioDevice === 'speaker' && styles.callStateAudioDeviceOptionActive,
+        ]}
+        activeOpacity={0.8}
+        onPress={() => selectAudioDevice('speaker')}
+      >
+        <View style={styles.callStateAudioDeviceOptionLeft}>
+          <VoiceControlSpeakerIcon
+            size={20}
+            color={
+              selectedAudioDevice === 'speaker'
+                ? colors.primary.purple
+                : colors.neutral[600]
+            }
+          />
+          <Text
+            style={[
+              styles.callStateAudioDeviceOptionText,
+              selectedAudioDevice === 'speaker' && styles.callStateAudioDeviceOptionTextActive,
+            ]}
+          >
+            Speaker
+          </Text>
+        </View>
+        {selectedAudioDevice === 'speaker' ? (
+          <AudioOptionCheckIcon size={16} color={colors.primary.purple} />
+        ) : null}
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.callStateAudioDeviceOption,
+          selectedAudioDevice === 'earpiece' && styles.callStateAudioDeviceOptionActive,
+        ]}
+        activeOpacity={0.8}
+        onPress={() => selectAudioDevice('earpiece')}
+      >
+        <View style={styles.callStateAudioDeviceOptionLeft}>
+          <AudioEarpieceIcon
+            size={20}
+            color={
+              selectedAudioDevice === 'earpiece'
+                ? colors.primary.purple
+                : colors.neutral[600]
+            }
+          />
+          <Text
+            style={[
+              styles.callStateAudioDeviceOptionText,
+              selectedAudioDevice === 'earpiece' && styles.callStateAudioDeviceOptionTextActive,
+            ]}
+          >
+            Earpiece
+          </Text>
+        </View>
+        {selectedAudioDevice === 'earpiece' ? (
+          <AudioOptionCheckIcon size={16} color={colors.primary.purple} />
+        ) : null}
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <View style={styles.screen}>
@@ -1702,12 +2286,608 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             <AskAiraSendIcon width={52} height={52} />
           </TouchableOpacity>
         )}
+        <TouchableOpacity
+          style={styles.headerCallButton}
+          onPress={handleHeaderVideoCallPress}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Video call"
+        >
+          <ChatHeaderVideoCallIcon size={24} color={colors.black} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.headerCallButton}
+          onPress={handleHeaderVoiceCallPress}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Voice call"
+        >
+          <ChatHeaderVoiceCallIcon size={24} color={colors.black} />
+        </TouchableOpacity>
         <View ref={moreMenuButtonRef} collapsable={false}>
           <TouchableOpacity style={styles.moreButton} onPress={openMoreMenu} accessibilityLabel="Chat options">
             <MoreVertIcon size={24} color={colors.black} />
           </TouchableOpacity>
         </View>
       </View>
+      <Modal
+        visible={incomingVoiceCallVisible}
+        animationType="fade"
+        transparent={false}
+        onRequestClose={declineIncomingVoiceCall}
+      >
+        <SafeAreaView style={styles.incomingVoiceBackdrop} edges={['top', 'left', 'right', 'bottom']}>
+          <StatusBar barStyle="light-content" backgroundColor="transparent" />
+          <View
+            style={[
+              styles.incomingVoiceCenterWrap,
+              { paddingBottom: incomingVoiceCenterBottomInset },
+            ]}
+          >
+            {avatar != null ? (
+              <Image source={avatar} style={styles.incomingVoiceAvatar} resizeMode="cover" />
+            ) : (
+              <View style={styles.incomingVoiceAvatar} />
+            )}
+            <Text style={styles.incomingVoiceTitle}>Incoming voice call...</Text>
+          </View>
+
+          <View
+            style={[
+              styles.incomingVoiceActionsRow,
+              { marginBottom: incomingVoiceActionsBottomInset },
+            ]}
+          >
+            <View style={styles.incomingVoiceActionGroupSmall}>
+              <TouchableOpacity
+                style={[styles.incomingVoiceActionCircle, styles.incomingVoiceDeclineBtn]}
+                activeOpacity={0.8}
+                onPress={declineIncomingVoiceCall}
+                accessibilityRole="button"
+                accessibilityLabel="Decline incoming call"
+              >
+                <VoiceControlEndIcon size={24} color={colors.white} />
+              </TouchableOpacity>
+              <Text style={styles.incomingVoiceActionLabel}>Decline</Text>
+            </View>
+
+            <View style={styles.incomingVoiceActionGroupCenter}>
+              <View style={styles.incomingVoiceSwipeIndicator}>
+                {[0, 1, 2, 3, 4].map(index => (
+                  <Text
+                    key={`incoming-voice-chevron-${index}`}
+                    style={[
+                      styles.incomingVoiceSwipeChevron,
+                      { opacity: 0.28 + index * 0.14 },
+                    ]}
+                  >
+                    ˄
+                  </Text>
+                ))}
+              </View>
+              <TouchableOpacity
+                style={[styles.incomingVoiceActionCircle, styles.incomingVoiceAcceptBtn]}
+                activeOpacity={0.8}
+                onPress={acceptIncomingVoiceCall}
+                accessibilityRole="button"
+                accessibilityLabel="Accept incoming call"
+              >
+                <VoiceControlMicIcon size={24} color={colors.white} />
+              </TouchableOpacity>
+              <Text style={styles.incomingVoiceActionLabel}>Swipe up to accept</Text>
+            </View>
+
+            <View style={styles.incomingVoiceActionGroupSmall}>
+              <TouchableOpacity
+                style={[styles.incomingVoiceActionCircle, styles.incomingVoiceMessageBtn]}
+                activeOpacity={0.8}
+                onPress={() => setIncomingVoiceCallVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Message caller"
+              >
+                <VoiceControlMessageIcon size={24} color={colors.white} />
+              </TouchableOpacity>
+              <Text style={styles.incomingVoiceActionLabel}>Message</Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal
+        visible={incomingVideoCallVisible}
+        animationType="fade"
+        transparent={false}
+        onRequestClose={declineIncomingVideoCall}
+      >
+        <SafeAreaView style={styles.incomingVideoFullBackdrop} edges={['top', 'left', 'right', 'bottom']}>
+          <StatusBar barStyle="light-content" backgroundColor="transparent" />
+          {avatar != null ? (
+            <Image source={avatar} style={styles.incomingVideoFullBgImage} resizeMode="cover" />
+          ) : (
+            <View style={styles.incomingVideoFullBgFallback} />
+          )}
+          <View style={styles.incomingVideoFullOverlay} />
+
+          <View style={styles.incomingVideoFullTopCenter}>
+            {avatar != null ? (
+              <Image source={avatar} style={styles.incomingVideoFullAvatar} resizeMode="cover" />
+            ) : (
+              <View style={styles.incomingVideoFullAvatar} />
+            )}
+            <Text style={styles.incomingVideoFullName} numberOfLines={1}>
+              {incomingVideoCallerName || name}
+            </Text>
+            <View style={styles.incomingVideoFullVideoTogglePill}>
+              <CallVideoMissedIcon size={16} color={colors.white} />
+              <Text style={styles.incomingVideoFullVideoToggleText}>Turn off your video</Text>
+            </View>
+          </View>
+
+          <View
+            style={[
+              styles.incomingVideoFullActionsRow,
+              { marginBottom: incomingVoiceActionsBottomInset },
+            ]}
+          >
+            <View style={styles.incomingVideoFullActionGroupSmall}>
+              <TouchableOpacity
+                style={[styles.incomingVideoFullActionCircle, styles.incomingVideoFullDeclineBtn]}
+                activeOpacity={0.8}
+                onPress={declineIncomingVideoCall}
+                accessibilityRole="button"
+                accessibilityLabel="Decline incoming video call"
+              >
+                <VoiceControlEndIcon size={24} color={colors.white} />
+              </TouchableOpacity>
+              <Text style={styles.incomingVideoFullActionLabel}>Decline</Text>
+            </View>
+
+            <View style={styles.incomingVideoFullActionGroupCenter}>
+              <View style={styles.incomingVideoFullSwipeIndicator}>
+                {[0, 1, 2, 3, 4].map(index => (
+                  <Text
+                    key={`incoming-video-chevron-${index}`}
+                    style={[
+                      styles.incomingVideoFullSwipeChevron,
+                      { opacity: 0.28 + index * 0.14 },
+                    ]}
+                  >
+                    ˄
+                  </Text>
+                ))}
+              </View>
+              <TouchableOpacity
+                style={[styles.incomingVideoFullActionCircle, styles.incomingVideoFullAcceptBtn]}
+                activeOpacity={0.8}
+                onPress={acceptIncomingVideoCall}
+                accessibilityRole="button"
+                accessibilityLabel="Accept incoming video call"
+              >
+                <CallVideoIncomingIcon size={24} color={colors.white} />
+              </TouchableOpacity>
+              <Text style={styles.incomingVideoFullActionLabel}>Swipe up to accept</Text>
+            </View>
+
+            <View style={styles.incomingVideoFullActionGroupSmall}>
+              <TouchableOpacity
+                style={[styles.incomingVideoFullActionCircle, styles.incomingVideoFullMessageBtn]}
+                activeOpacity={0.8}
+                onPress={() => setIncomingVideoCallVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Message caller"
+              >
+                <VoiceControlMessageIcon size={24} color={colors.white} />
+              </TouchableOpacity>
+              <Text style={styles.incomingVideoFullActionLabel}>Message</Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal
+        visible={callStateVisible}
+        animationType="slide"
+        onRequestClose={closeCallState}
+      >
+        {activeCallMode === 'video' ? (
+          <SafeAreaView style={styles.videoCallBackdrop} edges={['top', 'left', 'right', 'bottom']}>
+            <StatusBar barStyle="light-content" backgroundColor="transparent" />
+            {!isPartnerFullyOff && avatar != null ? (
+              <Image source={avatar} style={styles.videoCallBgImage} resizeMode="cover" />
+            ) : (
+              <View style={styles.videoCallBgFallback} />
+            )}
+            {!videoCallUiHidden ? <View style={styles.videoCallTopGradient} /> : null}
+            {!videoCallUiHidden ? (
+              <View style={styles.videoCallTopBar}>
+                <TouchableOpacity
+                  style={styles.videoCallTopBackButton}
+                  onPress={closeCallState}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="End call and go back"
+                >
+                  <BackArrowIcon size={48} backgroundColor="rgba(0,0,0,0.3)" strokeColor={colors.white} />
+                </TouchableOpacity>
+                <View style={styles.videoCallTopNameWrap}>
+                  <Text style={styles.videoCallTopName} numberOfLines={1}>
+                    {name}
+                  </Text>
+                  {!callAudioEnabled || !partnerAudioEnabled ? (
+                    <View style={styles.videoCallTopMicOffPill}>
+                      <VoiceControlMicOffIcon
+                        size={12}
+                        color={!callAudioEnabled ? colors.semantic.error : colors.white}
+                      />
+                    </View>
+                  ) : null}
+                </View>
+                <View style={styles.videoCallTopTimerPill}>
+                  <View style={styles.videoCallTopTimerDot} />
+                  <Text style={styles.videoCallTopTimerText}>{callDurationLabel}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            <View style={styles.videoCallMainSurface}>
+              {!videoCallUiHidden ? (
+                isPartnerFullyOff ? (
+                  <View style={styles.videoCallPartnerFullyOffStateCompact}>
+                    {avatar != null ? (
+                      <Image
+                        source={avatar}
+                        style={styles.videoCallPartnerFullyOffAvatarCompact}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.videoCallPartnerFullyOffAvatarCompact} />
+                    )}
+                  </View>
+                ) : callVideoEnabled ? (
+                  <View />
+                ) : (
+                  <View style={styles.videoCallVideoOffState}>
+                    <View style={styles.videoCallVideoOffAvatarWrap}>
+                      {avatar != null ? (
+                        <Image source={avatar} style={styles.videoCallVideoOffAvatar} resizeMode="cover" />
+                      ) : (
+                        <View style={styles.videoCallVideoOffAvatar} />
+                      )}
+                    </View>
+                    <Text style={styles.videoCallVideoOffName} numberOfLines={1}>
+                      {name}
+                    </Text>
+                    <Text style={styles.videoCallVideoOffTitle}>Video is off</Text>
+                    <Text style={styles.videoCallVideoOffSubtitle} numberOfLines={2}>
+                      Turn on your camera to continue video call.
+                    </Text>
+                  </View>
+                )
+              ) : null}
+
+              {!videoCallUiHidden || videoCallUiHidden ? (
+                <View
+                  style={[
+                    styles.videoCallLocalPreview,
+                    { top: videoCallUiHidden ? videoLocalPreviewHiddenTop : videoLocalPreviewTop },
+                  ]}
+                >
+                  {!showVideoPreviewOffSurface ? (
+                    avatar != null ? (
+                      <Image source={avatar} style={styles.videoCallLocalPreviewAvatar} resizeMode="cover" />
+                    ) : (
+                      <View style={styles.videoCallLocalPreviewAvatar} />
+                    )
+                  ) : (
+                    <View style={styles.videoCallLocalPreviewOffSurface}>
+                      {avatar != null ? (
+                        <Image
+                          source={avatar}
+                          style={styles.videoCallLocalPreviewOffAvatar}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={styles.videoCallLocalPreviewOffAvatar} />
+                      )}
+                    </View>
+                  )}
+                  {!callAudioEnabled || !partnerAudioEnabled || videoCallUiHidden ? (
+                    <View style={styles.videoCallLocalPreviewMicOffIcon}>
+                      <VoiceControlMicOffIcon size={20} color={colors.white} />
+                    </View>
+                  ) : null}
+                  {!videoCallUiHidden ? (
+                    <View style={styles.videoCallLocalPreviewSwitchIcon}>
+                      <CameraIcon size={20} color={colors.white} />
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+
+            {!videoCallUiHidden ? (
+              <View style={[styles.videoCallBottomControlsWrap, { top: videoControlsTop }]}>
+                <View style={styles.videoCallBottomControlsCapsule}>
+                  <TouchableOpacity
+                    style={[styles.videoCallBottomAction, styles.videoCallBottomActionEnd]}
+                    onPress={closeCallState}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel="End video call"
+                  >
+                    <VoiceControlEndIcon size={24} color={colors.white} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.videoCallBottomAction,
+                      audioDeviceSheetVisible && styles.videoCallBottomActionSelected,
+                    ]}
+                    onPress={openAudioDeviceSheet}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Choose audio device"
+                  >
+                    <VoiceControlSpeakerIcon
+                      size={24}
+                      color={audioDeviceSheetVisible ? colors.black : colors.white}
+                    />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.videoCallBottomAction,
+                      !callVideoEnabled && styles.videoCallBottomActionSelected,
+                    ]}
+                    onPress={toggleCallVideo}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel={callVideoEnabled ? 'Turn camera off' : 'Turn camera on'}
+                  >
+                    {callVideoEnabled ? (
+                      <CallVideoOutgoingIcon size={24} color={colors.white} />
+                    ) : (
+                      <CallVideoMissedIcon size={24} color={colors.semantic.error} />
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.videoCallBottomAction,
+                      !callAudioEnabled && styles.videoCallBottomActionSelected,
+                    ]}
+                    onPress={toggleCallAudio}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel={callAudioEnabled ? 'Mute microphone' : 'Unmute microphone'}
+                    accessibilityState={{ selected: !callAudioEnabled }}
+                  >
+                    {callAudioEnabled ? (
+                      <VoiceControlMicIcon size={24} color={colors.white} />
+                    ) : (
+                      <VoiceControlMicOffIcon size={24} color={colors.semantic.error} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : null}
+            {!videoCallUiHidden && audioDeviceSheetVisible ? (
+              <View style={styles.videoCallAudioDevicePopoverWrap}>
+                {renderAudioDevicePopoverOptions()}
+              </View>
+            ) : null}
+
+            {videoCallUiHidden ? (
+              <TouchableWithoutFeedback onPress={toggleVideoCallUiHidden}>
+                <View style={styles.videoCallHiddenUiTapArea} />
+              </TouchableWithoutFeedback>
+            ) : null}
+          </SafeAreaView>
+        ) : (
+          <SafeAreaView style={styles.callStateBackdrop} edges={['top', 'left', 'right', 'bottom']}>
+            <StatusBar barStyle="light-content" backgroundColor="transparent" />
+            <View style={[styles.callStateContent, styles.callStateContentRinging]}>
+              <View style={styles.callStateRingingHeader}>
+                <TouchableOpacity
+                  style={styles.callStateRingingBackButton}
+                  onPress={closeCallState}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel call and go back"
+                >
+                  <BackArrowIcon
+                    size={48}
+                    backgroundColor="rgba(0,0,0,0.3)"
+                    strokeColor={colors.white}
+                  />
+                </TouchableOpacity>
+                <Text style={styles.callStateRingingHeaderName} numberOfLines={1}>
+                  {name}
+                </Text>
+                <View style={styles.callStateRingingHeaderSpacer} />
+              </View>
+
+              <View style={styles.callStatePickedCenterWrap}>
+                <View style={styles.callStatePickedAvatarWrap}>
+                  {!isOutgoingVoiceRinging ? (
+                    <>
+                      <View style={styles.callStatePickedOuterRing} />
+                      <View style={styles.callStatePickedInnerRing} />
+                    </>
+                  ) : null}
+                  {avatar != null ? (
+                    <Image
+                      source={avatar}
+                      style={[
+                        styles.callStateAvatar,
+                        isOutgoingVoiceRinging
+                          ? styles.callStateAvatarRinging
+                          : styles.callStateAvatarPicked,
+                      ]}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View
+                      style={[
+                        styles.callStateAvatar,
+                        isOutgoingVoiceRinging
+                          ? styles.callStateAvatarRinging
+                          : styles.callStateAvatarPicked,
+                      ]}
+                    />
+                  )}
+                </View>
+                <View style={styles.callStateRingingWrap}>
+                  <Text style={styles.callStateRingingTitle}>
+                    {isOutgoingVoiceRinging ? 'Ringing...' : pickedVoiceDurationLabel}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.callStateRingingActionsRow}>
+                <View style={styles.callStateRingingActionsCapsule}>
+                  <TouchableOpacity
+                    style={[styles.callStateRingingActionButton, styles.callStateRingingCancelButton]}
+                    onPress={closeCallState}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancel outgoing call"
+                  >
+                    <View
+                      style={[
+                        styles.callStateRingingIconWrap,
+                        styles.callStateRingingIconWrapEnd,
+                      ]}
+                    >
+                      <VoiceControlEndIcon size={24} color={colors.white} />
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.callStateRingingActionButton,
+                      audioDeviceSheetVisible && styles.callStateRingingActionButtonSelected,
+                    ]}
+                    onPress={openAudioDeviceSheet}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Choose audio device"
+                  >
+                    <View
+                      style={[
+                        styles.callStateRingingIconWrap,
+                        styles.callStateRingingIconWrapSpeaker,
+                      ]}
+                    >
+                      <VoiceControlSpeakerIcon
+                        size={24}
+                        color={audioDeviceSheetVisible ? colors.black : colors.white}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.callStateRingingActionButton,
+                      (isOutgoingVoiceRinging || isSwitchingVoiceToVideo) &&
+                        styles.callStateRingingActionButtonDisabled,
+                    ]}
+                    onPress={
+                      !isOutgoingVoiceRinging && !isSwitchingVoiceToVideo
+                        ? openSwitchToVideoPopup
+                        : undefined
+                    }
+                    disabled={isOutgoingVoiceRinging || isSwitchingVoiceToVideo}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Switch to video call"
+                    accessibilityState={{
+                      disabled: isOutgoingVoiceRinging || isSwitchingVoiceToVideo,
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.callStateRingingIconWrap,
+                        styles.callStateRingingIconWrapVideo,
+                      ]}
+                    >
+                      <CallVideoOutgoingIcon size={24} color={colors.white} />
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.callStateRingingActionButton,
+                      !callAudioEnabled && styles.callStateRingingActionButtonMicMuted,
+                    ]}
+                    onPress={toggleCallAudio}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel={callAudioEnabled ? 'Mute microphone' : 'Unmute microphone'}
+                    accessibilityState={{ selected: !callAudioEnabled }}
+                  >
+                    {callAudioEnabled ? (
+                      <View
+                        style={[
+                          styles.callStateRingingIconWrap,
+                          styles.callStateRingingIconWrapMic,
+                        ]}
+                      >
+                        <VoiceControlMicIcon size={24} color={colors.white} />
+                      </View>
+                    ) : (
+                      <View
+                        style={[
+                          styles.callStateRingingIconWrap,
+                          styles.callStateRingingIconWrapMic,
+                        ]}
+                      >
+                        <VoiceControlMicOffIcon size={24} color={colors.semantic.error} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {audioDeviceSheetVisible ? (
+                <View style={styles.callStateAudioDevicePopover}>
+                  {renderAudioDevicePopoverOptions()}
+                </View>
+              ) : null}
+              {switchToVideoPopupVisible ? (
+                <View style={styles.callStateSwitchPopupBackdrop}>
+                  <View style={styles.callStateSwitchPopupSheet}>
+                    <View style={styles.callStateSwitchPopupHandle} />
+                    <View style={styles.callStateSwitchPopupIconWrap}>
+                      <CallVideoIncomingIcon size={40} color={colors.primary.purple} />
+                    </View>
+                    <Text style={styles.callStateSwitchPopupTitle}>Switch To Video Call?</Text>
+                    <View style={styles.callStateSwitchPopupActions}>
+                      <TouchableOpacity
+                        style={styles.callStateSwitchPopupCancelButton}
+                        activeOpacity={0.8}
+                        onPress={() => setSwitchToVideoPopupVisible(false)}
+                      >
+                        <Text style={styles.callStateSwitchPopupCancelText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.callStateSwitchPopupSwitchButton}
+                        activeOpacity={0.85}
+                        onPress={requestSwitchVoiceToVideo}
+                      >
+                        <LinearGradient
+                          colors={['#CB7BF5', '#7742F0']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.callStateSwitchPopupSwitchGradient}
+                        >
+                          <Text style={styles.callStateSwitchPopupSwitchText}>Switch</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+            </View>
+          </SafeAreaView>
+        )}
+      </Modal>
 
       <Modal
         visible={moreMenuVisible}
