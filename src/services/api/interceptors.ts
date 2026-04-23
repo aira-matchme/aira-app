@@ -7,6 +7,7 @@ import { env } from '../../config/env';
 const isTimeoutError = (error: { code?: string; message?: string }) =>
   error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout');
 
+/** True transport / DNS failures — not "server closed socket" (e.g. ECONNRESET) or other ambiguous cases. */
 const isNetworkError = (error: {
   message?: string;
   code?: string;
@@ -14,11 +15,24 @@ const isNetworkError = (error: {
   request?: unknown;
 }) => {
   if (isTimeoutError(error)) return false;
-  return (
-    error.message === 'Network Error' ||
-    error.code === 'ERR_NETWORK' ||
-    (!error.response && !!error.request)
-  );
+  if (error.response != null) return false;
+
+  if (error.message === 'Network Error' || error.code === 'ERR_NETWORK') {
+    return true;
+  }
+
+  const code = error.code;
+  if (typeof code === 'string') {
+    return (
+      code === 'ECONNREFUSED' ||
+      code === 'ENOTFOUND' ||
+      code === 'ENETUNREACH' ||
+      code === 'EHOSTUNREACH' ||
+      code === 'EAI_AGAIN'
+    );
+  }
+
+  return false;
 };
 
 export const setupInterceptors = () => {

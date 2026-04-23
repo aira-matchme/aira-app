@@ -1,17 +1,31 @@
 import React, { useState } from 'react';
-import { View, Text, StatusBar, TouchableOpacity, Pressable, useWindowDimensions } from 'react-native';
+import {
+  View,
+  Text,
+  StatusBar,
+  TouchableOpacity,
+  Pressable,
+  useWindowDimensions,
+  Alert,
+  Linking,
+  Platform,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ReusableBottomSheet } from '../../../components/BottomSheet';
 import { Button } from '../../../components/Button';
 import { STRINGS } from '../../../constants/strings';
-import { requestNotificationPermission } from '../../../config/permissions';
+import { checkNotificationPermission, requestNotificationPermission } from '../../../config/permissions';
 import { useAuthStore } from '../../../store/auth.store';
 import type { AuthStackParamList } from '../../../navigation/types';
 import Mockup from '../../../assets/icons/common/Mockup';
 import { FIGMA_ENABLE_NOTIFICATIONS, styles } from './styles';
 import { GradientBackground } from '../../../components/GradientBackground';
+import { getDeviceToken } from '../../../services/firebase/messaging';
+import { getNativeDeviceId } from '../../../utils/getNativeDeviceId';
+import { registerFcmTokenApi } from '../../../modules/auth/api';
 
 type EnableNotificationsNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'EnableNotifications'>;
 
@@ -40,6 +54,26 @@ export const EnableNotificationsScreen = () => {
 
   const absContentStyle = { left: contentLeft, width: contentW } as const;
 
+  useFocusEffect(
+    React.useCallback(() => {
+      let cancelled = false;
+      void (async () => {
+        try {
+          const status = await checkNotificationPermission();
+          if (!cancelled && status === 'granted') {
+            setShouldShowEnableNotifications(false);
+            navigation.navigate('ProfileIntro');
+          }
+        } catch {
+          // ignore permission check failure on focus
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [navigation, setShouldShowEnableNotifications])
+  );
+
   const handleEnableNotifications = async () => {
     setShowPermissionSheet(true);
   };
@@ -50,10 +84,31 @@ export const EnableNotificationsScreen = () => {
     try {
       const status = await requestNotificationPermission();
       if (status === 'granted') {
+        const deviceId = await getNativeDeviceId();
+        const deviceToken = (await getDeviceToken())?.trim() ?? '';
+        if (deviceId && deviceToken) {
+          await registerFcmTokenApi({
+            deviceId,
+            deviceToken,
+            deviceType: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web',
+          });
+        }
         setShouldShowEnableNotifications(false);
         navigation.navigate('ProfileIntro');
       } else if (status === 'denied') {
-        // User denied - no action
+        Alert.alert(
+          'Notifications Disabled',
+          'Notifications are currently off. You can enable them in Settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Open Settings',
+              onPress: () => {
+                void Linking.openSettings();
+              },
+            },
+          ]
+        );
       }
     } catch {
       // Request failed

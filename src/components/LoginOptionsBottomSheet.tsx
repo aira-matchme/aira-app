@@ -16,7 +16,9 @@ import type { RootStackParamList } from '../navigation/types';
 import { env } from '../config/env';
 import { useSocialLogin } from '../modules/auth/hooks';
 import { useAuthStore } from '../store/auth.store';
-import { checkNotificationPermission } from '../config/permissions';
+import {
+  checkNotificationPermission,
+} from '../config/permissions';
 import { getPostAuthScreen } from '../navigation/getPostAuthScreen';
 import appleAuth from '@invertase/react-native-apple-authentication';
 import { apiClient } from '../services/api/client';
@@ -107,11 +109,15 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
       return;
     }
 
+    const deviceId = await getNativeDeviceId();
+    const rawDeviceToken = await getDeviceToken();
+    const deviceToken = String(rawDeviceToken ?? '').trim() || undefined;
+
     const payload = {
       idToken: idToken,
       deviceType: Platform.OS === 'android' ? 'android' : 'ios',
-      deviceId: await getNativeDeviceId(),
-      deviceToken: await getDeviceToken(),
+      deviceId,
+      deviceToken,
 
     };
     const response = await apiClient.post(endpoints.auth.googleLogin, payload);
@@ -127,7 +133,7 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
       return;
     }
 
-    navigation.navigate('AuthStack', { screen: 'EnableNotifications' });
+    navigation.navigate('AuthStack', { screen: 'ProfileIntro' });
   } catch (error: any) {
     Alert.alert('Google login error', error.message || 'Unknown error');
     // Google login error
@@ -158,11 +164,15 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
         return;
       }
 
+      const deviceId = await getNativeDeviceId();
+      const rawDeviceToken = await getDeviceToken();
+      const deviceToken = String(rawDeviceToken ?? '').trim() || undefined;
+
       const payload = {
         idToken:identityToken,
         deviceType: Platform.OS === 'android' ? 'android' : 'ios',
-        deviceId: await getNativeDeviceId(),
-        deviceToken: await getDeviceToken(),
+        deviceId,
+        deviceToken,
       };
 
       const response = await apiClient.post(endpoints.auth.appleLogin, payload);
@@ -178,7 +188,7 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
         return;
       }
 
-      navigation.navigate('AuthStack', { screen: 'EnableNotifications' });
+      navigation.navigate('AuthStack', { screen: 'ProfileIntro' });
     } catch (error: any) {
       if (error.code !== appleAuth.Error.CANCELED) {
         // Apple login failed

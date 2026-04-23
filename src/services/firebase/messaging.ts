@@ -1,5 +1,6 @@
 import messaging from '@react-native-firebase/messaging';
 import { Platform } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 
 const GET_TOKEN_RETRY_DELAY_MS = 1000;
 /** iOS cold start / APNs can lag; empty `getToken()` is common for many seconds without retries. */
@@ -18,7 +19,14 @@ async function resolveDeviceTokenOnce(): Promise<string | null> {
       authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
       authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
-    if (!enabled) return null;
+    if (!enabled) {
+      Sentry.captureMessage('FCM permission not granted while requesting device token', {
+        level: 'warning',
+        tags: { area: 'auth', flow: 'otp-verify' },
+        extra: { platform: Platform.OS, authStatus },
+      });
+      return null;
+    }
 
     if (Platform.OS === 'ios') {
       await messaging().registerDeviceForRemoteMessages();
@@ -42,11 +50,24 @@ async function resolveDeviceTokenOnce(): Promise<string | null> {
     if (__DEV__) {
       console.warn('[getDeviceToken] No non-empty FCM token after retries');
     }
+    Sentry.captureMessage('FCM token empty after retries', {
+      level: 'warning',
+      tags: { area: 'auth', flow: 'otp-verify' },
+      extra: {
+        platform: Platform.OS,
+        attempts: MAX_GET_TOKEN_ATTEMPTS,
+        retryDelayMs: GET_TOKEN_RETRY_DELAY_MS,
+      },
+    });
     return null;
   } catch (error) {
     if (__DEV__) {
       console.warn('[getDeviceToken] Failed to obtain FCM token', error);
     }
+    Sentry.captureException(error, {
+      tags: { area: 'auth', flow: 'otp-verify' },
+      extra: { platform: Platform.OS },
+    });
     return null;
   }
 }

@@ -11,12 +11,12 @@ import {
   Modal,
   TouchableWithoutFeedback,
   StyleSheet,
+  Alert,
   Linking,
   StatusBar,
   ActivityIndicator,
   LayoutChangeEvent,
   useWindowDimensions,
-  type KeyboardEvent,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -58,7 +58,7 @@ import { colors, typography } from '../../theme';
 import type { ChatStackParamList } from '../../navigation/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // import AudioRecorderPlayer from 'react-native-audio-recorder-player';
-import { setChatRequestActionApi, blockUserApi, reportUserApi, getChatMessagesApi, mapApiMessageToChatMessage, markChatSeenApi, sendMessageApi, uploadChatFileApi, postAIMessagesApi, getAiSuggestionsApi, deleteMessageApi, type ChatMessageApiItem } from '../../modules/chat/api';
+import { setChatRequestActionApi, blockUserApi, reportUserApi, getChatMessagesApi, mapApiMessageToChatMessage, markChatSeenApi, sendMessageApi, uploadChatFileApi, postAIMessagesApi, getAiSuggestionsApi, deleteMessageApi, extractChatMessageFromSendResponse, type ChatMessageApiItem } from '../../modules/chat/api';
 import { useAuthStore } from '../../store/auth.store';
 import socketService, { type MessageReceivePayload, type MessageDeletePayload, type TypingPayload } from '../../services/socket/socketService';   
 import { styles, H_PADDING, CHAT_INPUT_MIN_HEIGHT, CHAT_INPUT_MAX_HEIGHT } from './styles';
@@ -66,48 +66,18 @@ import { TabAICenterIcon } from '../../assets/icons/tabs/TabAICenterIcon';
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
 import { showErrorToast, showSuccessToast } from '../../services/toast.srvice';
+import type { ChatMessage, PendingAttachment } from './types';
 import {
-  startRecording as startAudioRecording,
-  stopRecording as stopAudioRecording,
-  pauseRecording as pauseAudioRecording,
-  resumeRecording as resumeAudioRecording,
-  playAudio,
-  stopAudio,
-  pauseAudio,
-  resumeAudio,
-} from '../../utils/audio';
+  now,
+  extractChatIdFromAddChatResponse,
+  firstNonEmptyString,
+  formatMessageTimestamp,
+} from './utils/helpers';
+import { useKeyboardOffset } from './hooks/useKeyboardOffset';
+import { useAiraSuggestions } from './hooks/useAiraSuggestions';
+import { useVoiceRecording } from './hooks/useVoiceRecording';
 
 type Props = NativeStackScreenProps<ChatStackParamList, 'ChatDetail'>;
-
-type ChatMessage =
-  | {
-      type: 'text';
-      text: string;
-      timestamp: string;
-      sent: boolean;
-      replyTo?: { senderName: string; preview: string };
-      messageId?: string;
-    }
-  | {
-      type: 'rich';
-      blocks: Array<
-        | { type: 'paragraph'; text: string }
-        | {
-            type: 'bullet_list';
-            items: Array<{ title?: string; description?: string }>;
-          }
-      >;
-      timestamp: string;
-      sent: boolean;
-      messageId?: string;
-    }
-  | { type: 'voice'; uri: string; timestamp: string; sent: boolean; messageId?: string }
-  | { type: 'image'; uri: string; timestamp: string; sent: boolean; messageId?: string }
-  | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean; messageId?: string };
-
-type PendingAttachment =
-  | { type: 'image'; uri: string; name?: string; mimeType?: string }
-  | { type: 'file'; uri: string; name: string };
 
 const VOICE_WAVEFORM = [8, 12, 6, 14, 10, 16, 8, 14, 12, 10];
 
@@ -127,142 +97,6 @@ const REPORT_REASONS: { value: string; label: string }[] = [
   { value: 'underage_user', label: 'Underage user' },
   { value: 'something_else', label: "It's something else" },
 ];
-
-const now = () => {
-  const d = new Date();
-  return `${d.getHours() > 12 ? d.getHours() - 12 : d.getHours()}:${d.getMinutes().toString().padStart(2, '0')} ${d.getHours() >= 12 ? 'pm' : 'am'}`;
-};
-
-function isAiraLimitError(err: unknown): boolean {
-  const status = (err as { response?: { status?: number } })?.response?.status;
-  const data = (err as { response?: { data?: { message?: string; error?: string } } })?.response?.data;
-  const msg = ((data?.message ?? data?.error) ?? '').toString().toLowerCase();
-  return status === 429 || msg.includes('limit') || msg.includes('suggestion') || msg.includes('quota');
-}
-
-/** Time until next midnight (local) for "come back in" countdown */
-function getTimeUntilMidnight(): { hours: number; minutes: number; seconds: number } {
-  const now = new Date();
-  const midnight = new Date(now);
-  midnight.setHours(24, 0, 0, 0);
-  const diff = Math.max(0, midnight.getTime() - now.getTime());
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-  return { hours, minutes, seconds };
-}
-
-function parseAiraTimeLeft(
-  value: string | null | undefined
-): { hours: number; minutes: number; seconds: number } | null {
-  if (!value) return null;
-  const match = value.trim().match(/^(\d{1,2}):(\d{2}):(\d{2})$/);
-  if (!match) return null;
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  const seconds = Number(match[3]);
-  if (
-    Number.isNaN(hours) ||
-    Number.isNaN(minutes) ||
-    Number.isNaN(seconds) ||
-    minutes > 59 ||
-    seconds > 59
-  ) {
-    return null;
-  }
-  return { hours, minutes, seconds };
-}
-
-function decrementCountdown(prev: { hours: number; minutes: number; seconds: number }) {
-  const total = prev.hours * 3600 + prev.minutes * 60 + prev.seconds;
-  if (total <= 0) return prev;
-  const next = total - 1;
-  return {
-    hours: Math.floor(next / 3600),
-    minutes: Math.floor((next % 3600) / 60),
-    seconds: next % 60,
-  };
-}
-
-/** Format timestamp from socket (ISO string or ms number) for display; fallback to now(). */
-function formatMessageTimestamp(value: string | number | undefined): string {
-  if (value == null) return now();
-  const d = typeof value === 'number' ? new Date(value) : new Date(value);
-  if (Number.isNaN(d.getTime())) return now();
-  const h = d.getHours();
-  const m = d.getMinutes();
-  const hour = h > 12 ? h - 12 : h === 0 ? 12 : h;
-  const ampm = h >= 12 ? 'pm' : 'am';
-  return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
-}
-
-/**
- * add-chat-list returns chat id at `data.chat.id` (see API envelope: data.data.chat).
- * Older code only read `data.chatId` / `data.id`, so `effectiveChatId` was always null.
- */
-function extractChatIdFromAddChatResponse(addRes: { data?: unknown }): string | null {
-  const body = addRes?.data as Record<string, unknown> | undefined;
-  if (!body) return null;
-  const inner = body.data as Record<string, unknown> | undefined;
-  const chat = inner?.chat as Record<string, unknown> | undefined;
-  const fromChat = chat?.id ?? chat?._id;
-  if (typeof fromChat === 'string' && fromChat.length > 0) return fromChat;
-  if (inner) {
-    for (const key of ['chatId', 'id', '_id'] as const) {
-      const v = inner[key];
-      if (typeof v === 'string' && v.length > 0) return v;
-    }
-  }
-  for (const key of ['chatId', 'id', '_id'] as const) {
-    const v = body[key];
-    if (typeof v === 'string' && v.length > 0) return v;
-  }
-  return null;
-}
-
-/** Keyboard overlap with the app window (aligned with MatchScreen). */
-function keyboardOverlapFromEvent(windowHeight: number, e: KeyboardEvent): number {
-  const ec = e.endCoordinates;
-  if (!ec || windowHeight <= 0) return 0;
-
-  if (Platform.OS === 'ios') {
-    const screenY = typeof ec.screenY === 'number' ? ec.screenY : windowHeight;
-    return Math.max(0, Math.min(windowHeight, windowHeight - screenY));
-  }
-
-  const fromHeight = typeof ec.height === 'number' && ec.height > 0 ? ec.height : 0;
-  const fromScreenY =
-    typeof ec.screenY === 'number' ? Math.max(0, windowHeight - ec.screenY) : 0;
-
-  // Ignore unrealistic values so old-device quirks do not push composer too high.
-  const maxReasonableKeyboard = Math.floor(windowHeight * 0.45);
-  const minReasonableKeyboard = 80;
-  const candidates = [fromHeight, fromScreenY].filter(
-    (v) => v >= minReasonableKeyboard && v <= maxReasonableKeyboard
-  );
-  if (candidates.length > 0) {
-    // Some Android builds report inflated `height`; prefer the smaller sane value.
-    return Math.min(...candidates);
-  }
-
-  // Last fallback: prefer `screenY` overlap when available, then clamp.
-  const raw = Math.max(fromHeight, fromScreenY);
-  if (raw <= 0) return 0;
-  if (fromScreenY > 0) {
-    return Math.min(maxReasonableKeyboard, fromScreenY);
-  }
-  return Math.min(maxReasonableKeyboard, Math.max(minReasonableKeyboard, raw));
-}
-
-function firstNonEmptyString(...values: Array<unknown>): string | undefined {
-  for (const value of values) {
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      if (trimmed.length > 0) return trimmed;
-    }
-  }
-  return undefined;
-}
 
 export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const {
@@ -290,6 +124,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [messagesLoadingMore, setMessagesLoadingMore] = useState(false);
   const [inputText, setInputText] = useState('');
   const [attachmentSheetOpen, setAttachmentSheetOpen] = useState(false);
+
   const [showCameraPermissionSheet, setShowCameraPermissionSheet] = useState(false);
   const [showGalleryPermissionSheet, setShowGalleryPermissionSheet] = useState(false);
   const [showMicrophonePermissionSheet, setShowMicrophonePermissionSheet] = useState(false);
@@ -308,26 +143,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [selectedReportReason, setSelectedReportReason] = useState<string | null>(null);
   const [reportMessageInput, setReportMessageInput] = useState('');
   const [reportSubmitting, setReportSubmitting] = useState(false);
-  const [voiceBarVisible, setVoiceBarVisible] = useState(false);
-  const [voiceSeconds, setVoiceSeconds] = useState(0);
-  const [voicePaused, setVoicePaused] = useState(false);
-  const [voiceSendLoading, setVoiceSendLoading] = useState(false);
-  const voiceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isRecordingRef = useRef(false);
-  const [recordFilePath, setRecordFilePath] = useState<string | null>(null);
-  const [playingVoiceMessageKey, setPlayingVoiceMessageKey] = useState<string | null>(null);
-  const [voiceListenPaused, setVoiceListenPaused] = useState(false);
-  const [askAiraGenerating, setAskAiraGenerating] = useState(false);
-  const [generatedReplies, setGeneratedReplies] = useState<string[] | null>(null);
-  const [askAiraConfirmVisible, setAskAiraConfirmVisible] = useState(false);
-  const [dontShowAskAiraAgain, setDontShowAskAiraAgain] = useState(false);
-  const [dontShowAskAiraPersisted, setDontShowAskAiraPersisted] = useState(false);
-  const [askAiraConfirmLoading, setAskAiraConfirmLoading] = useState(false);
-  const [airaLimitReachedVisible, setAiraLimitReachedVisible] = useState(false);
-  const [airaLimitCountdown, setAiraLimitCountdown] = useState({ hours: 23, minutes: 47, seconds: 12 });
-  const [airaSuggestionsLimitLeft, setAiraSuggestionsLimitLeft] = useState<number | null>(null);
-  const [airaSuggestionsTotalLimit, setAiraSuggestionsTotalLimit] = useState<number | null>(null);
-  const [selectedReplyIndex, setSelectedReplyIndex] = useState(0);
   const [messageContextIndex, setMessageContextIndex] = useState<number | null>(null);
   /** Screen-space anchor for Reply/Delete menu (aligned to the long-pressed bubble). */
   const [messageContextAnchor, setMessageContextAnchor] = useState<{
@@ -337,6 +152,66 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   } | null>(null);
   const messageBubbleRefsRef = useRef<Map<number, View>>(new Map());
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
+
+  const showSettingsAlert = (permissionName: 'camera' | 'photos' | 'microphone') => {
+    const titleMap = {
+      camera: 'Camera access is turned off',
+      photos: 'Photo access is turned off',
+      microphone: 'Microphone access is turned off',
+    };
+    const messageMap = {
+      camera: 'To continue, allow camera access for Aira in Settings.',
+      photos: 'To continue, allow photo library access for Aira in Settings.',
+      microphone: 'To continue, allow microphone access for Aira in Settings.',
+    };
+    Alert.alert(titleMap[permissionName], messageMap[permissionName], [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+    ]);
+  };
+
+  /** Send-message responses often omit `content` or nest the document; merge so the bubble shows immediately. */
+  const enrichOutgoingTextPayload = (
+    partial: ChatMessageApiItem | undefined,
+    sentText: string,
+  ): ChatMessageApiItem => {
+    const merged: ChatMessageApiItem = {
+      messageType: 'text',
+      ...partial,
+      isSentByMe: partial?.isSentByMe ?? true,
+    };
+    const fromApi =
+      (typeof merged.content === 'string' && merged.content.trim()) ||
+      (merged.content &&
+        typeof merged.content === 'object' &&
+        merged.content !== null &&
+        'text' in merged.content &&
+        String((merged.content as { text?: unknown }).text ?? '').trim()) ||
+      (typeof (merged as { text?: string }).text === 'string' &&
+        (merged as { text: string }).text.trim()) ||
+      '';
+    if (!fromApi && sentText.trim()) {
+      merged.content = sentText.trim();
+    }
+    return merged;
+  };
+
+  const enrichOutgoingMediaPayload = (
+    partial: ChatMessageApiItem | undefined,
+    messageType: ChatMessageApiItem['messageType'] | 'video',
+    fileUrl: string,
+  ): ChatMessageApiItem =>
+    ({
+      ...partial,
+      messageType: messageType ?? partial?.messageType,
+      isSentByMe: partial?.isSentByMe ?? true,
+      messageTimeStamp: partial?.messageTimeStamp ?? new Date().toISOString(),
+      files:
+        partial?.files && partial.files.length > 0
+          ? partial.files
+          : [{ url: fileUrl, uri: fileUrl }],
+    }) as ChatMessageApiItem;
+
   const isPickingFileRef = useRef(false);
   const [replyingTo, setReplyingTo] = useState<{ index: number; message: ChatMessage; senderName: string; messageId?: string } | null>(null);
   const [sendLoading, setSendLoading] = useState(false);
@@ -346,18 +221,40 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [composerHeight, setComposerHeight] = useState(120);
   /** Growing multiline composer: expands until CHAT_INPUT_MAX_HEIGHT, then scrolls inside. */
   const [composerInputHeight, setComposerInputHeight] = useState(CHAT_INPUT_MIN_HEIGHT);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
   const [imagePreviewZoomed, setImagePreviewZoomed] = useState(false);
   const imagePreviewLastTapRef = useRef<number>(0);
-  const androidBaseWindowHeightRef = useRef(windowHeight);
-  const aiSuggestionsRequestIdRef = useRef(0);
   const typingStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const otherUserTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+  const { keyboardHeight, composerBottomOffset, resetKeyboard } = useKeyboardOffset({
+    windowHeight,
+    scrollViewRef,
+  });
+  const {
+    askAiraGenerating,
+    generatedReplies,
+    askAiraConfirmVisible,
+    setAskAiraConfirmVisible,
+    dontShowAskAiraAgain,
+    setDontShowAskAiraAgain,
+    dontShowAskAiraPersisted,
+    askAiraConfirmLoading,
+    airaLimitReachedVisible,
+    setAiraLimitReachedVisible,
+    airaLimitCountdown,
+    airaSuggestionsLimitLeft,
+    airaSuggestionsTotalLimit,
+    selectedReplyIndex,
+    setSelectedReplyIndex,
+    setDontShowAskAiraPersisted,
+    setGeneratedReplies,
+    requestAiSuggestions,
+    handleCancelAiSuggestions,
+    handleInsertReply,
+  } = useAiraSuggestions({ chatId, setInputText });
   // Prevent the "auto scroll to bottom" effect from running when we prepend older messages.
   // (When pagination prepends items, ScrollView tends to jump if we always scrollToEnd.)
   const isPrependingOlderMessagesRef = useRef(false);
@@ -371,6 +268,49 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const bumpScrollAfterLocalSend = useCallback(() => {
     setScrollAfterLocalSendNonce((n) => n + 1);
   }, []);
+
+  const onSendVoice = useCallback(async (filePath: string) => {
+    if (!currentUserId || !otherUserId) return;
+    let effectiveChatId = chatId;
+    if (!effectiveChatId) {
+      const addRes = await apiClient.post(endpoints.chat.addChat, {
+        senderId: currentUserId,
+        receiverId: otherUserId,
+        firstMessage: '',
+      });
+      effectiveChatId = extractChatIdFromAddChatResponse(addRes);
+      if (!effectiveChatId) return;
+      setChatId(effectiveChatId);
+      navigation.setParams({ chatId: effectiveChatId } as any);
+    }
+    const fileName = `voice_${Date.now()}.m4a`;
+    const { url, key } = await uploadChatFileApi(filePath, { mimeType: 'audio/m4a', fileName });
+    const res = await sendMessageApi({
+      chatId: effectiveChatId!,
+      content: '',
+      messageType: 'audio',
+      files: [{ url, key }],
+      replyTo: replyingTo?.messageId ?? null,
+    });
+    const extracted = extractChatMessageFromSendResponse(res);
+    const apiMessage = enrichOutgoingMediaPayload(extracted, 'audio', url);
+    const ui = mapApiMessageToChatMessage(apiMessage, currentUserId, {
+      chatStatus: isRequest ? 'pending' : undefined,
+    });
+    if (ui) {
+      setMessages((prev) => [...prev, ui as ChatMessage]);
+      bumpScrollAfterLocalSend();
+    }
+    socketService.messageSendFromApi(
+      currentUserId,
+      otherUserId,
+      apiMessage as unknown as Record<string, unknown>,
+    );
+    setReplyingTo(null);
+  }, [chatId, currentUserId, otherUserId, replyingTo, isRequest, enrichOutgoingMediaPayload, bumpScrollAfterLocalSend]);
+
+  const voice = useVoiceRecording({ onSendVoice });
+
   const handleComposerLayout = useCallback((event: LayoutChangeEvent) => {
     const nextHeight = Math.round(event.nativeEvent.layout.height);
     if (nextHeight > 0) {
@@ -378,73 +318,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
   }, []);
 
-  const scrollToEndAfterKeyboard = useCallback((animated: boolean) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        scrollViewRef.current?.scrollToEnd({ animated });
-      });
-    });
-  }, []);
-
-  useEffect(() => {
-const applyOverlap = (e: KeyboardEvent) => {
-  const overlap = keyboardOverlapFromEvent(windowHeight, e);
-
-  setIsKeyboardVisible(overlap > 0);
-  setKeyboardHeight(overlap);
-
-  // ✅ FIX: double frame sync (not timeout)
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    });
-  });
-};
-  
-    if (Platform.OS === 'ios') {
-      const frameSub = Keyboard.addListener('keyboardWillChangeFrame', applyOverlap);
-  
-      const hideSub = Keyboard.addListener('keyboardWillHide', () => {
-        setIsKeyboardVisible(false);
-        setKeyboardHeight(0);
-  
-        // requestAnimationFrame(() => {
-        //   scrollToEndAfterKeyboard(true);
-        // });
-        setTimeout(() => {
-          scrollToBottom(true);
-        }, 150);
-      });
-  
-      return () => {
-        frameSub.remove();
-        hideSub.remove();
-      };
-    }
-  
-    const showSub = Keyboard.addListener('keyboardDidShow', applyOverlap);
-  
-    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
-      setIsKeyboardVisible(false);
-      setKeyboardHeight(0);
-  
-      requestAnimationFrame(() => {
-        scrollToEndAfterKeyboard(false);
-      });
-    });
-  
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, [windowHeight, scrollToEndAfterKeyboard, keyboardHeight]);
-  // const scrollToBottom = (animated = true) => {
-  //   requestAnimationFrame(() => {
-  //     requestAnimationFrame(() => {
-  //       scrollViewRef.current?.scrollToEnd({ animated });
-  //     });
-  //   });
-  // };
   const scrollToBottom = (animated = true) => {
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated });
@@ -454,72 +327,12 @@ const applyOverlap = (e: KeyboardEvent) => {
   useFocusEffect(
     useCallback(() => {
       return () => {
-        if (voiceTimerRef.current) {
-          clearInterval(voiceTimerRef.current);
-          voiceTimerRef.current = null;
-        }
-        if (isRecordingRef.current) {
-          stopAudioRecording().catch(() => {});
-          isRecordingRef.current = false;
-        }
-        stopAudio().catch(() => {});
-        setPlayingVoiceMessageKey(null);
-        setVoiceListenPaused(false);
-        setVoiceBarVisible(false);
-        setVoicePaused(false);
-        setVoiceSeconds(0);
-        setRecordFilePath(null);
-        setIsKeyboardVisible(false);
-        setKeyboardHeight(0);
+        voice.resetVoiceState();
+        resetKeyboard();
         Keyboard.dismiss();
       };
-    }, [])
+    }, [voice.resetVoiceState, resetKeyboard])
   );
-
-  useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    // Learn the "keyboard hidden" baseline for this device/orientation.
-    if (!isKeyboardVisible && windowHeight > androidBaseWindowHeightRef.current) {
-      androidBaseWindowHeightRef.current = windowHeight;
-    }
-  }, [isKeyboardVisible, windowHeight]);
-  // const shouldApplyManualKeyboardOffset =
-  // Platform.OS === 'ios' || keyboardHeight > 0;
-  const isAndroid = Platform.OS === 'android';
-
-  const androidWindowShrink =
-    androidBaseWindowHeightRef.current - windowHeight;
-  
-  // Detect real resize
-  const isKeyboardHandledBySystem = isAndroid && androidWindowShrink > 100;
-
-  const isWeirdKeyboard =
-  Platform.OS === 'android' &&
-  isKeyboardVisible &&
-  keyboardHeight < 120;
-  
-  // const composerBottomOffset =
-  // Platform.OS === 'ios'
-  //   ? keyboardHeight
-  //   : isKeyboardHandledBySystem
-  //   ? 0
-  //   : isWeirdKeyboard
-  //   ? 0 // 🚨 KEY FIX
-  //   : keyboardHeight;
-  // const composerBottomOffset =
-  // Platform.OS === 'ios'
-  //   ? keyboardHeight
-  //   : isKeyboardHandledBySystem
-  //   ? 0
-  //   : keyboardHeight;
-  // const composerBottomOffset =
-  // Platform.OS === 'ios' ? keyboardHeight : 0;
-  const composerBottomOffset =
-  Platform.OS === 'ios'
-    ? keyboardHeight
-    : isKeyboardHandledBySystem
-    ? 0
-    : keyboardHeight;
 
   const isOtherUserOnlineFromPayload = useCallback(
     (payload: unknown): boolean | null => {
@@ -602,6 +415,7 @@ const applyOverlap = (e: KeyboardEvent) => {
       const ext = name.split('.').pop() ?? '';
       if (ext === 'png') return 'image/png';
       if (ext === 'webp') return 'image/webp';
+      if (ext === 'gif') return 'image/gif';
       return 'image/jpeg';
     }
     const name = (att as { type: 'file'; name: string }).name?.toLowerCase() ?? '';
@@ -621,38 +435,8 @@ const applyOverlap = (e: KeyboardEvent) => {
     return ext.length <= 4 ? ext : 'FILE';
   };
 
-  const formatVoiceTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
 
-  useEffect(() => {
-    if (!voiceBarVisible || voicePaused) {
-      if (voiceTimerRef.current) {
-        clearInterval(voiceTimerRef.current);
-        voiceTimerRef.current = null;
-      }
-      return;
-    }
-    voiceTimerRef.current = setInterval(() => {
-      setVoiceSeconds((prev) => prev + 1);
-    }, 1000);
-    return () => {
-      if (voiceTimerRef.current) {
-        clearInterval(voiceTimerRef.current);
-        voiceTimerRef.current = null;
-      }
-    };
-  }, [voiceBarVisible, voicePaused]);
 
-  // Turn off "thinking" once API response resolves (or is handled as limit reached).
-  useEffect(() => {
-    if (!askAiraGenerating) return;
-    if (generatedReplies != null || airaLimitReachedVisible) {
-      setAskAiraGenerating(false);
-    }
-  }, [askAiraGenerating, generatedReplies, airaLimitReachedVisible]);
 
   useEffect(() => {
     if (!chatId) return;
@@ -1060,115 +844,9 @@ const applyOverlap = (e: KeyboardEvent) => {
   }, [scrollAfterLocalSendNonce, messagesLoading]);
 
   useEffect(() => {
-    AsyncStorage.getItem(DONT_SHOW_ASK_AIRA_CONFIRM_KEY).then((value) => {
-      setDontShowAskAiraPersisted(value === 'true');
-    });
-  }, []);
-
-  useEffect(() => {
     if (inputText.length > 0) return;
     setComposerInputHeight(CHAT_INPUT_MIN_HEIGHT);
   }, [inputText]);
-
-  useEffect(() => {
-    if (!airaLimitReachedVisible) return;
-    const id = setInterval(() => {
-      setAiraLimitCountdown((prev) => decrementCountdown(prev));
-    }, 1000);
-    return () => clearInterval(id);
-  }, [airaLimitReachedVisible]);
-
-  const applyAiSuggestionsResponse = useCallback(
-    (
-      res: Awaited<ReturnType<typeof getAiSuggestionsApi>>,
-      opts?: { closeConfirmSheet?: boolean }
-    ) => {
-      const list =
-        res?.data?.suggestions ??
-        (res?.data as { data?: { suggestions?: string[] } } | undefined)?.data?.suggestions ??
-        res?.suggestions;
-      const meta = res?.data as
-        | {
-            limitLeft?: number | null;
-            totalMessageLimit?: number | null;
-            timeLeft?: string | null;
-          }
-        | undefined;
-      const limitLeft = meta?.limitLeft ?? null;
-      const totalLimit = meta?.totalMessageLimit ?? null;
-      const hasSuggestions = Array.isArray(list) && list.length > 0;
-      const isLimitReached = limitLeft != null && limitLeft <= 0;
-
-      setAiraSuggestionsLimitLeft(limitLeft);
-      setAiraSuggestionsTotalLimit(totalLimit);
-
-      if (hasSuggestions) {
-        setGeneratedReplies(list);
-        setSelectedReplyIndex(0);
-        setAiraLimitReachedVisible(false);
-        if (opts?.closeConfirmSheet) setAskAiraConfirmVisible(false);
-        return;
-      }
-
-      if (isLimitReached) {
-        const countdownFromApi =
-          parseAiraTimeLeft(meta?.timeLeft ?? null) ?? getTimeUntilMidnight();
-        setAiraLimitCountdown(countdownFromApi);
-        setGeneratedReplies(null);
-        setAskAiraConfirmVisible(false);
-        setAiraLimitReachedVisible(true);
-        return;
-      }
-      // API can return success with empty suggestions in non-limit cases.
-      setGeneratedReplies(null);
-    },
-    []
-  );
-
-  const requestAiSuggestions = useCallback(
-    (opts?: { closeConfirmSheetOnStart?: boolean }) => {
-      if (!chatId) return;
-      const requestId = ++aiSuggestionsRequestIdRef.current;
-      setAskAiraConfirmLoading(true);
-      setAskAiraGenerating(true);
-      if (opts?.closeConfirmSheetOnStart) {
-        setAskAiraConfirmVisible(false);
-      }
-      getAiSuggestionsApi(chatId)
-        .then((res) => {
-          if (requestId !== aiSuggestionsRequestIdRef.current) return;
-          applyAiSuggestionsResponse(res, { closeConfirmSheet: true });
-        })
-        .catch((err) => {
-          if (requestId !== aiSuggestionsRequestIdRef.current) return;
-          if (isAiraLimitError(err)) {
-            setAskAiraConfirmVisible(false);
-            setAiraLimitCountdown(getTimeUntilMidnight());
-            setAiraLimitReachedVisible(true);
-          }
-        })
-        .finally(() => {
-          if (requestId !== aiSuggestionsRequestIdRef.current) return;
-          setAskAiraConfirmLoading(false);
-          setAskAiraGenerating(false);
-        });
-    },
-    [applyAiSuggestionsResponse, chatId]
-  );
-
-  const handleCancelAiSuggestions = useCallback(() => {
-    // Ignore any in-flight response after user cancels this loading sheet.
-    aiSuggestionsRequestIdRef.current += 1;
-    setAskAiraGenerating(false);
-    setAskAiraConfirmLoading(false);
-  }, []);
-
-  const handleInsertReply = () => {
-    if (!generatedReplies?.length || selectedReplyIndex >= generatedReplies.length) return;
-    setInputText(generatedReplies[selectedReplyIndex]);
-    setGeneratedReplies(null);
-    setSelectedReplyIndex(0);
-  };
 
   const getMessagePreview = (msg: ChatMessage): string => {
     if (msg.type === 'text') return msg.text;
@@ -1187,16 +865,6 @@ const applyOverlap = (e: KeyboardEvent) => {
     return '';
   };
 
-  const startVoiceRecording = useCallback(async () => {
-    try {
-      const path = await startAudioRecording();
-      isRecordingRef.current = true;
-      setRecordFilePath(path);
-    } catch {
-      setVoiceBarVisible(false);
-    }
-  }, []);
-
   const handleMicPress = async () => {
     if (inputText.trim() || pendingAttachments.length || sendLoading) return;
     const status = await checkMicrophonePermission();
@@ -1204,10 +872,7 @@ const applyOverlap = (e: KeyboardEvent) => {
       setShowMicrophonePermissionSheet(true);
       return;
     }
-    setVoiceBarVisible(true);
-    setVoiceSeconds(0);
-    setVoicePaused(false);
-    await startVoiceRecording();
+    await voice.beginVoiceRecording();
   };
 
   const handleAllowMicrophonePermission = async () => {
@@ -1216,139 +881,12 @@ const applyOverlap = (e: KeyboardEvent) => {
       const requested = await requestMicrophonePermission();
       setShowMicrophonePermissionSheet(false);
       if (requested === 'granted') {
-        setVoiceBarVisible(true);
-        setVoiceSeconds(0);
-        setVoicePaused(false);
-        await startVoiceRecording();
+        await voice.beginVoiceRecording();
+      } else {
+        showSettingsAlert('microphone');
       }
     } finally {
       setIsRequestingPermission(false);
-    }
-  };
-
-  const handleVoiceTrash = () => {
-    if (isRecordingRef.current) {
-      stopAudioRecording().catch(() => {});
-      isRecordingRef.current = false;
-    }
-    setRecordFilePath(null);
-    setVoiceBarVisible(false);
-    setVoiceSeconds(0);
-    setVoicePaused(false);
-  };
-
-  const handleVoicePlayPause = () => {
-    if (!isRecordingRef.current) return;
-    if (voicePaused) {
-      resumeAudioRecording().catch(() => {});
-    } else {
-      pauseAudioRecording().catch(() => {});
-    }
-    setVoicePaused((p) => !p);
-  };
-
-  const stopVoiceRecordingSafely = async () => {
-    try {
-      const result = await stopAudioRecording();
-      isRecordingRef.current = false;
-      return result;
-    } catch {
-      return null;
-    }
-  };
-
-  const handleVoiceSend = async () => {
-    if (!currentUserId || !otherUserId || voiceSendLoading) return;
-    try {
-      setVoiceSendLoading(true);
-      let effectiveChatId = chatId;
-      if (!effectiveChatId) {
-        const addRes = await apiClient.post(endpoints.chat.addChat, {
-          senderId: currentUserId,
-          receiverId: otherUserId,
-          firstMessage: '',
-        });
-        effectiveChatId = extractChatIdFromAddChatResponse(addRes);
-        if (!effectiveChatId) {
-          setVoiceBarVisible(false);
-          return;
-        }
-        setChatId(effectiveChatId);
-        navigation.setParams({ chatId: effectiveChatId } as any);
-      }
-
-      const path = await stopVoiceRecordingSafely();
-      const uploadPath = path ?? recordFilePath;
-      if (!uploadPath) {
-        setVoiceBarVisible(false);
-        return;
-      }
-
-      const fileName = `voice_${Date.now()}.m4a`;
-      const { url, key } = await uploadChatFileApi(uploadPath, {
-        mimeType: 'audio/m4a',
-        fileName,
-      });
-
-      const res = await sendMessageApi({
-        chatId: effectiveChatId!,
-        content: '',
-        messageType: 'audio',
-        files: [{ url, key }],
-        replyTo: replyingTo?.messageId ?? null,
-      });
-
-      const apiMessage = (res?.data as unknown) as ChatMessageApiItem | undefined;
-      if (apiMessage) {
-        const ui = mapApiMessageToChatMessage(apiMessage, currentUserId, {
-          chatStatus: isRequest ? 'pending' : undefined,
-        });
-        if (ui) {
-          setMessages((prev) => [...prev, ui as ChatMessage]);
-          // setTimeout(() => {
-          //   scrollToBottom(true);
-          // }, 100);
-          bumpScrollAfterLocalSend();
-        }
-        socketService.messageSendFromApi(
-          currentUserId,
-          otherUserId,
-          apiMessage as unknown as Record<string, unknown>,
-        );
-      }
-
-      setVoiceBarVisible(false);
-      setVoiceSeconds(0);
-      setVoicePaused(false);
-      setRecordFilePath(null);
-      setReplyingTo(null);
-    } finally {
-      setVoiceSendLoading(false);
-    }
-  };
-
-  const toggleVoiceMessagePlayback = async (
-    uri: string,
-    messageKey: string,
-  ) => {
-    try {
-      if (playingVoiceMessageKey !== messageKey) {
-        await stopAudio().catch(() => {});
-        setVoiceListenPaused(false);
-        await playAudio(uri);
-        setPlayingVoiceMessageKey(messageKey);
-        return;
-      }
-      if (voiceListenPaused) {
-        await resumeAudio();
-        setVoiceListenPaused(false);
-      } else {
-        await pauseAudio();
-        setVoiceListenPaused(true);
-      }
-    } catch {
-      setPlayingVoiceMessageKey(null);
-      setVoiceListenPaused(false);
     }
   };
 
@@ -1386,10 +924,7 @@ const applyOverlap = (e: KeyboardEvent) => {
           const mimeType = a?.type;
           if (typeof mimeType === 'string') {
             if (!mimeType.startsWith('image/')) return;
-            if (mimeType === 'image/gif') return;
           }
-          const lowerUri = uri.split('?')[0]?.toLowerCase() ?? '';
-          if (lowerUri.endsWith('.gif')) return;
           pickedImages.push({
             type: 'image',
             uri,
@@ -1452,7 +987,7 @@ const applyOverlap = (e: KeyboardEvent) => {
       if (status === 'granted') {
         openCamera();
       } else {
-        setShowCameraPermissionSheet(false);
+        showSettingsAlert('camera');
       }
     } catch {
       setShowCameraPermissionSheet(false);
@@ -1481,7 +1016,7 @@ const applyOverlap = (e: KeyboardEvent) => {
       if (hasAccess) {
         openGallery();
       } else {
-        setShowGalleryPermissionSheet(false);
+        showSettingsAlert('photos');
       }
     } catch {
       setShowGalleryPermissionSheet(false);
@@ -1564,8 +1099,22 @@ const applyOverlap = (e: KeyboardEvent) => {
                   .filter((m): m is ChatMessage => m != null)
                   .reverse()
               : [];
-            setMessages(list);
-            appendedOutgoing = list.length > 0;
+            // Right after addChat, history can be briefly empty; still show what the user sent.
+            if (list.length === 0 && trimmed) {
+              setMessages([
+                {
+                  type: 'text',
+                  text: trimmed,
+                  timestamp: now(),
+                  sent: true,
+                },
+              ]);
+              appendedOutgoing = true;
+              bumpScrollAfterLocalSend();
+            } else {
+              setMessages(list);
+              appendedOutgoing = list.length > 0;
+            }
             const meta = msgRes.data?.meta;
             const currentPage = meta?.currentPage ?? meta?.pageNo ?? 1;
             const totalPages = meta?.totalPages ?? 1;
@@ -1582,25 +1131,24 @@ const applyOverlap = (e: KeyboardEvent) => {
             files: [],
             replyTo: replyToPayload,
           });
-          const apiMessage = (res?.data as unknown) as ChatMessageApiItem | undefined;
-          if (apiMessage) {
-            const ui = mapApiMessageToChatMessage(apiMessage, currentUserId, {
-              chatStatus: isRequest ? 'pending' : undefined,
-            });
-            if (ui) {
-              setMessages((prev) => [...prev, ui as ChatMessage]);
-              appendedOutgoing = true;
-              setTimeout(() => {
-                scrollToBottom(true);
-              }, 100);
-            }
-            if (currentUserId && otherUserId) {
-              socketService.messageSendFromApi(
-                currentUserId,
-                otherUserId,
-                apiMessage as unknown as Record<string, unknown>
-              );
-            }
+          const extracted = extractChatMessageFromSendResponse(res);
+          const apiMessage = enrichOutgoingTextPayload(extracted, trimmed);
+          const ui = mapApiMessageToChatMessage(apiMessage, currentUserId, {
+            chatStatus: isRequest ? 'pending' : undefined,
+          });
+          if (ui) {
+            setMessages((prev) => [...prev, ui as ChatMessage]);
+            appendedOutgoing = true;
+            setTimeout(() => {
+              scrollToBottom(true);
+            }, 100);
+          }
+          if (currentUserId && otherUserId) {
+            socketService.messageSendFromApi(
+              currentUserId,
+              otherUserId,
+              apiMessage as unknown as Record<string, unknown>
+            );
           }
           clearComposer();
           setReplyingTo(null);
@@ -1620,45 +1168,40 @@ const applyOverlap = (e: KeyboardEvent) => {
           files: [{ url, key }],
           replyTo: replyToPayload,
         });
-        const apiMessage = (res?.data as unknown) as ChatMessageApiItem | undefined;
-        if (apiMessage) {
-          const firstFile = Array.isArray(apiMessage.files) ? apiMessage.files[0] : undefined;
-          const normalizedApiMessage: ChatMessageApiItem = {
-            ...apiMessage,
-            files: [
-              {
-                ...(firstFile ?? {}),
-                url: firstNonEmptyString(firstFile?.url, firstFile?.uri, url),
-                uri: firstNonEmptyString(firstFile?.uri, firstFile?.url, url),
-                name: firstNonEmptyString(firstFile?.name, firstFile?.filename, fileName),
-              },
-            ],
-            name: firstNonEmptyString(
-              apiMessage.name,
-              firstFile?.name,
-              firstFile?.filename,
-              fileName,
-            ),
-          };
-          const ui = mapApiMessageToChatMessage(normalizedApiMessage, currentUserId, {
-            chatStatus: isRequest ? 'pending' : undefined,
-          });
-          if (ui) {
-            setMessages((prev) => [...prev, ui]);
-            appendedOutgoing = true;
-            bumpScrollAfterLocalSend(); // ADD THIS
-            // setTimeout(() => {
-            //   scrollToBottom(true);
-            // }, 100);
-
-          }
-          if (currentUserId && otherUserId) {
-            socketService.messageSendFromApi(
-              currentUserId,
-              otherUserId,
-              normalizedApiMessage as unknown as Record<string, unknown>
-            );
-          }
+        const extracted = extractChatMessageFromSendResponse(res);
+        const base = enrichOutgoingMediaPayload(extracted, messageType, url);
+        const firstFile = Array.isArray(base.files) ? base.files[0] : undefined;
+        const normalizedApiMessage: ChatMessageApiItem = {
+          ...base,
+          files: [
+            {
+              ...(firstFile ?? {}),
+              url: firstNonEmptyString(firstFile?.url, firstFile?.uri, url),
+              uri: firstNonEmptyString(firstFile?.uri, firstFile?.url, url),
+              name: firstNonEmptyString(firstFile?.name, firstFile?.filename, fileName),
+            },
+          ],
+          name: firstNonEmptyString(
+            base.name,
+            firstFile?.name,
+            firstFile?.filename,
+            fileName,
+          ),
+        };
+        const ui = mapApiMessageToChatMessage(normalizedApiMessage, currentUserId, {
+          chatStatus: isRequest ? 'pending' : undefined,
+        });
+        if (ui) {
+          setMessages((prev) => [...prev, ui]);
+          appendedOutgoing = true;
+          bumpScrollAfterLocalSend();
+        }
+        if (currentUserId && otherUserId) {
+          socketService.messageSendFromApi(
+            currentUserId,
+            otherUserId,
+            normalizedApiMessage as unknown as Record<string, unknown>
+          );
         }
       }
 
@@ -1886,8 +1429,8 @@ const applyOverlap = (e: KeyboardEvent) => {
     }
     if (msg.type === 'voice') {
       const messageKey = msg.messageId ?? `${index}_${msg.uri}`;
-      const isCurrentPlaying = playingVoiceMessageKey === messageKey;
-      const isPlayingNow = isCurrentPlaying && !voiceListenPaused;
+      const isCurrentPlaying = voice.playingVoiceMessageKey === messageKey;
+      const isPlayingNow = isCurrentPlaying && !voice.voiceListenPaused;
       return (
         <React.Fragment key={index}>
           <View style={[styles.messageRow, msg.sent ? undefined : styles.messageRowReceived]}>
@@ -1904,7 +1447,7 @@ const applyOverlap = (e: KeyboardEvent) => {
                 style={styles.voiceBubblePlay}
                 activeOpacity={0.8}
                 onPress={() => {
-                  toggleVoiceMessagePlayback(msg.uri, messageKey).catch(() => {});
+                  voice.toggleVoiceMessagePlayback(msg.uri, messageKey).catch(() => {});
                 }}
               >
                 {isPlayingNow ? (
@@ -2107,7 +1650,8 @@ const applyOverlap = (e: KeyboardEvent) => {
 
   const handleComposerTextContentSizeChange = useCallback(
     (e: { nativeEvent: { contentSize: { height: number } } }) => {
-      const h = e.nativeEvent.contentSize.height;
+      const raw = e.nativeEvent.contentSize.height;
+      const h = typeof raw === 'number' && Number.isFinite(raw) ? raw : CHAT_INPUT_MIN_HEIGHT;
       setComposerInputHeight(
         Math.min(CHAT_INPUT_MAX_HEIGHT, Math.max(CHAT_INPUT_MIN_HEIGHT, h)),
       );
@@ -2369,7 +1913,6 @@ const applyOverlap = (e: KeyboardEvent) => {
                   style={styles.askAiraConfirmGenerateButton}
                   onPress={() => {
                     if (!chatId) return;
-                    setAskAiraConfirmLoading(true);
                     if (dontShowAskAiraAgain) {
                       AsyncStorage.setItem(DONT_SHOW_ASK_AIRA_CONFIRM_KEY, 'true').then(() => {
                         setDontShowAskAiraPersisted(true);
@@ -2395,7 +1938,7 @@ const applyOverlap = (e: KeyboardEvent) => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.askAiraConfirmCheckRow}
-                  onPress={() => setDontShowAskAiraAgain((v) => !v)}
+                  onPress={() => setDontShowAskAiraAgain(!dontShowAskAiraAgain)}
                   activeOpacity={0.8}
                   disabled={askAiraConfirmLoading}
                 >
@@ -2768,13 +2311,13 @@ const applyOverlap = (e: KeyboardEvent) => {
         style={[styles.bottomComposerContainer, { bottom: composerBottomOffset }]}
         onLayout={handleComposerLayout}
       >
-      {voiceBarVisible ? (
+      {voice.voiceBarVisible ? (
         <View style={[styles.voiceBar, { paddingBottom: 12 + bottomSafeInset }]}>
           <TouchableOpacity
             style={styles.voiceBarTrash}
             activeOpacity={0.8}
-            onPress={handleVoiceTrash}
-            disabled={voiceSendLoading}
+            onPress={voice.handleVoiceTrash}
+            disabled={voice.voiceSendLoading}
           >
             <DeleteIcon size={20} color={colors.white} />
           </TouchableOpacity>
@@ -2782,10 +2325,10 @@ const applyOverlap = (e: KeyboardEvent) => {
             <TouchableOpacity
               style={styles.voiceBarPlayPause}
               activeOpacity={0.8}
-              onPress={handleVoicePlayPause}
-              disabled={voiceSendLoading}
+              onPress={voice.handleVoicePlayPause}
+              disabled={voice.voiceSendLoading}
             >
-              {voicePaused ? (
+              {voice.voicePaused ? (
                 <PlayIcon size={22} color={colors.black} />
               ) : (
                 <PauseIcon size={22} color={colors.black} />
@@ -2799,17 +2342,17 @@ const applyOverlap = (e: KeyboardEvent) => {
                 />
               ))}
             </View>
-            <Text style={styles.voiceBarTimer}>{formatVoiceTime(voiceSeconds)}</Text>
+            <Text style={styles.voiceBarTimer}>{voice.formatVoiceTime(voice.voiceSeconds)}</Text>
           </View>
           <TouchableOpacity
             style={styles.voiceBarSend}
             activeOpacity={0.8}
             onPress={() => {
-              handleVoiceSend().catch(() => {});
+              voice.handleVoiceSend().catch(() => {});
             }}
-            disabled={voiceSendLoading}
+            disabled={voice.voiceSendLoading}
           >
-            {voiceSendLoading ? (
+            {voice.voiceSendLoading ? (
               <ActivityIndicator size="small" color={colors.white} />
             ) : (
               <ForwardArrowIcon size={22} color={colors.white} />
@@ -3073,7 +2616,7 @@ const applyOverlap = (e: KeyboardEvent) => {
               }
               handleSend().catch(() => {});
             }}
-            disabled={sendLoading || voiceSendLoading}
+            disabled={sendLoading || voice.voiceSendLoading}
           >
             {sendLoading ? (
               <ActivityIndicator size="small" color={colors.white} />
@@ -3096,11 +2639,14 @@ const applyOverlap = (e: KeyboardEvent) => {
 
       <ReusableBottomSheet
         isOpen={showCameraPermissionSheet}
-        onClose={() => setShowCameraPermissionSheet(false)}
+        onClose={() => {
+          if (isRequestingPermission) return;
+          handleAllowCameraPermission().catch(() => {});
+        }}
         snapPoints={[336]}
         showDragHandle
         showCloseButton={false}
-        enablePanDownToClose
+        enablePanDownToClose={false}
         backgroundStyle={permissionSheetStyles.sheet}
         backdropStyle={permissionSheetStyles.backdrop}
         dragHandleContainerStyle={permissionSheetStyles.dragHandleContainer}
@@ -3132,18 +2678,9 @@ const applyOverlap = (e: KeyboardEvent) => {
                 <ActivityIndicator color={colors.white} />
               ) : (
                 <Text style={permissionSheetStyles.primaryButtonText}>
-                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
+                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.CONTINUE}
                 </Text>
               )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => setShowCameraPermissionSheet(false)}
-              disabled={isRequestingPermission}
-              style={permissionSheetStyles.secondaryButton}
-            >
-              <Text style={permissionSheetStyles.secondaryButtonText}>Don’t Allow</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -3151,11 +2688,14 @@ const applyOverlap = (e: KeyboardEvent) => {
 
       <ReusableBottomSheet
         isOpen={showGalleryPermissionSheet}
-        onClose={() => setShowGalleryPermissionSheet(false)}
+        onClose={() => {
+          if (isRequestingPermission) return;
+          handleAllowGalleryPermission().catch(() => {});
+        }}
         snapPoints={[336]}
         showDragHandle
         showCloseButton={false}
-        enablePanDownToClose
+        enablePanDownToClose={false}
         backgroundStyle={permissionSheetStyles.sheet}
         backdropStyle={permissionSheetStyles.backdrop}
         dragHandleContainerStyle={permissionSheetStyles.dragHandleContainer}
@@ -3187,18 +2727,9 @@ const applyOverlap = (e: KeyboardEvent) => {
                 <ActivityIndicator color={colors.white} />
               ) : (
                 <Text style={permissionSheetStyles.primaryButtonText}>
-                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
+                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.CONTINUE}
                 </Text>
               )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => setShowGalleryPermissionSheet(false)}
-              disabled={isRequestingPermission}
-              style={permissionSheetStyles.secondaryButton}
-            >
-              <Text style={permissionSheetStyles.secondaryButtonText}>Don’t Allow</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -3206,11 +2737,14 @@ const applyOverlap = (e: KeyboardEvent) => {
 
       <ReusableBottomSheet
         isOpen={showMicrophonePermissionSheet}
-        onClose={() => setShowMicrophonePermissionSheet(false)}
+        onClose={() => {
+          if (isRequestingPermission) return;
+          handleAllowMicrophonePermission().catch(() => {});
+        }}
         snapPoints={[336]}
         showDragHandle
         showCloseButton={false}
-        enablePanDownToClose
+        enablePanDownToClose={false}
         backgroundStyle={permissionSheetStyles.sheet}
         backdropStyle={permissionSheetStyles.backdrop}
         dragHandleContainerStyle={permissionSheetStyles.dragHandleContainer}
@@ -3244,19 +2778,9 @@ const applyOverlap = (e: KeyboardEvent) => {
                 <ActivityIndicator color={colors.white} />
               ) : (
                 <Text style={permissionSheetStyles.primaryButtonText}>
-                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
+                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.CONTINUE}
                 </Text>
               )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => setShowMicrophonePermissionSheet(false)}
-              disabled={isRequestingPermission}
-              style={permissionSheetStyles.secondaryButton}
-            >
-              <Text style={permissionSheetStyles.secondaryButtonText}>
-                {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.DONT_ALLOW}
-              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -3264,6 +2788,7 @@ const applyOverlap = (e: KeyboardEvent) => {
 
       <ReusableBottomSheet
         isOpen={showReportSheet}
+
         onClose={() => {
           setShowReportSheet(false);
           setReportSheetMode('report');
@@ -3275,7 +2800,7 @@ const applyOverlap = (e: KeyboardEvent) => {
         showCloseButton={false}
         enablePanDownToClose
         backgroundStyle={permissionSheetStyles.sheet}
-        scrollEnabled={false}
+        scrollEnabled={true}
       >
         <View style={reportSheetStyles.content}>
           <View style={reportSheetStyles.iconWrap}>

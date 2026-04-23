@@ -25,7 +25,6 @@ export const typography = {
   /** Heading 1 / Semibold — 32 / 40 */
   h1: {
     fontSize: 32,
-    fontWeight: '600' as const,
     lineHeight: 40,
     letterSpacing: 0,
     fontFamily: clash.semibold,
@@ -33,7 +32,6 @@ export const typography = {
   /** Heading 1 / Medium — 32 / 40 */
   h1Medium: {
     fontSize: 32,
-    fontWeight: '500' as const,
     lineHeight: 40,
     letterSpacing: 0,
     fontFamily: clash.medium,
@@ -41,7 +39,6 @@ export const typography = {
   /** Heading 2 / Semibold — 28 / 36 */
   h2Semibold: {
     fontSize: 28,
-    fontWeight: '600' as const,
     lineHeight: 36,
     letterSpacing: 0,
     fontFamily: clash.semibold,
@@ -49,7 +46,6 @@ export const typography = {
   /** Heading 2 / Medium — 28 / 36 */
   h2: {
     fontSize: 28,
-    fontWeight: '500' as const,
     lineHeight: 36,
     letterSpacing: 0,
     fontFamily: clash.medium,
@@ -57,7 +53,6 @@ export const typography = {
   /** Heading 3 / Semibold — 24 / 32 */
   h3Semibold: {
     fontSize: 24,
-    fontWeight: '600' as const,
     lineHeight: 32,
     letterSpacing: 0,
     fontFamily: clash.semibold,
@@ -65,7 +60,6 @@ export const typography = {
   /** Heading 3 / Medium — 24 / 32 */
   h3: {
     fontSize: 24,
-    fontWeight: '500' as const,
     lineHeight: 32,
     letterSpacing: 0,
     fontFamily: clash.medium,
@@ -73,7 +67,6 @@ export const typography = {
   /** Screen titles / subheads (not in H1–H3 scale) */
   h4: {
     fontSize: 20,
-    fontWeight: '500' as const,
     lineHeight: 28,
     letterSpacing: 0,
     fontFamily: clash.medium,
@@ -81,7 +74,6 @@ export const typography = {
 
   body: {
     fontSize: 16,
-    fontWeight: '400' as const,
     lineHeight: 24,
     fontFamily: clash.regular,
     letterSpacing: 0,
@@ -89,14 +81,12 @@ export const typography = {
   /** Body/Large/Medium — Figma 16 / 22 / tracking 2% → 0.32px */
   bodyMedium: {
     fontSize: 16,
-    fontWeight: '500' as const,
     lineHeight: 22,
     letterSpacing: 0.32,
     fontFamily: clash.medium,
   },
   bodyLarge: {
     fontSize: 18,
-    fontWeight: '400' as const,
     lineHeight: 26,
     fontFamily: clash.regular,
     letterSpacing: 0,
@@ -105,14 +95,12 @@ export const typography = {
   /** Buttons Text / Medium — Figma 16 / 22 / tracking 2% */
   button: {
     fontSize: 16,
-    fontWeight: '500' as const,
     lineHeight: 22,
     letterSpacing: 0.32,
     fontFamily: clash.medium,
   },
   buttonLarge: {
     fontSize: 18,
-    fontWeight: '500' as const,
     lineHeight: 24,
     letterSpacing: 0.36,
     fontFamily: clash.medium,
@@ -120,14 +108,12 @@ export const typography = {
 
   small: {
     fontSize: 12,
-    fontWeight: '400' as const,
     lineHeight: 14,
     letterSpacing: 0.48,
     fontFamily: clash.regular,
   },
   caption: {
     fontSize: 10,
-    fontWeight: '400' as const,
     lineHeight: 12,
     letterSpacing: 0.4,
     fontFamily: clash.regular,
@@ -135,7 +121,6 @@ export const typography = {
 
   label: {
     fontSize: 14,
-    fontWeight: '500' as const,
     lineHeight: 20,
     letterSpacing: 0.28,
     fontFamily: clash.medium,

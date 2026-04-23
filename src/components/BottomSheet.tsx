@@ -23,6 +23,8 @@ interface BottomSheetProps {
   showDragHandle?: boolean;
   showCloseButton?: boolean;
   enablePanDownToClose?: boolean;
+  /** When false, tapping the dimmed backdrop does not call onClose (default: true). */
+  closeOnBackdropPress?: boolean;
   backgroundStyle?: object;
   backdropStyle?: object;
   dragHandleContainerStyle?: object;
@@ -40,6 +42,7 @@ export const ReusableBottomSheet: React.FC<BottomSheetProps> = ({
   showDragHandle = true,
   showCloseButton = true,
   enablePanDownToClose = true,
+  closeOnBackdropPress = true,
   backgroundStyle,
   backdropStyle,
   dragHandleContainerStyle,
@@ -176,51 +179,89 @@ export const ReusableBottomSheet: React.FC<BottomSheetProps> = ({
   }, [isOpen, slideAnim, backdropOpacity]);
 
   useEffect(() => {
-    if (!isOpen || Platform.OS !== 'ios') {
+    if (!isOpen) {
       keyboardShift.setValue(0);
       return;
     }
-  
-    const MIN_TOP_SPACE = 80;
-    let lastShift = 0;
-  
-    const subscription = Keyboard.addListener(
-      'keyboardWillChangeFrame',
-      (event) => {
-        const screenY = event.endCoordinates.screenY;
-        const keyboardHeight = SCREEN_HEIGHT - screenY;
-  
-        if (keyboardHeight <= 0) {
-          // Keyboard closing
+
+    /**
+     * Move the sheet up by the full keyboard height so its bottom edge sits above the IME.
+     * Do NOT clamp using `SCREEN_HEIGHT - sheetHeight - MIN_TOP_SPACE`: for tall sheets (e.g. 90%),
+     * that clamp becomes ~0 so `Math.max(-keyboardHeight, 0)` prevents any movement — the classic
+     * “keyboard opens but sheet doesn’t budge” bug. Allowing the top of the sheet to move off-screen
+     * is fine; users need the bottom (with TextInputs) above the keyboard.
+     */
+    const computeShiftUp = (keyboardHeight: number) => {
+      if (keyboardHeight <= 0) return 0;
+      return -keyboardHeight;
+    };
+
+    if (Platform.OS === 'ios') {
+      let lastShift = 0;
+
+      const subscription = Keyboard.addListener(
+        'keyboardWillChangeFrame',
+        (event) => {
+          const screenY = event.endCoordinates.screenY;
+          const keyboardHeight = SCREEN_HEIGHT - screenY;
+
+          if (keyboardHeight <= 0) {
+            Animated.timing(keyboardShift, {
+              toValue: 0,
+              duration: event.duration ?? 250,
+              useNativeDriver: true,
+            }).start();
+            lastShift = 0;
+            return;
+          }
+
+          const shift = computeShiftUp(keyboardHeight);
+
+          if (Math.abs(shift - lastShift) < 6) {
+            return;
+          }
+
+          lastShift = shift;
+
           Animated.timing(keyboardShift, {
-            toValue: 0,
+            toValue: shift,
             duration: event.duration ?? 250,
             useNativeDriver: true,
           }).start();
-          lastShift = 0;
-          return;
-        }
-  
-        let shift = -keyboardHeight;
-        const maxNegativeShift = -(SCREEN_HEIGHT - sheetHeight - MIN_TOP_SPACE);
-        shift = Math.max(shift, maxNegativeShift);
-  
-        // 🔥 PREVENT MICRO-FLICKER
-        if (Math.abs(shift - lastShift) < 6) {
-          return;
-        }
-  
-        lastShift = shift;
-  
-        Animated.timing(keyboardShift, {
-          toValue: shift,
-          duration: event.duration ?? 250,
-          useNativeDriver: true,
-        }).start();
+        },
+      );
+
+      return () => subscription.remove();
+    }
+
+    // Android: Modal does not resize like the main activity; lift the sheet when the keyboard opens.
+    let lastAndroidShift = 0;
+    const onShow = Keyboard.addListener('keyboardDidShow', (e) => {
+      const keyboardHeight = e.endCoordinates?.height ?? 0;
+      const shift = computeShiftUp(keyboardHeight);
+      if (Math.abs(shift - lastAndroidShift) < 6) {
+        return;
       }
-    );
-  
-    return () => subscription.remove();
+      lastAndroidShift = shift;
+      Animated.timing(keyboardShift, {
+        toValue: shift,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    });
+    const onHide = Keyboard.addListener('keyboardDidHide', () => {
+      lastAndroidShift = 0;
+      Animated.timing(keyboardShift, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    return () => {
+      onShow.remove();
+      onHide.remove();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, sheetHeight]);
   
@@ -234,12 +275,24 @@ export const ReusableBottomSheet: React.FC<BottomSheetProps> = ({
       transparent
       visible={isOpen}
       animationType="none"
-      onRequestClose={onClose}
+      onRequestClose={closeOnBackdropPress ? onClose : () => {}}
       statusBarTranslucent={true}
     >
       <View style={styles.modalContainer}>
         {/* Backdrop */}
-        <TouchableWithoutFeedback onPress={onClose}>
+        {closeOnBackdropPress ? (
+          <TouchableWithoutFeedback onPress={onClose}>
+            <Animated.View
+              style={[
+                styles.backdrop,
+                backdropStyle,
+                {
+                  opacity: backdropOpacity,
+                },
+              ]}
+            />
+          </TouchableWithoutFeedback>
+        ) : (
           <Animated.View
             style={[
               styles.backdrop,
@@ -248,8 +301,9 @@ export const ReusableBottomSheet: React.FC<BottomSheetProps> = ({
                 opacity: backdropOpacity,
               },
             ]}
+            pointerEvents="none"
           />
-        </TouchableWithoutFeedback>
+        )}
 
         {/* Bottom Sheet */}
         <Animated.View
@@ -260,13 +314,7 @@ export const ReusableBottomSheet: React.FC<BottomSheetProps> = ({
             },
             backgroundStyle,
             {
-              transform: [
-                {
-                  translateY:
-                    Platform.OS === 'ios' ? keyboardShift : 0,
-                },
-              ],
-              
+              transform: [{ translateY: keyboardShift }],
             },
           ]}
         >

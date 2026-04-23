@@ -81,7 +81,7 @@ export const FaceVerificationScreen: React.FC = () => {
       const status = await requestCameraPermission();
       if (status === 'granted') {
         navigation.navigate('SelfieCamera');
-      } else if (status === 'denied' && Platform.OS === 'ios') {
+      } else if (status === 'denied') {
         showCameraDeniedSettingsAlert();
       }
     } catch {
@@ -91,15 +91,9 @@ export const FaceVerificationScreen: React.FC = () => {
     }
   };
 
-  const handleDontAllow = () => {
-    setShowPermissionSheet(false);
-
-    // Keep the sheet open - user must grant permission
-  };
-
   const handleCloseSheet = () => {
-    setShowPermissionSheet(false);
-    // Prevent closing without granting permission
+    if (isRequesting) return;
+    handleAllow().catch(() => {});
   };
 
   return (
@@ -192,18 +186,10 @@ export const FaceVerificationScreen: React.FC = () => {
               >
                 <View style={styles.allowButtonInner}>
                   <Text style={styles.allowButtonText}>
-                    {isRequesting ? 'Requesting...' : 'Allow'}
+                    {isRequesting ? 'Requesting...' : 'Continue'}
                   </Text>
                 </View>
               </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleDontAllow}
-              activeOpacity={0.7}
-              style={styles.dontAllowButton}
-            >
-              <Text style={styles.dontAllowButtonText}>Don't Allow</Text>
             </TouchableOpacity>
           </View>
         </View>

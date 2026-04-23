@@ -15,6 +15,7 @@ import { getPostAuthScreen } from './getPostAuthScreen';
 import { ApiErrorModal } from '../components/ApiErrorModal';
 import ConnectivityWatcher from '../components/ConnectivityWatcher';
 import { RequestTimeoutModal } from '../components/RequestTimeoutModal';
+import { StoreUpdatePrompt } from '../components/StoreUpdatePrompt';
 
 const RootStack = createNativeStackNavigator();
 
@@ -56,6 +57,7 @@ export const RootNavigator = () => {
         variant={apiErrorVariant}
       />
       <RequestTimeoutModal />
+      <StoreUpdatePrompt />
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {/* Show SplashScreen while checking authentication */}
         {isLoading ? (

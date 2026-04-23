@@ -45,6 +45,7 @@ import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
 import { STRINGS } from '../../constants/strings';
 import { DASHBOARD_WALKTHROUGH_STORAGE_KEY } from '../../constants/dashboardWalkthroughStorage';
+import { showErrorToast, showSuccessToast } from '../../services/toast.srvice';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -208,6 +209,7 @@ export const DashboardScreen = () => {
 
   const fetchCursorPage = useCallback(
     async (cursor: string | null, direction: 'forward' | 'backward'): Promise<CursorPageResult> => {
+      console.log('Fetching matches cursor page', { cursor, direction });
       const res = await apiClient.post(endpoints.matches.getMatchesCursorPage, {
         cursor,
         direction,
@@ -1008,7 +1010,7 @@ export const DashboardScreen = () => {
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
                   >
-                    Let Aira break
+                   Aira Introduce
                   </GradientText>
                   <GradientText
                     style={{ fontSize: 16, fontWeight: '500' }}
@@ -1016,7 +1018,7 @@ export const DashboardScreen = () => {
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
                   >
-                    the ice
+                  Me
                   </GradientText>
                 </View>
               </Pressable>
@@ -1090,13 +1092,13 @@ export const DashboardScreen = () => {
                       setShowMatchOptions(false);
                       setOptionsMatch(null);
                       await bootstrapMatches();
-                      Alert.alert('Blocked', apiMessage.toString());
+                      showSuccessToast(apiMessage.toString());
                     } catch (e: any) {
                       const errMessage =
                         e?.response?.data?.message ??
                         e?.message ??
                         'Could not block this user. Please try again.';
-                      Alert.alert('Error', errMessage.toString());
+                      showErrorToast(errMessage.toString());
                     } finally {
                       setBlockLoading(false);
                     }
@@ -1133,13 +1135,13 @@ export const DashboardScreen = () => {
                       setShowMatchOptions(false);
                       setOptionsMatch(null);
                       await bootstrapMatches();
-                      Alert.alert('Reported', apiMessage.toString());
+                      showSuccessToast(apiMessage.toString());
                     } catch (e: any) {
                       const errMessage =
                         e?.response?.data?.message ??
                         e?.message ??
                         'Could not submit report. Please try again.';
-                      Alert.alert('Error', errMessage.toString());
+                      showErrorToast(errMessage.toString());
                     } finally {
                       setReportLoading(false);
                     }

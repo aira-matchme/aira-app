@@ -8,6 +8,14 @@ export const STRINGS = {
     NO_INTERNET_MESSAGE:
       'Please check your Wi-Fi or mobile data and try again.',
   },
+
+  /** Android in-app update sheet — Figma node 3557-13281 (single CTA; no Remind me later). */
+  APP_UPDATE: {
+    TITLE: 'Update available',
+    MESSAGE:
+      'A new version of Aira is ready with improvements and fixes. Update now to get the latest experience.',
+    CTA: 'Update now',
+  },
   // Email Login Screen
   EMAIL_LOGIN: {
     TITLE: 'Enter your email',

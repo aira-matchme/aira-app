@@ -60,14 +60,25 @@ export const verifyOtpApi = async (
   payload: VerifyOtpRequest
 ): Promise<AuthResponse> => {
   const deviceToken = String(payload.deviceToken ?? '').trim();
-  if (!deviceToken) {
-    throw new Error('deviceToken should not be empty');
-  }
+  const body: VerifyOtpRequest = {
+    ...payload,
+    ...(deviceToken ? { deviceToken } : { deviceToken: undefined }),
+  };
   const { data } = await apiClient.post<AuthResponse>(
     endpoints.auth.verifyOtp,
-    { ...payload, deviceToken }
+    body
   );
   return data;
+};
+
+export interface RegisterFcmTokenRequest {
+  deviceId: string;
+  deviceToken: string;
+  deviceType: 'android' | 'ios' | 'web';
+}
+
+export const registerFcmTokenApi = async (payload: RegisterFcmTokenRequest): Promise<void> => {
+  await apiClient.post(endpoints.auth.fcmToken, payload);
 };
 
 export const socialLoginApi = async (

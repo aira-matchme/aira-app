@@ -23,7 +23,9 @@ import { colors, spacing, typography } from '../../../theme';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { env } from '../../../config/env';
 import { useAuthStore } from '../../../store/auth.store';
-import { checkNotificationPermission } from '../../../config/permissions';
+import {
+  checkNotificationPermission,
+} from '../../../config/permissions';
 import { getPostAuthScreen } from '../../../navigation/getPostAuthScreen';
 import appleAuth from '@invertase/react-native-apple-authentication';
 import { apiClient } from '../../../services/api/client';
@@ -159,11 +161,15 @@ export const WelcomeScreen: React.FC = () => {
       const { idToken } = userInfo;
       if (!idToken) return;
 
+      const deviceId = await getNativeDeviceId();
+      const rawDeviceToken = await getDeviceToken();
+      const deviceToken = String(rawDeviceToken ?? '').trim() || undefined;
+
       const payload = {
         idToken,
         deviceType: Platform.OS === 'android' ? 'android' : 'ios',
-        deviceId: await getNativeDeviceId(),
-        deviceToken: await getDeviceToken(),
+        deviceId,
+        deviceToken,
       };
 
       const response = await apiClient.post(endpoints.auth.googleLogin, payload);
@@ -176,7 +182,7 @@ export const WelcomeScreen: React.FC = () => {
         navigation.navigate(screen as any);
         return;
       }
-      navigation.navigate('EnableNotifications');
+      navigation.navigate('ProfileIntro');
     } catch(e) {
       console.log('Google Sign-In error:', e);
       console.log('Google Sign-In failed');
@@ -198,11 +204,15 @@ export const WelcomeScreen: React.FC = () => {
       const { identityToken } = appleAuthRequestResponse;
       if (!identityToken) return;
 
+      const deviceId = await getNativeDeviceId();
+      const rawDeviceToken = await getDeviceToken();
+      const deviceToken = String(rawDeviceToken ?? '').trim() || undefined;
+
       const payload = {
         idToken: identityToken,
         deviceType: Platform.OS === 'android' ? 'android' : 'ios',
-        deviceId: await getNativeDeviceId(),
-        deviceToken: await getDeviceToken(),
+        deviceId,
+        deviceToken,
       };
 
       const response = await apiClient.post(endpoints.auth.appleLogin, payload);
@@ -215,7 +225,7 @@ export const WelcomeScreen: React.FC = () => {
         navigation.navigate(screen as any);
         return;
       }
-      navigation.navigate('EnableNotifications');
+      navigation.navigate('ProfileIntro');
     } catch (error: any) {
       if (error?.code !== appleAuth.Error.CANCELED) {
         // Apple login failed

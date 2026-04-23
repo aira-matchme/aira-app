@@ -11,6 +11,7 @@ import {
   NativeModules,
   DeviceEventEmitter,
   requireNativeComponent,
+  Alert,
   Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -131,6 +132,17 @@ export const VideoVerificationScreen: React.FC = () => {
 
   const livenessSubmittedRef = useRef(false);
 
+  const showCameraDeniedSettingsAlert = () => {
+    Alert.alert(
+      'Camera access is turned off',
+      'To continue, allow camera access for Aira in Settings. You can turn it on and return here.',
+      [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+      ],
+    );
+  };
+
   /* ------------------------------------------------------------------ */
   /* ---------------- ANDROID CAMERA LISTENER ------------------------- */
   /* ------------------------------------------------------------------ */
@@ -191,10 +203,9 @@ export const VideoVerificationScreen: React.FC = () => {
         setShowPermissionSheet(false);
         setShowCamera(true);
         StatusBar.setHidden(true);
-      } else if (status === 'denied') {
+      } else {
         setShowPermissionSheet(false);
-      } else if (status === 'notDetermined') {
-        setShowPermissionSheet(false);
+        showCameraDeniedSettingsAlert();
       }
     } catch {
       setShowPermissionSheet(false);
@@ -203,14 +214,9 @@ export const VideoVerificationScreen: React.FC = () => {
     }
   };
 
-  const handleDontAllow = () => {
-    setShowPermissionSheet(false);
-    // User declined
-  };
-
   const handleCloseSheet = () => {
-    setShowPermissionSheet(false);
-    // Close sheet
+    if (isRequesting) return;
+    handleAllow().catch(() => {});
   };
 
   const handleStartVerification = async () => {
@@ -386,18 +392,10 @@ export const VideoVerificationScreen: React.FC = () => {
               >
                 <View style={styles.allowButtonInner}>
                   <Text style={styles.allowButtonText}>
-                    {isRequesting ? 'Requesting...' : 'Allow'}
+                    {isRequesting ? 'Requesting...' : 'Continue'}
                   </Text>
                 </View>
               </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleDontAllow}
-              activeOpacity={0.7}
-              style={styles.dontAllowButton}
-            >
-              <Text style={styles.dontAllowButtonText}>Don't Allow</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -9,6 +9,7 @@ import { AuthProvider } from './src/app/AuthProvider';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import * as Sentry from '@sentry/react-native';
 import { getSentryDist, getSentryRelease } from './src/services/sentry/release';
+import { syncSentryDeviceContext } from './src/services/sentry/deviceContext';
 
 Sentry.init({
   dsn: 'https://21d056737c05cfb00b3a0c1188669429@o4511193937739776.ingest.us.sentry.io/4511193938788352',
@@ -21,6 +22,7 @@ Sentry.init({
 
   // Enable Logs
   enableLogs: true,
+  debug: __DEV__,
 
   // Configure Session Replay
   replaysSessionSampleRate: 0.1,
@@ -35,6 +37,10 @@ Sentry.init({
 });
 
 const App = () => {
+  useEffect(() => {
+    void syncSentryDeviceContext();
+  }, []);
+
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" />

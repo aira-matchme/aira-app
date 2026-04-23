@@ -44,7 +44,7 @@ export interface SocialLoginRequest {
 export interface VerifyOtpRequest {
   email: string;
   otp: string;
-  deviceToken: string;
+  deviceToken?: string;
   deviceId: string;
   deviceType?: 'android' | 'ios' | 'web';
 }

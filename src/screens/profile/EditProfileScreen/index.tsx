@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
+  Alert,
   Linking,
   ActivityIndicator,
 } from 'react-native';
@@ -107,6 +108,22 @@ export const EditProfileScreen: React.FC = () => {
   const [showGalleryPermissionSheet, setShowGalleryPermissionSheet] = useState(false);
   const [pendingGalleryIndex, setPendingGalleryIndex] = useState<number | null>(null);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+
+  const showSettingsAlert = (permissionName: 'camera' | 'photos') => {
+    const title =
+      permissionName === 'camera'
+        ? 'Camera access is turned off'
+        : 'Photo access is turned off';
+    const message =
+      permissionName === 'camera'
+        ? 'To continue, allow camera access for Aira in Settings.'
+        : 'To continue, allow photo library access for Aira in Settings.';
+
+    Alert.alert(title, message, [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+    ]);
+  };
   const isPickingGalleryRef = useRef(false);
   const [uploadingSlot, setUploadingSlot] = useState<number | null>(null);
 
@@ -202,8 +219,7 @@ export const EditProfileScreen: React.FC = () => {
       setShowCameraPermissionSheet(false);
       setPendingCameraIndex(null);
       if (status === 'granted') openCameraForSlot(index);
-      else
-        setShowCameraPermissionSheet(false);
+      else showSettingsAlert('camera');
     } catch {
       setShowCameraPermissionSheet(false);
       setPendingCameraIndex(null);
@@ -247,8 +263,7 @@ export const EditProfileScreen: React.FC = () => {
       setPendingGalleryIndex(null);
       const hasAccess = status === 'granted' || status === 'limited';
       if (hasAccess) openGalleryForSlot(index);
-      else
-        setShowGalleryPermissionSheet(false);
+      else showSettingsAlert('photos');
     } catch {
       setShowGalleryPermissionSheet(false);
       setPendingGalleryIndex(null);
@@ -648,13 +663,13 @@ export const EditProfileScreen: React.FC = () => {
       <ReusableBottomSheet
         isOpen={showCameraPermissionSheet}
         onClose={() => {
-          setShowCameraPermissionSheet(false);
-          setPendingCameraIndex(null);
+          if (isRequestingPermission) return;
+          handleAllowCameraPermission().catch(() => {});
         }}
         snapPoints={[336]}
         showDragHandle={true}
         showCloseButton={false}
-        enablePanDownToClose={true}
+        enablePanDownToClose={false}
         backgroundStyle={permissionSheetStyles.sheet}
         backdropStyle={permissionSheetStyles.backdrop}
         dragHandleContainerStyle={permissionSheetStyles.dragHandleContainer}
@@ -686,21 +701,9 @@ export const EditProfileScreen: React.FC = () => {
                 <ActivityIndicator color={colors.white} />
               ) : (
                 <Text style={permissionSheetStyles.primaryButtonText}>
-                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
+                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.CONTINUE}
                 </Text>
               )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => {
-                setShowCameraPermissionSheet(false);
-                setPendingCameraIndex(null);
-              }}
-              disabled={isRequestingPermission}
-              style={permissionSheetStyles.secondaryButton}
-            >
-              <Text style={permissionSheetStyles.secondaryButtonText}>Don’t Allow</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -709,13 +712,13 @@ export const EditProfileScreen: React.FC = () => {
       <ReusableBottomSheet
         isOpen={showGalleryPermissionSheet}
         onClose={() => {
-          setShowGalleryPermissionSheet(false);
-          setPendingGalleryIndex(null);
+          if (isRequestingPermission) return;
+          handleAllowGalleryPermission().catch(() => {});
         }}
         snapPoints={[336]}
         showDragHandle={true}
         showCloseButton={false}
-        enablePanDownToClose={true}
+        enablePanDownToClose={false}
         backgroundStyle={permissionSheetStyles.sheet}
         backdropStyle={permissionSheetStyles.backdrop}
         dragHandleContainerStyle={permissionSheetStyles.dragHandleContainer}
@@ -747,21 +750,9 @@ export const EditProfileScreen: React.FC = () => {
                 <ActivityIndicator color={colors.white} />
               ) : (
                 <Text style={permissionSheetStyles.primaryButtonText}>
-                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.ALLOW}
+                  {STRINGS.PROFILE_SETUP.PROFILE_PHOTOS.CONTINUE}
                 </Text>
               )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => {
-                setShowGalleryPermissionSheet(false);
-                setPendingGalleryIndex(null);
-              }}
-              disabled={isRequestingPermission}
-              style={permissionSheetStyles.secondaryButton}
-            >
-              <Text style={permissionSheetStyles.secondaryButtonText}>Don’t Allow</Text>
             </TouchableOpacity>
           </View>
         </View>

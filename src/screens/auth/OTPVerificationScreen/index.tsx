@@ -15,9 +15,12 @@ import type { RootStackParamList, AuthStackParamList } from '../../../navigation
 import { useVerifyOtp, useSendOtp, useResendOtp } from '../../../modules/auth/hooks';
 import { getProfileApi } from '../../../modules/auth/api';
 import { useAuthStore } from '../../../store/auth.store';
-import { checkNotificationPermission } from '../../../config/permissions';
+import {
+  checkNotificationPermission,
+} from '../../../config/permissions';
 import { getPostAuthScreen, type PostAuthUser } from '../../../navigation/getPostAuthScreen';
 import Toast from 'react-native-toast-message';
+import * as Sentry from '@sentry/react-native';
 import { styles } from './styles';
 import { getDeviceToken } from '../../../services/firebase/messaging';
 import { getNativeDeviceId } from '../../../utils/getNativeDeviceId';
@@ -50,6 +53,7 @@ export const OTPVerificationScreen: React.FC = () => {
   const [canResend, setCanResend] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [apiError, setApiError] = useState<string | undefined>();
+  const [isSubmittingVerify, setIsSubmittingVerify] = useState(false);
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   /** Warm FCM token while the user waits for the email; avoids verify-time races on iOS APNs. */
@@ -162,24 +166,22 @@ export const OTPVerificationScreen: React.FC = () => {
   };
 
   const onSubmit = async (data: OTPFormData) => {
+    if (isSubmittingVerify || verifyOtpMutation.isPending || isVerified) {
+      return;
+    }
+    setIsSubmittingVerify(true);
     setApiError(undefined);
     clearErrors('otp');
 
     try {
-      const deviceToken = (await resolveDeviceTokenForVerify())?.trim();
-      if (!deviceToken) {
-        const message = STRINGS.OTP_VERIFICATION.ERROR_DEVICE_TOKEN;
-        setApiError(message);
-        setError('otp', { type: 'manual', message });
-        return;
-      }
-
+      const deviceId = await getNativeDeviceId();
+      const resolvedDeviceToken = (await resolveDeviceTokenForVerify())?.trim() ?? '';
       const response = await verifyOtpMutation.mutateAsync({
         email,
         otp: data.otp,
-        deviceToken,
-        deviceId: await getNativeDeviceId(),
+        deviceId,
         deviceType: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web',
+        ...(resolvedDeviceToken ? { deviceToken: resolvedDeviceToken } : {}),
       });
       if (response.data?.accessToken && response.data?.refreshToken) {
         await setTokens(response.data.accessToken, response.data.refreshToken);
@@ -233,6 +235,13 @@ export const OTPVerificationScreen: React.FC = () => {
         }, 1000);
       }
     } catch (error: any) {
+      Sentry.captureException(error, {
+        tags: { area: 'auth', flow: 'email-otp' },
+        extra: {
+          emailDomain: email.split('@')[1] ?? null,
+          verifyMutationPending: verifyOtpMutation.isPending,
+        },
+      });
       const errorMessage =
         error?.response?.data?.message ||
         error?.message ||
@@ -243,6 +252,8 @@ export const OTPVerificationScreen: React.FC = () => {
         type: 'manual',
         message: errorMessage,
       });
+    } finally {
+      setIsSubmittingVerify(false);
     }
   };
 
@@ -322,14 +333,14 @@ export const OTPVerificationScreen: React.FC = () => {
             title={
               isVerified
                 ? STRINGS.OTP_VERIFICATION.VERIFIED
-                : verifyOtpMutation.isPending
+                : isSubmittingVerify || verifyOtpMutation.isPending
                 ? STRINGS.OTP_VERIFICATION.VERIFYING
                 : STRINGS.OTP_VERIFICATION.VERIFY
             }
             onPress={handleSubmit(onSubmit)}
             variant="primary"
-            disabled={!isValid && !isVerified && !verifyOtpMutation.isPending}
-            loading={verifyOtpMutation.isPending}
+            disabled={!isValid || isVerified || isSubmittingVerify || verifyOtpMutation.isPending}
+            loading={isSubmittingVerify || verifyOtpMutation.isPending}
             success={isVerified}
             successIcon={
               isVerified ? (

@@ -4,9 +4,10 @@ import type { NetInfoState } from '@react-native-community/netinfo';
 import { useApiErrorStore } from '../store/apiError.store';
 
 function isDeviceOffline(state: NetInfoState): boolean {
-  if (state.isConnected === false) return true;
-  if (state.isInternetReachable === false) return true;
-  return false;
+  // Only isConnected is reliable for "no network interface".
+  // isInternetReachable === false is a common false positive (good Wi‑Fi/cellular while
+  // the OS reachability probe fails, VPN, captive portal, or transient checks).
+  return state.isConnected === false;
 }
 
 /**

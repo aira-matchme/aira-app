@@ -47,6 +47,7 @@ import { OccupationEssentialIcon } from '../../assets/icons/match/OccupationEsse
 import { EducationEssentialIcon } from '../../assets/icons/match/EducationEssentialIcon';
 import { InsightsTabIcon } from '../../assets/icons/match/InsightsTabIcon';
 import { InterestChipCheckIcon } from '../../assets/icons/common/InterestChipCheckIcon';
+import { showErrorToast, showSuccessToast } from '../../services/toast.srvice';
 
 type MatchDetailsRoute = RouteProp<RootStackParamList, 'MatchDetails'>;
 
@@ -981,14 +982,14 @@ export const MatchDetailsScreen: React.FC = () => {
                         (res as any)?.message ??
                         'User blocked successfully.';
                       setShowMoreOptions(false);
-                      Alert.alert('Blocked', apiMessage.toString());
+                      showSuccessToast(apiMessage.toString());
                       navigation.goBack();
                     } catch (e: any) {
                       const errMessage =
                         e?.response?.data?.message ??
                         e?.message ??
                         'Could not block this user. Please try again.';
-                      Alert.alert('Error', errMessage.toString());
+                      showErrorToast(errMessage.toString());
                     } finally {
                       setBlockLoading(false);
                     }
@@ -1023,14 +1024,14 @@ export const MatchDetailsScreen: React.FC = () => {
                         (res as any)?.message ??
                         'Report submitted successfully.';
                       setShowMoreOptions(false);
-                      Alert.alert('Reported', apiMessage.toString());
+                      showSuccessToast(apiMessage.toString());
                       navigation.goBack();
                     } catch (e: any) {
                       const errMessage =
                         e?.response?.data?.message ??
                         e?.message ??
                         'Could not submit report. Please try again.';
-                      Alert.alert('Error', errMessage.toString());
+                      showErrorToast(errMessage.toString());
                     } finally {
                       setReportLoading(false);
                     }
@@ -1065,7 +1066,7 @@ export const MatchDetailsScreen: React.FC = () => {
         showDragHandle
         showCloseButton={false}
         enablePanDownToClose={!reportBlockSubmitting}
-        scrollEnabled={false}
+        scrollEnabled={true}
       >
         <View style={reportSheetStyles.content}>
           <View style={reportSheetStyles.iconWrap}>
@@ -1139,14 +1140,14 @@ export const MatchDetailsScreen: React.FC = () => {
                   setShowReportBlockSheet(false);
                   setReportMessageInput('');
                   setSelectedReportReason(null);
-                  Alert.alert('Done', apiMessage.toString());
+                  showSuccessToast(apiMessage.toString());
                   navigation.goBack();
                 } catch (e: any) {
                   const errMessage =
                     e?.response?.data?.message ??
                     e?.message ??
                     'Could not submit report. Please try again.';
-                  Alert.alert('Error', errMessage.toString());
+                  showErrorToast(errMessage.toString());
                 } finally {
                   setReportBlockSubmitting(false);
                 }
@@ -1237,7 +1238,7 @@ export const MatchDetailsScreen: React.FC = () => {
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
                   >
-                    Let Aira break
+                   Aira Introduce
                   </GradientText>
                   <GradientText
                     style={{ fontSize: 16, fontWeight: '500' }}
@@ -1245,7 +1246,7 @@ export const MatchDetailsScreen: React.FC = () => {
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
                   >
-                    the ice
+                  Me
                   </GradientText>
                 </View>
               </Pressable>

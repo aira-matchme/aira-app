@@ -38,17 +38,16 @@ export type PostAuthScreen = keyof Pick<
  * Central logic for post-login / post-auth navigation.
  * Used by AuthNavigator (initial route), LoginOptionsBottomSheet, OTPVerificationScreen, etc.
  *
- * Order: notifications → profile → face verification → gallery photos → questionnaire → main app.
+ * Order: profile → face verification → gallery photos → questionnaire → main app.
  *
  * @param user - Current user from profile API or auth response
- * @param shouldShowEnableNotifications - Whether notification permission prompt is needed (caller checks permission)
+ * @param _shouldShowEnableNotifications - Kept for API compatibility; notifications gate is disabled.
  * @returns Screen name to navigate to
  */
 export function getPostAuthScreen(
   user: PostAuthUser | null,
-  shouldShowEnableNotifications: boolean
+  _shouldShowEnableNotifications: boolean
 ): PostAuthScreen {
-  if (shouldShowEnableNotifications) return 'EnableNotifications';
   if (!user) return 'ProfileIntro';
   if (!user.isProfileComplete) return 'ProfileIntro';
   if (!user.livenessCheck) return 'FaceVerification';

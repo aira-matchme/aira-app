@@ -137,6 +137,8 @@ export const MatchScreen = () => {
   const [keyboardHeight, setKeyboardHeight] = React.useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = React.useState(false);
   const androidBaseWindowHeightRef = React.useRef(windowHeight);
+  const keyboardHideDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const keyboardHeightRef = React.useRef(0);
   const bottomSafeInset = insets.bottom;
 
   const hasText = message.trim().length > 0;
@@ -537,34 +539,45 @@ export const MatchScreen = () => {
   }, []);
 
   React.useEffect(() => {
+    const cancelDebounce = () => {
+      if (keyboardHideDebounceRef.current) {
+        clearTimeout(keyboardHideDebounceRef.current);
+        keyboardHideDebounceRef.current = null;
+      }
+    };
+
     const applyOverlap = (e: KeyboardEvent) => {
+      cancelDebounce();
       const overlap = keyboardOverlapFromEvent(windowHeight, e);
-      setIsKeyboardVisible(overlap > 0);
-      setKeyboardHeight(overlap);
+      const finalHeight =
+        Platform.OS === 'android' ? (overlap < 120 ? 280 : overlap) : overlap;
+      keyboardHeightRef.current = finalHeight;
+      setIsKeyboardVisible(finalHeight > 0);
+      setKeyboardHeight(finalHeight);
       scrollToEndAfterKeyboard(true);
     };
 
     if (Platform.OS === 'ios') {
-      // Single source of truth on iOS (show/hide/undock/floating): more reliable than willShow alone.
       const frameSub = Keyboard.addListener('keyboardWillChangeFrame', applyOverlap);
-      const hideSub = Keyboard.addListener('keyboardWillHide', () => {
-        setIsKeyboardVisible(false);
-        setKeyboardHeight(0);
-        scrollToEndAfterKeyboard(true);
-      });
       return () => {
+        cancelDebounce();
         frameSub.remove();
-        hideSub.remove();
       };
     }
 
     const showSub = Keyboard.addListener('keyboardDidShow', applyOverlap);
     const hideSub = Keyboard.addListener('keyboardDidHide', () => {
-      setIsKeyboardVisible(false);
-      setKeyboardHeight(0);
+      cancelDebounce();
+      keyboardHideDebounceRef.current = setTimeout(() => {
+        if (keyboardHeightRef.current < 100) return;
+        setIsKeyboardVisible(false);
+        setKeyboardHeight(0);
+        keyboardHideDebounceRef.current = null;
+      }, 180);
       scrollToEndAfterKeyboard(false);
     });
     return () => {
+      cancelDebounce();
       showSub.remove();
       hideSub.remove();
     };
@@ -582,10 +595,13 @@ export const MatchScreen = () => {
     0,
     androidBaseWindowHeightRef.current - windowHeight
   );
-  const androidUsesResizeMode = androidWindowShrink > 60;
-  const shouldApplyManualKeyboardOffset =
-    Platform.OS === 'ios' || !androidUsesResizeMode;
-  const composerBottomOffset = shouldApplyManualKeyboardOffset ? keyboardHeight : 0;
+  const isKeyboardHandledBySystem = Platform.OS === 'android' && androidWindowShrink > 100;
+  const composerBottomOffset =
+    Platform.OS === 'ios'
+      ? keyboardHeight
+      : isKeyboardHandledBySystem
+      ? androidWindowShrink
+      : keyboardHeight;
 
   return (
       <View style={styles.screen}>
@@ -614,7 +630,7 @@ export const MatchScreen = () => {
                 paddingBottom:
                   composerHeight +
                   12 +
-                  (shouldApplyManualKeyboardOffset ? keyboardHeight : 0),
+                  composerBottomOffset,
               }}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
@@ -632,7 +648,7 @@ export const MatchScreen = () => {
                       <GradientText
                         style={{
                           fontSize: typography.h2.fontSize,
-                          fontWeight: typography.h2.fontWeight,
+                          fontWeight: '500',
                           fontFamily: typography.h2.fontFamily,
                         }}
                       >

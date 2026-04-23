@@ -454,6 +454,62 @@ export async function sendMessageApi(payload: SendMessagePayload): Promise<{ sta
   return data;
 }
 
+/**
+ * Normalizes send-message API envelopes so we always get a `ChatMessageApiItem` when the server returns one.
+ * Backend shapes vary: message at `data`, `data.message`, `data.data`, etc.
+ */
+export function extractChatMessageFromSendResponse(
+  envelope: { data?: unknown; statusCode?: number; message?: string } | null | undefined,
+): ChatMessageApiItem | undefined {
+  if (!envelope || typeof envelope !== 'object') return undefined;
+  const payload = envelope.data;
+  if (payload == null || typeof payload !== 'object') return undefined;
+  const p = payload as Record<string, unknown>;
+
+  const pickNested = (obj: Record<string, unknown>): ChatMessageApiItem | undefined => {
+    const keys = ['message', 'chatMessage', 'createdMessage', 'newMessage', 'msg'];
+    for (const key of keys) {
+      const v = obj[key];
+      if (v && typeof v === 'object') {
+        return v as ChatMessageApiItem;
+      }
+    }
+    return undefined;
+  };
+
+  const nested = pickNested(p);
+  if (nested) return nested;
+
+  if (
+    '_id' in p ||
+    'messageType' in p ||
+    'content' in p ||
+    'sender' in p ||
+    'senderId' in p ||
+    'isSentByMe' in p ||
+    'files' in p
+  ) {
+    return payload as ChatMessageApiItem;
+  }
+
+  const inner = p.data;
+  if (inner && typeof inner === 'object') {
+    const innerObj = inner as Record<string, unknown>;
+    const fromInner = pickNested(innerObj);
+    if (fromInner) return fromInner;
+    if (
+      '_id' in innerObj ||
+      'messageType' in innerObj ||
+      'content' in innerObj ||
+      'files' in innerObj
+    ) {
+      return inner as ChatMessageApiItem;
+    }
+  }
+
+  return undefined;
+}
+
 /** Upload a file for chat (image/audio/video). Uses /aws-s3-files/upload. Returns { url, key } for use in sendMessage. */
 export type UploadChatFileResponse = { url?: string; key?: string; data?: { url?: string; key?: string } };
 
