@@ -1,10 +1,6 @@
-import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+import NitroSound from 'react-native-nitro-sound';
 
-/**
- * v3.x exports a class — you must instantiate it. Calling methods on the
- * constructor itself makes `startRecorder` undefined and recording fails silently.
- */
-const audioRecorderPlayer = new AudioRecorderPlayer();
+const sound = NitroSound;
 
 /** When true, ignore rn-playback end detection (manual stop / session ended). */
 let playbackEndLatch = false;
@@ -20,7 +16,7 @@ export const setPlaybackEndedCallback = (cb: (() => void) | null) => {
   playbackEndedCallback = cb;
 };
 
-audioRecorderPlayer.addPlayBackListener((e) => {
+sound.addPlayBackListener((e: any) => {
   if (playbackEndLatch) return;
   const duration = typeof e.duration === 'number' ? e.duration : 0;
   const pos = typeof e.currentPosition === 'number' ? e.currentPosition : 0;
@@ -34,34 +30,34 @@ audioRecorderPlayer.addPlayBackListener((e) => {
 export const startRecording = async () => {
   // Let native pick a writable temp path and return absolute URI.
   // Relative filenames can break multipart uploads on some Android devices.
-  const result = await audioRecorderPlayer.startRecorder();
+  const result = await sound.startRecorder();
   return result;
 };
 
 export const stopRecording = async () => {
-  const result = await audioRecorderPlayer.stopRecorder();
-  audioRecorderPlayer.removeRecordBackListener();
+  const result = await sound.stopRecorder();
+  sound.removeRecordBackListener();
   return result;
 };
 
-export const pauseRecording = () => audioRecorderPlayer.pauseRecorder();
+export const pauseRecording = () => sound.pauseRecorder();
 
-export const resumeRecording = () => audioRecorderPlayer.resumeRecorder();
+export const resumeRecording = () => sound.resumeRecorder();
 
 export const playAudio = async (path: string) => {
   playbackEndLatch = false;
-  await audioRecorderPlayer.startPlayer(path);
+  await sound.startPlayer(path);
 };
 
 export const stopAudio = async () => {
   playbackEndLatch = true;
-  await audioRecorderPlayer.stopPlayer();
+  await sound.stopPlayer();
 };
 
 export const pauseAudio = async () => {
-  await audioRecorderPlayer.pausePlayer();
+  await sound.pausePlayer();
 };
 
 export const resumeAudio = async () => {
-  await audioRecorderPlayer.resumePlayer();
+  await sound.resumePlayer();
 };

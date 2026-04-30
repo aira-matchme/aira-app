@@ -53,12 +53,38 @@ export interface IncomingCallPayload {
   receiverId: string;
   chatId?: string;
   callId?: string;
+  channelName?: string;
+  rtcToken?: string;
   callerName?: string;
-  callType: 'voice' | 'video';
+  callerAvatar?: string;
+  status?: string;
+  createdAt?: string;
+  callType: 'audio' | 'video';
 }
 
 export interface CallLifecyclePayload {
   callId: string;
+  callerId?: string;
+  receiverId?: string;
+  chatId?: string;
+  channelName?: string;
+  rtcToken?: string;
+  callType?: 'audio' | 'video';
+  status?: string;
+  startedAt?: string;
+  endedAt?: string;
+  endedBy?: string;
+  durationSeconds?: number;
+}
+
+export interface CallRequestSentPayload extends CallLifecyclePayload {
+  delivery?: string;
+}
+
+export interface CallFailedPayload {
+  callId?: string;
+  code?: string;
+  message?: string;
 }
 
 export interface CallPartnerAudioPayload {
@@ -84,7 +110,9 @@ export type SocketEventType =
   | 'call_rejected'
   | 'call_ended'
   | 'call_partner_audio'
-  | 'call_partner_video';
+  | 'call_partner_video'
+  | 'call_request_sent'
+  | 'call_failed';
 
 export type SocketEventListener<T = unknown> = (data: T) => void;
 
@@ -108,7 +136,23 @@ class SocketService {
     call_ended: new Set(),
     call_partner_audio: new Set(),
     call_partner_video: new Set(),
+    call_request_sent: new Set(),
+    call_failed: new Set(),
   };
+
+  /** Enable verbose socket logs while debugging call flows. */
+  private static readonly ENABLE_CALL_SOCKET_LOGS = true;
+
+  private logCallSocket(direction: 'emit' | 'receive' | 'state', event: string, payload?: unknown) {
+    if (!SocketService.ENABLE_CALL_SOCKET_LOGS) return;
+    const ts = new Date().toISOString();
+    // eslint-disable-next-line no-console
+    console.log(`[socket:${direction}] ${ts} ${event}`, payload ?? '');
+  }
+
+  private onSocketReceive(event: string, payload: unknown) {
+    this.logCallSocket('receive', event, payload);
+  }
 
   /** Backend contract (verify against your server):
    * - Client emit: join({ chatId } | { userId }) | typing({ sender, receiver, isTyping }) | message_send({ sender, receiver, message }) | message_delete({ sender, receiver, messageId })
@@ -170,16 +214,19 @@ class SocketService {
     });
 
     this.socket.on('connect', () => {
+      this.logCallSocket('state', 'connect', { userId: this.userId });
       this.notifyConnectionState(true);
       const payload = this.userId ? { userId: this.userId } : {};
       this.send('join', payload);
     });
 
     this.socket.on('disconnect', (_reason) => {
+      this.logCallSocket('state', 'disconnect', { reason: _reason });
       this.notifyConnectionState(false);
     });
 
     this.socket.on('connect_error', (_err) => {
+      this.logCallSocket('state', 'connect_error', _err);
     });
 
     this.socket.onAny((_event, ..._args) => {
@@ -187,10 +234,12 @@ class SocketService {
 
     // Incoming events from backend
     this.socket.on('join', (data: unknown) => {
+      this.onSocketReceive('join', data);
       this.emit('join', data);
     });
 
     const handlePresence = (data: unknown) => {
+      this.onSocketReceive('join_success', data);
       this.emit('join_success', data);
     };
     this.socket.on('join_success', handlePresence);
@@ -202,6 +251,7 @@ class SocketService {
     this.socket.on('user_offline', handlePresence);
 
     this.socket.on('typing', (data: unknown) => {
+      this.onSocketReceive('typing', data);
       const d = (data ?? {}) as Record<string, unknown>;
       const sender = String(d.sender ?? d.userId ?? d.senderId ?? '');
       let receiver = String(d.receiver ?? d.targetUserId ?? d.receiverId ?? '');
@@ -212,6 +262,7 @@ class SocketService {
 
     // Some backends emit `message_receive`, others emit `message_send` for incoming messages.
     const handleIncomingMessage = (data: unknown) => {
+      this.onSocketReceive('message_receive', data);
       const raw = (data ?? {}) as Record<string, unknown>;
       const msg = (raw.message ?? {}) as Record<string, unknown>;
       let sender = String(msg.sender ?? raw.sender ?? raw.senderId ?? '');
@@ -236,6 +287,7 @@ class SocketService {
     this.socket.on('chat_message', handleIncomingMessage);
 
     const handleMessageDelete = (data: unknown) => {
+      this.onSocketReceive('message_delete', data);
       const d = (data ?? {}) as Record<string, unknown>;
       const sender = String(d.sender ?? d.senderId ?? '');
       let receiver = String(d.receiver ?? d.receiverId ?? '');
@@ -247,36 +299,145 @@ class SocketService {
     this.socket.on('message_deleted', handleMessageDelete);
     this.socket.on('delete_message', handleMessageDelete);
 
-    const handleIncomingCall = (data: unknown, defaultType?: 'voice' | 'video') => {
+    const handleIncomingCall = (data: unknown, defaultType?: 'audio' | 'video') => {
       const d = (data ?? {}) as Record<string, unknown>;
       const senderId = String(d.senderId ?? d.sender ?? d.fromUserId ?? d.userId ?? '');
       let receiverId = String(d.receiverId ?? d.receiver ?? d.toUserId ?? '');
       if (!receiverId && this.userId) receiverId = this.userId;
-      const rawType = String(d.callType ?? d.type ?? d.mode ?? defaultType ?? 'voice').toLowerCase();
-      const callType: 'voice' | 'video' =
-        rawType.includes('video') ? 'video' : rawType.includes('audio') ? 'voice' : 'voice';
+      const rawType = String(d.callType ?? d.type ?? d.mode ?? defaultType ?? 'audio').toLowerCase();
+      const callType: 'audio' | 'video' = rawType.includes('video') ? 'video' : 'audio';
       const callerName = String(d.callerName ?? d.name ?? d.fromName ?? '').trim() || undefined;
+      const callerAvatar = String(
+        d.callerAvatar ?? d.callerProfilePicture ?? d.profilePicture ?? d.avatar ?? d.photo ?? ''
+      ).trim() || undefined;
       const callId = String(d.callId ?? d.call_id ?? d.id ?? '').trim() || undefined;
       const chatId = String(d.chatId ?? d.chat_id ?? '').trim() || undefined;
-      this.emit('incoming_call', { senderId, receiverId, callerName, callType, callId, chatId });
+      const channelName = String(d.channelName ?? d.channel_name ?? d.channel ?? '').trim() || undefined;
+      const rtcToken = String(d.rtcToken ?? d.rtc_token ?? d.token ?? '').trim() || undefined;
+      const status = String(d.status ?? '').trim() || undefined;
+      const createdAt = String(d.createdAt ?? d.created_at ?? '').trim() || undefined;
+      this.logCallSocket('receive', 'incoming_call', {
+        senderId,
+        receiverId,
+        callerName,
+        callerAvatar,
+        callType,
+        callId,
+        chatId,
+        channelName,
+        rtcToken,
+        status,
+        createdAt,
+        raw: d,
+      });
+      this.emit('incoming_call', {
+        senderId,
+        receiverId,
+        callerName,
+        callerAvatar,
+        callType,
+        callId,
+        chatId,
+        channelName,
+        rtcToken,
+        status,
+        createdAt,
+      });
     };
-    this.socket.on('incoming_call', (data) => handleIncomingCall(data));
-    this.socket.on('call_incoming', (data) => handleIncomingCall(data));
-    this.socket.on('incoming_voice_call', (data) => handleIncomingCall(data, 'voice'));
-    this.socket.on('voice_call_incoming', (data) => handleIncomingCall(data, 'voice'));
-    this.socket.on('incoming_video_call', (data) => handleIncomingCall(data, 'video'));
-    this.socket.on('video_call_incoming', (data) => handleIncomingCall(data, 'video'));
+    this.socket.on('incoming_call', (data) => {
+      this.onSocketReceive('incoming_call(raw)', data);
+      handleIncomingCall(data);
+    });
+    this.socket.on('call_incoming', (data) => {
+      this.onSocketReceive('call_incoming(raw)', data);
+      handleIncomingCall(data);
+    });
+    this.socket.on('incoming_voice_call', (data) => {
+      this.onSocketReceive('incoming_voice_call(raw)', data);
+      handleIncomingCall(data, 'audio');
+    });
+    this.socket.on('voice_call_incoming', (data) => {
+      this.onSocketReceive('voice_call_incoming(raw)', data);
+      handleIncomingCall(data, 'audio');
+    });
+    this.socket.on('incoming_video_call', (data) => {
+      this.onSocketReceive('incoming_video_call(raw)', data);
+      handleIncomingCall(data, 'video');
+    });
+    this.socket.on('video_call_incoming', (data) => {
+      this.onSocketReceive('video_call_incoming(raw)', data);
+      handleIncomingCall(data, 'video');
+    });
 
     const handleCallLifecycle = (data: unknown): CallLifecyclePayload => {
       const d = (data ?? {}) as Record<string, unknown>;
-      return { callId: String(d.callId ?? d.call_id ?? d.id ?? '') };
+      const rawType = String(d.callType ?? d.call_type ?? d.mode ?? '').toLowerCase();
+      const payload: CallLifecyclePayload = {
+        callId: String(d.callId ?? d.call_id ?? d.id ?? ''),
+        callerId: String(d.callerId ?? d.caller_id ?? d.senderId ?? d.sender ?? '').trim() || undefined,
+        receiverId: String(d.receiverId ?? d.receiver_id ?? d.toUserId ?? d.receiver ?? '').trim() || undefined,
+        chatId: String(d.chatId ?? d.chat_id ?? '').trim() || undefined,
+        channelName: String(d.channelName ?? d.channel_name ?? d.channel ?? '').trim() || undefined,
+        rtcToken: String(d.rtcToken ?? d.rtc_token ?? d.token ?? '').trim() || undefined,
+        callType: rawType
+          ? rawType.includes('video')
+            ? 'video'
+            : rawType.includes('audio') || rawType.includes('voice')
+            ? 'audio'
+            : undefined
+          : undefined,
+        status: String(d.status ?? '').trim() || undefined,
+        startedAt: String(d.startedAt ?? d.started_at ?? '').trim() || undefined,
+        endedAt: String(d.endedAt ?? d.ended_at ?? '').trim() || undefined,
+        endedBy: String(d.endedBy ?? d.ended_by ?? '').trim() || undefined,
+        durationSeconds:
+          typeof d.durationSeconds === 'number'
+            ? d.durationSeconds
+            : typeof d.duration_seconds === 'number'
+            ? d.duration_seconds
+            : undefined,
+      };
+      this.logCallSocket('receive', 'call_lifecycle', { payload, raw: d });
+      return payload;
     };
-    this.socket.on('call_accepted', (data) => this.emit('call_accepted', handleCallLifecycle(data)));
-    this.socket.on('call_accept', (data) => this.emit('call_accepted', handleCallLifecycle(data)));
-    this.socket.on('call_rejected', (data) => this.emit('call_rejected', handleCallLifecycle(data)));
-    this.socket.on('call_reject', (data) => this.emit('call_rejected', handleCallLifecycle(data)));
-    this.socket.on('call_end', (data) => this.emit('call_ended', handleCallLifecycle(data)));
-    this.socket.on('call_ended', (data) => this.emit('call_ended', handleCallLifecycle(data)));
+    this.socket.on('call_request_sent', (data) => {
+      this.onSocketReceive('call_request_sent(raw)', data);
+      this.emit('call_request_sent', handleCallLifecycle(data) as CallRequestSentPayload);
+    });
+    this.socket.on('call_failed', (data) => {
+      this.onSocketReceive('call_failed(raw)', data);
+      const d = (data ?? {}) as Record<string, unknown>;
+      const payload: CallFailedPayload = {
+        callId: String(d.callId ?? d.call_id ?? d.id ?? '').trim() || undefined,
+        code: String(d.code ?? '').trim() || undefined,
+        message: String(d.message ?? '').trim() || undefined,
+      };
+      this.emit('call_failed', payload);
+    });
+    this.socket.on('call_accepted', (data) => {
+      this.onSocketReceive('call_accepted(raw)', data);
+      this.emit('call_accepted', handleCallLifecycle(data));
+    });
+    this.socket.on('call_accept', (data) => {
+      this.onSocketReceive('call_accept(raw)', data);
+      this.emit('call_accepted', handleCallLifecycle(data));
+    });
+    this.socket.on('call_rejected', (data) => {
+      this.onSocketReceive('call_rejected(raw)', data);
+      this.emit('call_rejected', handleCallLifecycle(data));
+    });
+    this.socket.on('call_reject', (data) => {
+      this.onSocketReceive('call_reject(raw)', data);
+      this.emit('call_rejected', handleCallLifecycle(data));
+    });
+    this.socket.on('call_end', (data) => {
+      this.onSocketReceive('call_end(raw)', data);
+      this.emit('call_ended', handleCallLifecycle(data));
+    });
+    this.socket.on('call_ended', (data) => {
+      this.onSocketReceive('call_ended(raw)', data);
+      this.emit('call_ended', handleCallLifecycle(data));
+    });
 
     const handlePartnerAudio = (data: unknown, forceEnabled?: boolean) => {
       const d = (data ?? {}) as Record<string, unknown>;
@@ -295,13 +456,29 @@ class SocketService {
       } else if (typeof mutedRaw === 'boolean') {
         enabled = !mutedRaw;
       }
+      this.logCallSocket('receive', 'call_partner_audio', { callId, userId, enabled, raw: d });
       this.emit('call_partner_audio', { callId, userId, enabled });
     };
-    this.socket.on('call_mic_update', (data) => handlePartnerAudio(data));
-    this.socket.on('call_audio_state', (data) => handlePartnerAudio(data));
-    this.socket.on('call_participant_audio', (data) => handlePartnerAudio(data));
-    this.socket.on('call_mute', (data) => handlePartnerAudio(data, false));
-    this.socket.on('call_unmute', (data) => handlePartnerAudio(data, true));
+    this.socket.on('call_mic_update', (data) => {
+      this.onSocketReceive('call_mic_update(raw)', data);
+      handlePartnerAudio(data);
+    });
+    this.socket.on('call_audio_state', (data) => {
+      this.onSocketReceive('call_audio_state(raw)', data);
+      handlePartnerAudio(data);
+    });
+    this.socket.on('call_participant_audio', (data) => {
+      this.onSocketReceive('call_participant_audio(raw)', data);
+      handlePartnerAudio(data);
+    });
+    this.socket.on('call_mute', (data) => {
+      this.onSocketReceive('call_mute(raw)', data);
+      handlePartnerAudio(data, false);
+    });
+    this.socket.on('call_unmute', (data) => {
+      this.onSocketReceive('call_unmute(raw)', data);
+      handlePartnerAudio(data, true);
+    });
 
     const handlePartnerVideo = (data: unknown, forceEnabled?: boolean) => {
       const d = (data ?? {}) as Record<string, unknown>;
@@ -320,13 +497,29 @@ class SocketService {
       } else if (typeof offRaw === 'boolean') {
         enabled = !offRaw;
       }
+      this.logCallSocket('receive', 'call_partner_video', { callId, userId, enabled, raw: d });
       this.emit('call_partner_video', { callId, userId, enabled });
     };
-    this.socket.on('call_video_state', (data) => handlePartnerVideo(data));
-    this.socket.on('call_camera_update', (data) => handlePartnerVideo(data));
-    this.socket.on('call_participant_video', (data) => handlePartnerVideo(data));
-    this.socket.on('call_video_off', (data) => handlePartnerVideo(data, false));
-    this.socket.on('call_video_on', (data) => handlePartnerVideo(data, true));
+    this.socket.on('call_video_state', (data) => {
+      this.onSocketReceive('call_video_state(raw)', data);
+      handlePartnerVideo(data);
+    });
+    this.socket.on('call_camera_update', (data) => {
+      this.onSocketReceive('call_camera_update(raw)', data);
+      handlePartnerVideo(data);
+    });
+    this.socket.on('call_participant_video', (data) => {
+      this.onSocketReceive('call_participant_video(raw)', data);
+      handlePartnerVideo(data);
+    });
+    this.socket.on('call_video_off', (data) => {
+      this.onSocketReceive('call_video_off(raw)', data);
+      handlePartnerVideo(data, false);
+    });
+    this.socket.on('call_video_on', (data) => {
+      this.onSocketReceive('call_video_on(raw)', data);
+      handlePartnerVideo(data, true);
+    });
   }
 
   private notifyConnectionState(connected: boolean) {
@@ -334,6 +527,9 @@ class SocketService {
   }
 
   private emit<T>(type: SocketEventType, data: T) {
+    if (type.startsWith('call_') || type === 'incoming_call') {
+      this.logCallSocket('state', `emit_to_listeners:${type}`, data);
+    }
     this.listeners[type]?.forEach((fn) => fn(data as T));
   }
 
@@ -351,10 +547,12 @@ class SocketService {
   /** Send socket.io event. Always attaches bearer token to payload. */
   send(event: string, payload: Record<string, unknown> = {}) {
     if (!this.socket?.connected) {
+      this.logCallSocket('state', 'send_skipped_disconnected', { event, payload });
       return;
     }
 
     const body = this.withAuthorization(payload);
+    this.logCallSocket('emit', event, body);
     this.socket.emit(event, body);
   }
 
@@ -401,23 +599,57 @@ class SocketService {
   }
 
   /** Start a call to another user in a chat. */
-  callRequest(toUserId: string, chatId: string, callType: 'audio' | 'video') {
-    this.send('call_request', { toUserId, chatId, callType });
+  callRequest(
+    toUserId: string,
+    chatId: string,
+    callType: 'audio' | 'video',
+    meta?: { callerName?: string; callerAvatar?: string }
+  ) {
+    const callerName = typeof meta?.callerName === 'string' ? meta.callerName.trim() : '';
+    const callerAvatar = typeof meta?.callerAvatar === 'string' ? meta.callerAvatar.trim() : '';
+    const payload: Record<string, unknown> = {
+      toUserId,
+      chatId,
+      callType,
+    };
+    if (callerName) payload.callerName = callerName;
+    if (callerAvatar) payload.callerAvatar = callerAvatar;
+
+    console.log('callRequest', toUserId, chatId, callType, payload);
+    this.logCallSocket('emit', 'call_request(method)', payload);
+    this.send('call_request', payload);
   }
 
   /** Receiver accepts incoming call. */
   callAccept(callId: string) {
+    this.logCallSocket('emit', 'call_accept(method)', { callId });
     this.send('call_accept', { callId });
   }
 
   /** Receiver rejects incoming call. */
   callReject(callId: string) {
+    this.logCallSocket('emit', 'call_reject(method)', { callId });
     this.send('call_reject', { callId });
   }
 
   /** Any participant ends an ongoing call. */
   callEnd(callId: string) {
+    this.logCallSocket('emit', 'call_end(method)', { callId });
     this.send('call_end', { callId });
+  }
+
+  /** Broadcast local mic state so peer UI can reflect mute/unmute quickly. */
+  callMicUpdate(callId: string, userId: string, enabled: boolean) {
+    const payload = {
+      callId,
+      userId,
+      enabled,
+      isMuted: !enabled,
+      muted: !enabled,
+      micEnabled: enabled,
+    };
+    this.logCallSocket('emit', 'call_mic_update(method)', payload);
+    this.send('call_mic_update', payload);
   }
 
   /** Subscribe to incoming socket events. Returns unsubscribe. */

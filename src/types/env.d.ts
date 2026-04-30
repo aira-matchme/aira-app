@@ -12,5 +12,6 @@ declare module '@env' {
    * is in dev mode (for UI / store-check debugging only; remove before shipping).
    */
   export const STORE_UPDATE_CHECK_IN_DEV: string | undefined;
+  export const AGORA_APP_ID: string | undefined;
 }
 

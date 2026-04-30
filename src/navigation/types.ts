@@ -113,6 +113,16 @@ export type ChatStackParamList = {
     isRequest?: boolean;
     /** Optional — used for block/report and profile navigation; otherwise derived. */
     otherUserId?: string;
+    /** Optional — provided by global call listener when opening chat from another tab/screen. */
+    incomingCall?: {
+      mode: 'voice' | 'video';
+      callId?: string;
+      callerName?: string;
+      callerAvatar?: string;
+      senderId?: string;
+      channelName?: string;
+      rtcToken?: string;
+    };
   };
 };
 

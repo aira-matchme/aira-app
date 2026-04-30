@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Pressable,
@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
-import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { getFocusedRouteNameFromRoute, useNavigation, useNavigationState } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HomeStackNavigator } from './HomeStackNavigator';
@@ -20,6 +20,8 @@ import { LikesScreen } from '../screens/LikesScreen/index';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { TabStackParamList } from './types';
 import { colors } from '../theme';
+import socketService, { type IncomingCallPayload } from '../services/socket/socketService';
+import { useAuthStore } from '../store/auth.store';
 import {
   TabWalkthroughProvider,
   TabWalkthroughMeasuringView,
@@ -102,7 +104,10 @@ function CenterTabButton({
 
 function TabNavigatorInner() {
   const { visibleForTabBar: isWalkthroughVisible } = useTabWalkthrough();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const currentUserId = useAuthStore((s) => s.user?.id);
+  const tabState = useNavigationState((state) => state);
   const bottomPadding = TAB_BAR_PADDING_BOTTOM + insets.bottom;
   const tabBarStyle: StyleProp<ViewStyle> = [
     styles.tabBar,
@@ -115,6 +120,50 @@ function TabNavigatorInner() {
       bottom: 0,
     },
   ];
+
+  useEffect(() => {
+    const unsubscribeIncomingCall = socketService.on<IncomingCallPayload>('incoming_call', (payload) => {
+      if (!payload) return;
+      if (currentUserId && payload.receiverId && payload.receiverId !== currentUserId) return;
+
+      const currentTabRoute = tabState.routes[tabState.index];
+      const currentNestedRouteName =
+        currentTabRoute?.state && typeof currentTabRoute.state === 'object'
+          ? (currentTabRoute.state as { index: number; routes: Array<{ name: string }> }).routes[
+              (currentTabRoute.state as { index: number; routes: Array<{ name: string }> }).index
+            ]?.name
+          : undefined;
+
+      if (currentTabRoute?.name === 'Chat' && currentNestedRouteName === 'ChatDetail') {
+        return;
+      }
+
+      const mode = payload.callType === 'video' ? 'video' : 'voice';
+      (navigation as any).navigate('Tabs', {
+        screen: 'Chat',
+        params: {
+          screen: 'ChatDetail',
+          params: {
+            chatId: payload.chatId ?? null,
+            name: payload.callerName,
+            avatar: payload.callerAvatar ? { uri: payload.callerAvatar } : undefined,
+            otherUserId: payload.senderId,
+            incomingCall: {
+              mode,
+              callId: payload.callId,
+              callerName: payload.callerName,
+              callerAvatar: payload.callerAvatar,
+              senderId: payload.senderId,
+              channelName: payload.channelName,
+              rtcToken: payload.rtcToken,
+            },
+          },
+        },
+      });
+    });
+
+    return () => unsubscribeIncomingCall();
+  }, [currentUserId, navigation, tabState]);
 
   return (
     <Tab.Navigator

@@ -7,6 +7,7 @@ import {
   TENOR_API_KEY,
   IOS_APP_STORE_ID,
   STORE_UPDATE_CHECK_IN_DEV,
+  AGORA_APP_ID,
 } from '@env';
 
 export const env = {
@@ -20,6 +21,7 @@ export const env = {
   IOS_APP_STORE_ID,
   /** When `true` / `1`, run store update checks while `__DEV__` is true (local testing only). */
   STORE_UPDATE_CHECK_IN_DEV,
+  AGORA_APP_ID,
 };
 
 

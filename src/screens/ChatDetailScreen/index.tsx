@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
+  Animated,
   Image,
   ScrollView,
   TextInput,
   Keyboard,
   Platform,
   Modal,
+  PanResponder,
   TouchableWithoutFeedback,
   StyleSheet,
   Alert,
@@ -17,6 +19,7 @@ import {
   ActivityIndicator,
   LayoutChangeEvent,
   useWindowDimensions,
+  type ImageSourcePropType,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -84,9 +87,12 @@ import socketService, {
   type TypingPayload,
   type IncomingCallPayload,
   type CallLifecyclePayload,
+  type CallRequestSentPayload,
+  type CallFailedPayload,
   type CallPartnerAudioPayload,
   type CallPartnerVideoPayload,
 } from '../../services/socket/socketService';
+import { agoraCallService } from '../../services/call/agoraCallService';
 import { styles, H_PADDING, CHAT_INPUT_MIN_HEIGHT, CHAT_INPUT_MAX_HEIGHT } from './styles';
 import { TabAICenterIcon } from '../../assets/icons/tabs/TabAICenterIcon';
 import { apiClient } from '../../services/api/client';
@@ -114,11 +120,24 @@ const MORE_MENU_GAP = 8;
 const APPROX_MESSAGE_CONTEXT_HEIGHT = 132;
 const MESSAGE_CONTEXT_GAP = 8;
 const MESSAGE_CONTEXT_MIN_WIDTH = 172;
+
+// Figma banner icons (Incoming video call banner, node 3629:22256).
+// These remote assets expire after a short time, so keep them temporary.
+const INCOMING_CALL_VIDEO_BADGE_ICON = {
+  uri: 'https://www.figma.com/api/mcp/asset/0a37e746-e5f5-4ee3-a5c9-324da371c8c7',
+};
+const INCOMING_CALL_VIDEO_ACCEPT_ICON = {
+  uri: 'https://www.figma.com/api/mcp/asset/89d6ce01-2f86-4db1-8392-3e33106e0684',
+};
+const INCOMING_CALL_VIDEO_DECLINE_ICON = {
+  uri: 'https://www.figma.com/api/mcp/asset/a8735b4f-d963-4b30-a427-4c11913733fd',
+};
 type ActiveCallMode = 'voice' | 'video';
 type IncomingCallPrompt = {
   callerName: string;
   mode: ActiveCallMode;
   callId?: string;
+  callerAvatar?: string;
 };
 type AudioDevice = 'speaker' | 'earpiece' | 'bluetooth' | 'wired';
 
@@ -131,6 +150,20 @@ const REPORT_REASONS: { value: string; label: string }[] = [
   { value: 'something_else', label: "It's something else" },
 ];
 
+const DEFAULT_PARTNER_AVATAR = require('../../assets/images/ProfileImage.png');
+
+type ChatDetailRouteAvatar = ChatStackParamList['ChatDetail']['avatar'];
+
+function resolvePartnerDisplaySource(partner: ChatDetailRouteAvatar | undefined): ImageSourcePropType {
+  if (partner == null) return DEFAULT_PARTNER_AVATAR;
+  if (typeof partner === 'number') return partner;
+  if (typeof partner === 'object' && partner !== null && 'uri' in partner) {
+    const uri = typeof partner.uri === 'string' ? partner.uri.trim() : '';
+    if (uri.length > 0) return partner;
+  }
+  return DEFAULT_PARTNER_AVATAR;
+}
+
 export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const {
     chatId: initialChatId,
@@ -138,6 +171,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     name: initialName,
     isRequest: initialIsRequest,
     otherUserId: initialOtherUserId,
+    incomingCall: initialIncomingCall,
   } = route.params;
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -147,6 +181,35 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [chatId, setChatId] = useState<string | null>(initialChatId ?? null);
   const [name, setName] = useState<string>(initialName ?? 'Chat');
   const [avatar, setAvatar] = useState<typeof initialAvatar | undefined>(initialAvatar);
+  const [partnerAvatar, setPartnerAvatar] = useState<typeof initialAvatar | undefined>(initialAvatar);
+  const partnerDisplaySource = useMemo(
+    () => resolvePartnerDisplaySource(partnerAvatar),
+    [partnerAvatar],
+  );
+  const currentUser = useAuthStore((s) => s.user);
+  const localVideoPreviewFallback = useMemo((): ImageSourcePropType => {
+    const u = currentUser;
+    if (!u) return DEFAULT_PARTNER_AVATAR;
+    const direct = typeof u.profilePicture === 'string' ? u.profilePicture.trim() : '';
+    if (direct) return { uri: direct };
+    const url = u.profilePhoto?.url as { medium?: unknown; original?: unknown; thumb?: unknown } | undefined;
+    const picked = firstNonEmptyString(url?.medium, url?.original, url?.thumb);
+    if (picked) return { uri: picked };
+    return DEFAULT_PARTNER_AVATAR;
+  }, [currentUser]);
+  const outgoingCallMeta = useMemo(() => {
+    const callerName = firstNonEmptyString((currentUser as any)?.name);
+    const photoUrl = firstNonEmptyString(
+      (currentUser as any)?.profilePicture,
+      (currentUser as any)?.profilePhoto?.url?.medium,
+      (currentUser as any)?.profilePhoto?.url?.original,
+      (currentUser as any)?.profilePhoto?.url?.thumb,
+    );
+    return {
+      callerName: callerName ?? undefined,
+      callerAvatar: photoUrl ?? undefined,
+    };
+  }, [currentUser]);
   const [isRequest, setIsRequest] = useState<boolean>(!!initialIsRequest);
   const [otherUserId, setOtherUserId] = useState<string | undefined>(initialOtherUserId);
   const [requestActionLoading, setRequestActionLoading] = useState<'accept' | 'decline' | 'block' | null>(null);
@@ -195,17 +258,32 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [incomingVoiceCallVisible, setIncomingVoiceCallVisible] = useState(false);
   const [incomingVoiceCallerName, setIncomingVoiceCallerName] = useState('');
   const [incomingVoiceCallId, setIncomingVoiceCallId] = useState<string | null>(null);
+  const [incomingCallBannerVisible, setIncomingCallBannerVisible] = useState(false);
+  const [incomingCallBannerMode, setIncomingCallBannerMode] = useState<ActiveCallMode>('voice');
   const [incomingVideoCallVisible, setIncomingVideoCallVisible] = useState(false);
   const [incomingVideoCallerName, setIncomingVideoCallerName] = useState('');
   const [incomingVideoCallId, setIncomingVideoCallId] = useState<string | null>(null);
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
+  const [activeCallChannelName, setActiveCallChannelName] = useState<string | null>(null);
+  const [activeCallRtcToken, setActiveCallRtcToken] = useState<string | null>(null);
+  const [localRtcUid, setLocalRtcUid] = useState<number>(0);
+  const [remoteRtcUid, setRemoteRtcUid] = useState<number | null>(null);
   const [isOutgoingVoiceRinging, setIsOutgoingVoiceRinging] = useState(false);
   const [isSwitchingVoiceToVideo, setIsSwitchingVoiceToVideo] = useState(false);
   const [callConnectedAtMs, setCallConnectedAtMs] = useState<number | null>(null);
   const [callDurationSec, setCallDurationSec] = useState(0);
   const [audioDeviceSheetVisible, setAudioDeviceSheetVisible] = useState(false);
-  const [selectedAudioDevice, setSelectedAudioDevice] = useState<AudioDevice>('speaker');
+  const [selectedAudioDevice, setSelectedAudioDevice] = useState<AudioDevice>('earpiece');
   const [switchToVideoPopupVisible, setSwitchToVideoPopupVisible] = useState(false);
+  const AgoraRtcSurfaceView = useMemo(() => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires,global-require
+      const mod = require('react-native-agora');
+      return (mod?.RtcSurfaceView ?? mod?.default?.RtcSurfaceView ?? null) as React.ComponentType<any> | null;
+    } catch {
+      return null;
+    }
+  }, []);
   const videoLocalPreviewTop = Math.round((500 / 812) * windowHeight);
   const videoLocalPreviewHiddenTop = Math.round((580 / 812) * windowHeight);
   const videoControlsTop = Math.round((716 / 812) * windowHeight);
@@ -289,6 +367,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const typingStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const otherUserTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handledIncomingRouteCallRef = useRef<string | null>(null);
+  const handledIncomingCallRef = useRef<string | null>(null);
   const inputRef = useRef<TextInput>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const { keyboardHeight, composerBottomOffset, resetKeyboard } = useKeyboardOffset({
@@ -461,12 +541,123 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         return null;
       }
       const mode: ActiveCallMode = data.callType === 'video' ? 'video' : 'voice';
+      const rawCallerName = String(data.callerName ?? '').trim();
+      const rawCallerAvatar = String(data.callerAvatar ?? '').trim();
+      const fallbackName = String(name ?? '').trim();
       const callerName =
-        String(data.callerName ?? name ?? '').trim() || 'Incoming call';
-      return { callerName, mode, callId: data.callId };
+        rawCallerName || (fallbackName && fallbackName !== 'Chat' ? fallbackName : 'Incoming call');
+      return {
+        callerName,
+        mode,
+        callId: data.callId,
+        callerAvatar: rawCallerAvatar || undefined,
+      };
     },
     [name, otherUserId]
   );
+
+  const openIncomingCallPrompt = useCallback((incoming: IncomingCallPrompt) => {
+    if (incoming.callerName && incoming.callerName !== 'Incoming call') {
+      setName((prev) => {
+        const current = String(prev ?? '').trim();
+        if (!current || current === 'Chat' || current === 'Incoming call') {
+          return incoming.callerName;
+        }
+        return prev;
+      });
+    }
+    if (incoming.callerAvatar) {
+      setPartnerAvatar({ uri: incoming.callerAvatar } as any);
+    }
+    if (incoming.mode === 'video') {
+      setIncomingVideoCallerName(incoming.callerName);
+      setIncomingVideoCallId(incoming.callId ?? null);
+      setIncomingVideoCallVisible(true);
+      return;
+    }
+    setIncomingVoiceCallerName(incoming.callerName);
+    setIncomingVoiceCallId(incoming.callId ?? null);
+    setIncomingVoiceCallVisible(true);
+  }, []);
+
+  const openIncomingCallFromBanner = useCallback(() => {
+    setIncomingCallBannerVisible(false);
+    setIncomingVoiceCallVisible(incomingCallBannerMode === 'voice');
+    setIncomingVideoCallVisible(incomingCallBannerMode === 'video');
+  }, [incomingCallBannerMode]);
+
+  const showIncomingCallBanner = useCallback(
+    (incoming: IncomingCallPrompt) => {
+      if (incoming.callerName && incoming.callerName !== 'Incoming call') {
+        setName((prev) => {
+          const current = String(prev ?? '').trim();
+          if (!current || current === 'Chat' || current === 'Incoming call') {
+            return incoming.callerName;
+          }
+          return prev;
+        });
+      }
+      if (incoming.callerAvatar) {
+        setPartnerAvatar({ uri: incoming.callerAvatar } as any);
+      }
+
+      setIncomingCallBannerMode(incoming.mode);
+      if (incoming.mode === 'video') {
+        setIncomingVideoCallerName(incoming.callerName);
+        setIncomingVideoCallId(incoming.callId ?? null);
+        setIncomingVoiceCallerName('');
+        setIncomingVoiceCallId(null);
+      } else {
+        setIncomingVoiceCallerName(incoming.callerName);
+        setIncomingVoiceCallId(incoming.callId ?? null);
+        setIncomingVideoCallerName('');
+        setIncomingVideoCallId(null);
+      }
+
+      // Hide full-screen incoming modals; banner is the first UX step.
+      setIncomingVoiceCallVisible(false);
+      setIncomingVideoCallVisible(false);
+      setIncomingCallBannerVisible(true);
+    },
+    [setIncomingCallBannerMode],
+  );
+
+  useEffect(() => {
+    const incomingFromRoute = route.params?.incomingCall ?? initialIncomingCall;
+    if (!incomingFromRoute) return;
+    const dedupeKey = `${incomingFromRoute.callId ?? 'no-call-id'}:${incomingFromRoute.mode}:${incomingFromRoute.senderId ?? ''}`;
+    if (handledIncomingRouteCallRef.current === dedupeKey) return;
+    handledIncomingRouteCallRef.current = dedupeKey;
+
+    if (incomingFromRoute.senderId && !otherUserId) {
+      setOtherUserId(incomingFromRoute.senderId);
+    }
+    if (incomingFromRoute.callerName && (!name || name === 'Chat')) {
+      setName(incomingFromRoute.callerName);
+    }
+    if (incomingFromRoute.callerAvatar) {
+      setPartnerAvatar({ uri: incomingFromRoute.callerAvatar } as any);
+    }
+    if (incomingFromRoute.callId) {
+      setActiveCallId(incomingFromRoute.callId);
+    }
+    if (incomingFromRoute.channelName) {
+      setActiveCallChannelName(incomingFromRoute.channelName);
+    }
+    if (incomingFromRoute.rtcToken) {
+      setActiveCallRtcToken(incomingFromRoute.rtcToken);
+    }
+
+    const key = `${incomingFromRoute.mode}:${incomingFromRoute.callId ?? ''}`;
+    handledIncomingCallRef.current = key;
+
+    showIncomingCallBanner({
+      mode: incomingFromRoute.mode,
+      callerName: incomingFromRoute.callerName ?? name ?? 'Incoming call',
+      callId: incomingFromRoute.callId,
+      callerAvatar: incomingFromRoute.callerAvatar,
+    });
+  }, [initialIncomingCall, name, otherUserId, route.params, showIncomingCallBanner]);
 
 
   const getMessageTypeFromAttachment = (
@@ -565,19 +756,23 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             if (pname) setName(pname);
           }
 
-          if (!avatar) {
-            const photo = other.profilePhoto;
-            let avatarUrl: string | undefined;
-            if (typeof photo === 'string') avatarUrl = photo;
-            if (photo && typeof photo === 'object') {
-              const u = (photo as { url?: Record<string, unknown> }).url as
-                | { medium?: unknown; thumb?: unknown; original?: unknown }
-                | undefined;
-              avatarUrl = firstNonEmptyString(u?.medium, u?.thumb, u?.original);
-            }
-            const pic = typeof other.profilePicture === 'string' ? other.profilePicture : undefined;
-            const picked = firstNonEmptyString(avatarUrl, pic);
-            if (picked) setAvatar({ uri: picked } as any);
+          const photo = other.profilePhoto;
+          let avatarUrl: string | undefined;
+          if (typeof photo === 'string') avatarUrl = photo;
+          if (photo && typeof photo === 'object') {
+            const u = (photo as { url?: Record<string, unknown> }).url as
+              | { medium?: unknown; thumb?: unknown; original?: unknown }
+              | undefined;
+            avatarUrl = firstNonEmptyString(u?.medium, u?.thumb, u?.original);
+          }
+          const pic = typeof other.profilePicture === 'string' ? other.profilePicture : undefined;
+          const picked = firstNonEmptyString(avatarUrl, pic);
+          if (picked) {
+            const resolvedPartnerAvatar = { uri: picked } as any;
+            setPartnerAvatar(resolvedPartnerAvatar);
+            if (!avatar) setAvatar(resolvedPartnerAvatar);
+          } else {
+            setPartnerAvatar(undefined);
           }
         }
 
@@ -757,19 +952,28 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     const showIncomingCallPrompt = (payload: IncomingCallPayload) => {
       const parsed = parseIncomingCallPayload(payload);
       if (!parsed) return;
-      if (parsed.mode === 'video') {
-        setIncomingVideoCallerName(parsed.callerName);
-        setIncomingVideoCallId(parsed.callId ?? null);
-        setIncomingVideoCallVisible(true);
-        return;
-      }
-      setIncomingVoiceCallerName(parsed.callerName);
-      setIncomingVoiceCallId(parsed.callId ?? null);
-      setIncomingVoiceCallVisible(true);
+      // If we already handled this call (route navigation or banner already visible), ignore duplicates.
+      const key = `${parsed.mode}:${parsed.callId ?? ''}`;
+      if (handledIncomingCallRef.current === key) return;
+      handledIncomingCallRef.current = key;
+
+      // If call UI is already showing, don't override it.
+      if (callStateVisible) return;
+      if (parsed.mode === 'voice' && incomingVoiceCallVisible) return;
+      if (parsed.mode === 'video' && incomingVideoCallVisible) return;
+
+      showIncomingCallBanner(parsed);
     };
     const onCallAccepted = (payload: CallLifecyclePayload) => {
       if (!payload.callId) return;
       setActiveCallId(payload.callId);
+      setActiveCallChannelName(payload.channelName ?? null);
+      setActiveCallRtcToken(payload.rtcToken ?? null);
+      if (payload.callType) {
+        const mode: ActiveCallMode = payload.callType === 'video' ? 'video' : 'voice';
+        setActiveCallMode(mode);
+        setCallVideoEnabled(mode === 'video');
+      }
       if (isSwitchingVoiceToVideo) {
         setActiveCallMode('video');
         setCallVideoEnabled(true);
@@ -777,6 +981,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       }
       setIsSwitchingVoiceToVideo(false);
       setAudioDeviceSheetVisible(false);
+      setSelectedAudioDevice('earpiece');
       setPartnerAudioEnabled(true);
       setPartnerVideoEnabled(true);
       setIsOutgoingVoiceRinging(false);
@@ -784,13 +989,25 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setCallStateVisible(true);
       setIncomingVoiceCallVisible(false);
       setIncomingVideoCallVisible(false);
+      setIncomingCallBannerVisible(false);
       setSwitchToVideoPopupVisible(false);
     };
-    const onCallRejected = (payload: CallLifecyclePayload) => {
+    const onCallRequestSent = (payload: CallRequestSentPayload) => {
       if (!payload.callId) return;
-      if (activeCallId && payload.callId !== activeCallId) return;
+      setActiveCallId(payload.callId);
+      setActiveCallChannelName(payload.channelName ?? null);
+      setActiveCallRtcToken(payload.rtcToken ?? null);
+      if (payload.callType) {
+        const mode: ActiveCallMode = payload.callType === 'video' ? 'video' : 'voice';
+        setActiveCallMode(mode);
+        setCallVideoEnabled(mode === 'video');
+      }
+    };
+    const onCallFailed = (payload: CallFailedPayload) => {
+      const normalizedCode = String(payload.code ?? '').toUpperCase();
       setIncomingVoiceCallVisible(false);
       setIncomingVideoCallVisible(false);
+      setIncomingCallBannerVisible(false);
       setCallStateVisible(false);
       setActiveCallId(null);
       setPartnerAudioEnabled(true);
@@ -800,6 +1017,35 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setSwitchToVideoPopupVisible(false);
       setCallConnectedAtMs(null);
       setCallDurationSec(0);
+      setActiveCallChannelName(null);
+      setActiveCallRtcToken(null);
+      setLocalRtcUid(0);
+      void agoraCallService.leaveChannel();
+      if (normalizedCode === 'RECEIVER_OFFLINE' || normalizedCode === 'RECEIVER_DELIVERY_FAILED') {
+        showErrorToast('User is offline right now.');
+        return;
+      }
+      showErrorToast(payload.message || 'Call failed. Please try again.');
+    };
+    const onCallRejected = (payload: CallLifecyclePayload) => {
+      if (!payload.callId) return;
+      if (activeCallId && payload.callId !== activeCallId) return;
+      setIncomingVoiceCallVisible(false);
+      setIncomingVideoCallVisible(false);
+      setIncomingCallBannerVisible(false);
+      setCallStateVisible(false);
+      setActiveCallId(null);
+      setPartnerAudioEnabled(true);
+      setPartnerVideoEnabled(true);
+      setIsOutgoingVoiceRinging(false);
+      setIsSwitchingVoiceToVideo(false);
+      setSwitchToVideoPopupVisible(false);
+      setCallConnectedAtMs(null);
+      setCallDurationSec(0);
+      setActiveCallChannelName(null);
+      setActiveCallRtcToken(null);
+      setLocalRtcUid(0);
+      void agoraCallService.leaveChannel();
       showErrorToast('Call was declined.');
     };
     const onCallEnded = (payload: CallLifecyclePayload) => {
@@ -807,6 +1053,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       if (activeCallId && payload.callId !== activeCallId) return;
       setIncomingVoiceCallVisible(false);
       setIncomingVideoCallVisible(false);
+      setIncomingCallBannerVisible(false);
       setCallStateVisible(false);
       setActiveCallId(null);
       setPartnerAudioEnabled(true);
@@ -816,6 +1063,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setSwitchToVideoPopupVisible(false);
       setCallConnectedAtMs(null);
       setCallDurationSec(0);
+      setActiveCallChannelName(null);
+      setActiveCallRtcToken(null);
+      setLocalRtcUid(0);
+      void agoraCallService.leaveChannel();
       showSuccessToast('Call ended.');
     };
     const onCallPartnerAudio = (payload: CallPartnerAudioPayload) => {
@@ -832,6 +1083,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     const unsubCallAccepted = socketService.on<CallLifecyclePayload>('call_accepted', onCallAccepted);
     const unsubCallRejected = socketService.on<CallLifecyclePayload>('call_rejected', onCallRejected);
     const unsubCallEnded = socketService.on<CallLifecyclePayload>('call_ended', onCallEnded);
+    const unsubCallRequestSent = socketService.on<CallRequestSentPayload>('call_request_sent', onCallRequestSent);
+    const unsubCallFailed = socketService.on<CallFailedPayload>('call_failed', onCallFailed);
     const unsubCallPartnerAudio = socketService.on<CallPartnerAudioPayload>('call_partner_audio', onCallPartnerAudio);
     const unsubCallPartnerVideo = socketService.on<CallPartnerVideoPayload>('call_partner_video', onCallPartnerVideo);
     return () => {
@@ -844,10 +1097,24 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       unsubCallAccepted();
       unsubCallRejected();
       unsubCallEnded();
+      unsubCallRequestSent();
+      unsubCallFailed();
       unsubCallPartnerAudio();
       unsubCallPartnerVideo();
     };
-  }, [activeCallId, chatId, currentUserId, isOtherUserOnlineFromPayload, isSwitchingVoiceToVideo, otherUserId, parseIncomingCallPayload]);
+  }, [
+    activeCallId,
+    chatId,
+    currentUserId,
+    isOtherUserOnlineFromPayload,
+    isSwitchingVoiceToVideo,
+    otherUserId,
+    incomingVoiceCallVisible,
+    incomingVideoCallVisible,
+    callStateVisible,
+    showIncomingCallBanner,
+    parseIncomingCallPayload,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -1970,27 +2237,38 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   );
 
   const handleHeaderVideoCallPress = useCallback(() => {
-    if (chatId && otherUserId) {
-      socketService.callRequest(otherUserId, chatId, 'video');
-    }
-    setActiveCallId(null);
-    setActiveCallMode('video');
-    setCallAudioEnabled(true);
-    setCallVideoEnabled(true);
-    setPartnerAudioEnabled(true);
-    setPartnerVideoEnabled(true);
-    setIsOutgoingVoiceRinging(false);
-    setIsSwitchingVoiceToVideo(false);
+    const start = async () => {
+      const permission = await checkCameraPermission();
+      const granted =
+        permission === 'granted' || (await requestCameraPermission()) === 'granted';
+      if (!granted) {
+        showErrorToast('Camera permission is required for video calls.');
+        return;
+      }
+      if (chatId && otherUserId) {
+        socketService.callRequest(otherUserId, chatId, 'video', outgoingCallMeta);
+      }
+      setActiveCallId(null);
+      setActiveCallMode('video');
+      setCallAudioEnabled(true);
+      setCallVideoEnabled(true);
+      setPartnerAudioEnabled(true);
+      setPartnerVideoEnabled(true);
+      setIsOutgoingVoiceRinging(false);
+      setIsSwitchingVoiceToVideo(false);
+      setSelectedAudioDevice('earpiece');
       setAudioDeviceSheetVisible(false);
-    setCallConnectedAtMs(null);
-    setCallDurationSec(0);
-    setVideoCallUiHidden(false);
-    setCallStateVisible(true);
-  }, [chatId, otherUserId]);
+      setCallConnectedAtMs(null);
+      setCallDurationSec(0);
+      setVideoCallUiHidden(false);
+      setCallStateVisible(true);
+    };
+    void start();
+  }, [chatId, otherUserId, outgoingCallMeta]);
 
   const handleHeaderVoiceCallPress = useCallback(() => {
     if (chatId && otherUserId) {
-      socketService.callRequest(otherUserId, chatId, 'audio');
+      socketService.callRequest(otherUserId, chatId, 'audio', outgoingCallMeta);
     }
     setActiveCallId(null);
     setActiveCallMode('voice');
@@ -2000,25 +2278,50 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     setPartnerVideoEnabled(true);
     setIsOutgoingVoiceRinging(true);
     setIsSwitchingVoiceToVideo(false);
+    setSelectedAudioDevice('earpiece');
       setAudioDeviceSheetVisible(false);
     setCallConnectedAtMs(null);
     setCallDurationSec(0);
     setCallStateVisible(true);
-  }, [chatId, otherUserId]);
+  }, [chatId, otherUserId, outgoingCallMeta]);
 
   const toggleCallAudio = useCallback(() => {
-    setCallAudioEnabled((prev) => !prev);
-  }, []);
+    setCallAudioEnabled((prev) => {
+      const nextEnabled = !prev;
+      if (activeCallId && currentUserId) {
+        socketService.callMicUpdate(activeCallId, String(currentUserId), nextEnabled);
+      }
+      void agoraCallService.setMuted(!nextEnabled);
+      return nextEnabled;
+    });
+  }, [activeCallId, currentUserId]);
 
   const toggleCallVideo = useCallback(() => {
-    setCallVideoEnabled((prev) => !prev);
-  }, []);
+    const toggle = async () => {
+      if (!callVideoEnabled) {
+        const permission = await checkCameraPermission();
+        const granted =
+          permission === 'granted' || (await requestCameraPermission()) === 'granted';
+        if (!granted) {
+          showErrorToast('Camera permission is required to turn video on.');
+          return;
+        }
+      }
+      setCallVideoEnabled((prev) => !prev);
+    };
+    void toggle();
+  }, [callVideoEnabled]);
 
   const closeCallState = useCallback(() => {
     if (activeCallId) {
       socketService.callEnd(activeCallId);
       setActiveCallId(null);
     }
+    setIncomingCallBannerVisible(false);
+    setActiveCallChannelName(null);
+    setActiveCallRtcToken(null);
+    setLocalRtcUid(0);
+    void agoraCallService.leaveChannel();
     setCallStateVisible(false);
     setVideoCallUiHidden(false);
     setPartnerAudioEnabled(true);
@@ -2031,12 +2334,21 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     setCallDurationSec(0);
   }, [activeCallId]);
 
+  const minimizeCallState = useCallback(() => {
+    setCallStateVisible(false);
+    setVideoCallUiHidden(false);
+    setAudioDeviceSheetVisible(false);
+    setSwitchToVideoPopupVisible(false);
+    setIncomingCallBannerVisible(false);
+  }, []);
+
   const acceptIncomingVoiceCall = useCallback(() => {
     if (incomingVoiceCallId) {
       socketService.callAccept(incomingVoiceCallId);
       setActiveCallId(incomingVoiceCallId);
     }
     setIncomingVoiceCallVisible(false);
+    setIncomingCallBannerVisible(false);
     setActiveCallMode('voice');
     setCallAudioEnabled(true);
     setCallVideoEnabled(false);
@@ -2044,6 +2356,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     setPartnerVideoEnabled(true);
     setIsOutgoingVoiceRinging(false);
     setIsSwitchingVoiceToVideo(false);
+    setSelectedAudioDevice('earpiece');
     setSwitchToVideoPopupVisible(false);
     setCallConnectedAtMs(Date.now());
     setCallDurationSec(0);
@@ -2056,25 +2369,79 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
     setIncomingVoiceCallVisible(false);
     setIncomingVoiceCallId(null);
+    setIncomingCallBannerVisible(false);
   }, [incomingVoiceCallId]);
 
+  const incomingVoiceSwipeY = useRef(new Animated.Value(0)).current;
+  const resetIncomingVoiceSwipe = useCallback(() => {
+    Animated.spring(incomingVoiceSwipeY, {
+      toValue: 0,
+      useNativeDriver: true,
+      bounciness: 6,
+      speed: 16,
+    }).start();
+  }, [incomingVoiceSwipeY]);
+  const triggerIncomingVoiceSwipeAccept = useCallback(() => {
+    Animated.timing(incomingVoiceSwipeY, {
+      toValue: -96,
+      duration: 120,
+      useNativeDriver: true,
+    }).start(() => {
+      incomingVoiceSwipeY.setValue(0);
+      acceptIncomingVoiceCall();
+    });
+  }, [acceptIncomingVoiceCall, incomingVoiceSwipeY]);
+  const incomingVoiceAcceptPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_evt, gestureState) =>
+          gestureState.dy < -3 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onPanResponderMove: (_evt, gestureState) => {
+          const y = Math.max(-110, Math.min(0, gestureState.dy));
+          incomingVoiceSwipeY.setValue(y);
+        },
+        onPanResponderRelease: (_evt, gestureState) => {
+          if (gestureState.dy <= -56) {
+            triggerIncomingVoiceSwipeAccept();
+            return;
+          }
+          resetIncomingVoiceSwipe();
+        },
+        onPanResponderTerminate: resetIncomingVoiceSwipe,
+      }),
+    [incomingVoiceSwipeY, resetIncomingVoiceSwipe, triggerIncomingVoiceSwipeAccept]
+  );
+
   const acceptIncomingVideoCall = useCallback(() => {
-    if (incomingVideoCallId) {
-      socketService.callAccept(incomingVideoCallId);
-      setActiveCallId(incomingVideoCallId);
-    }
-    setIncomingVideoCallVisible(false);
-    setActiveCallMode('video');
-    setCallAudioEnabled(true);
-    setCallVideoEnabled(true);
-    setPartnerAudioEnabled(true);
-    setPartnerVideoEnabled(true);
-    setIsOutgoingVoiceRinging(false);
-    setIsSwitchingVoiceToVideo(false);
-    setCallConnectedAtMs(Date.now());
-    setCallDurationSec(0);
-    setVideoCallUiHidden(false);
-    setCallStateVisible(true);
+    const accept = async () => {
+      const permission = await checkCameraPermission();
+      const granted =
+        permission === 'granted' || (await requestCameraPermission()) === 'granted';
+      if (!granted) {
+        showErrorToast('Camera permission is required to accept video call.');
+        return;
+      }
+      if (incomingVideoCallId) {
+        socketService.callAccept(incomingVideoCallId);
+        setActiveCallId(incomingVideoCallId);
+      }
+      setIncomingVideoCallVisible(false);
+      setIncomingCallBannerVisible(false);
+      setActiveCallMode('video');
+      setCallAudioEnabled(true);
+      setCallVideoEnabled(true);
+      setPartnerAudioEnabled(true);
+      setPartnerVideoEnabled(true);
+      setIsOutgoingVoiceRinging(false);
+      setIsSwitchingVoiceToVideo(false);
+      setSelectedAudioDevice('earpiece');
+      setCallConnectedAtMs(Date.now());
+      setCallDurationSec(0);
+      setVideoCallUiHidden(false);
+      setCallStateVisible(true);
+    };
+    void accept();
   }, [incomingVideoCallId]);
 
   const declineIncomingVideoCall = useCallback(() => {
@@ -2083,27 +2450,190 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
     setIncomingVideoCallVisible(false);
     setIncomingVideoCallId(null);
+    setIncomingCallBannerVisible(false);
   }, [incomingVideoCallId]);
+
+  const incomingVideoSwipeY = useRef(new Animated.Value(0)).current;
+  const resetIncomingVideoSwipe = useCallback(() => {
+    Animated.spring(incomingVideoSwipeY, {
+      toValue: 0,
+      useNativeDriver: true,
+      bounciness: 6,
+      speed: 16,
+    }).start();
+  }, [incomingVideoSwipeY]);
+  const triggerIncomingVideoSwipeAccept = useCallback(() => {
+    Animated.timing(incomingVideoSwipeY, {
+      toValue: -96,
+      duration: 120,
+      useNativeDriver: true,
+    }).start(() => {
+      incomingVideoSwipeY.setValue(0);
+      acceptIncomingVideoCall();
+    });
+  }, [acceptIncomingVideoCall, incomingVideoSwipeY]);
+  const incomingVideoAcceptPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_evt, gestureState) =>
+          gestureState.dy < -3 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onPanResponderMove: (_evt, gestureState) => {
+          const y = Math.max(-110, Math.min(0, gestureState.dy));
+          incomingVideoSwipeY.setValue(y);
+        },
+        onPanResponderRelease: (_evt, gestureState) => {
+          if (gestureState.dy <= -56) {
+            triggerIncomingVideoSwipeAccept();
+            return;
+          }
+          resetIncomingVideoSwipe();
+        },
+        onPanResponderTerminate: resetIncomingVideoSwipe,
+      }),
+    [incomingVideoSwipeY, resetIncomingVideoSwipe, triggerIncomingVideoSwipeAccept]
+  );
 
   const toggleVideoCallUiHidden = useCallback(() => {
     setVideoCallUiHidden((prev) => !prev);
   }, []);
+
+  const flipVideoCallCamera = useCallback(() => {
+    if (!callStateVisible || activeCallMode !== 'video' || !callVideoEnabled) return;
+    void agoraCallService.flipCamera();
+  }, [activeCallMode, callStateVisible, callVideoEnabled]);
 
   const openAudioDeviceSheet = useCallback(() => {
     setAudioDeviceSheetVisible((prev) => !prev);
   }, []);
 
   const selectAudioDevice = useCallback((device: AudioDevice) => {
+    const routeLabel =
+      device === 'speaker'
+        ? 'Speaker'
+        : device === 'earpiece'
+        ? 'Earpiece'
+        : device === 'bluetooth'
+        ? 'Bluetooth'
+        : 'Wired';
     setSelectedAudioDevice(device);
     setAudioDeviceSheetVisible(false);
+    // Agora SDK exposes direct speaker toggle; non-speaker routes fallback to OS default.
+    void agoraCallService.setSpeakerEnabled(device === 'speaker');
+    // eslint-disable-next-line no-console
+    console.log('[call][audio-route] selected', {
+      route: device,
+      label: routeLabel,
+      callId: activeCallId,
+      mode: activeCallMode,
+    });
+    if (__DEV__) {
+      showSuccessToast(`Audio route: ${routeLabel}`);
+    }
+  }, [activeCallId, activeCallMode]);
+
+  const getAgoraUidForCurrentUser = useCallback((): number => {
+    const raw = String(currentUserId ?? '').trim();
+    if (!raw) return 0;
+    if (/^\d+$/.test(raw)) {
+      const numeric = Number(raw);
+      if (Number.isFinite(numeric) && numeric > 0) return numeric;
+    }
+    let hash = 0;
+    for (let i = 0; i < raw.length; i += 1) {
+      hash = ((hash * 31) + raw.charCodeAt(i)) >>> 0;
+    }
+    return (hash % 2147483646) + 1;
+  }, [currentUserId]);
+
+  const fetchAgoraRtcToken = useCallback(
+    async (
+      channelName: string,
+      uid: number
+    ): Promise<{ token: string | null; uid: number }> => {
+      try {
+        const res = await apiClient.post(endpoints.rtc.agoraToken, { channelName, uid });
+        const root = (res.data ?? {}) as Record<string, unknown>;
+        const data = (root.data ?? root) as Record<string, unknown>;
+        const token = firstNonEmptyString(data.token, root.token);
+        const serverUidRaw = data.uid ?? root.uid;
+        const serverUid =
+          typeof serverUidRaw === 'number' && Number.isFinite(serverUidRaw)
+            ? serverUidRaw
+            : typeof serverUidRaw === 'string' && /^\d+$/.test(serverUidRaw)
+            ? Number(serverUidRaw)
+            : uid;
+        return { token: token ?? null, uid: serverUid };
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.log('[agora] token fetch failed', { channelName, uid, error });
+        return { token: null, uid };
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!callStateVisible) return;
+    void agoraCallService.setMuted(!callAudioEnabled);
+  }, [callAudioEnabled, callStateVisible]);
+
+  useEffect(() => {
+    if (!callStateVisible) return;
+    const speakerEnabled = selectedAudioDevice === 'speaker';
+    void agoraCallService.setSpeakerEnabled(speakerEnabled);
+  }, [selectedAudioDevice, callStateVisible]);
+
+  useEffect(() => {
+    if (!callStateVisible || activeCallMode !== 'video') return;
+    void agoraCallService.setLocalVideoEnabled(callVideoEnabled);
+  }, [activeCallMode, callStateVisible, callVideoEnabled]);
+
+  useEffect(() => {
+    const unsubscribe = agoraCallService.onRemoteUidChange((uid) => {
+      setRemoteRtcUid(uid);
+    });
+    return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!callStateVisible || !activeCallId || !activeCallChannelName) return;
+    let cancelled = false;
+    const join = async () => {
+      const fallbackUid = getAgoraUidForCurrentUser();
+      const tokenPayload = await fetchAgoraRtcToken(activeCallChannelName, fallbackUid);
+      const resolvedToken = firstNonEmptyString(activeCallRtcToken, tokenPayload.token);
+      const resolvedUid = tokenPayload.uid || fallbackUid;
+      if (cancelled) return;
+      setLocalRtcUid(resolvedUid);
+      await agoraCallService.joinVoiceChannel({
+        channelName: activeCallChannelName,
+        token: resolvedToken,
+        uid: resolvedUid,
+        isVideoCall: activeCallMode === 'video',
+        localVideoEnabled: activeCallMode === 'video' ? callVideoEnabled : false,
+      });
+    };
+    void join();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeCallId,
+    activeCallChannelName,
+    activeCallRtcToken,
+    callStateVisible,
+    fetchAgoraRtcToken,
+    getAgoraUidForCurrentUser,
+    activeCallMode,
+  ]);
 
   const requestSwitchVoiceToVideo = useCallback(() => {
     if (!chatId || !otherUserId) return;
     setSwitchToVideoPopupVisible(false);
-    socketService.callRequest(otherUserId, chatId, 'video');
+    socketService.callRequest(otherUserId, chatId, 'video', outgoingCallMeta);
     setIsSwitchingVoiceToVideo(true);
-  }, [chatId, otherUserId]);
+  }, [chatId, otherUserId, outgoingCallMeta]);
 
   const openSwitchToVideoPopup = useCallback(() => {
     if (isOutgoingVoiceRinging || isSwitchingVoiceToVideo) return;
@@ -2147,7 +2677,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       ? 'Audio on bluetooth'
       : 'Audio on wired headset';
   const isPartnerFullyOff = !partnerAudioEnabled && !partnerVideoEnabled;
-  const showVideoPreviewOffSurface = !callVideoEnabled || !partnerVideoEnabled;
+  const showPartnerMicOffState = partnerVideoEnabled && !partnerAudioEnabled;
+  const showVideoPreviewOffSurface = !callVideoEnabled;
+  const showRemoteRtcVideo =
+    activeCallMode === 'video' &&
+    remoteRtcUid != null &&
+    AgoraRtcSurfaceView != null;
   const renderAudioDevicePopoverOptions = () => (
     <View style={styles.callStateAudioDevicePopoverList}>
       <TouchableOpacity
@@ -2310,6 +2845,84 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           </TouchableOpacity>
         </View>
       </View>
+      {incomingCallBannerVisible ? (
+        <View style={styles.incomingCallBannerWrap}>
+          <TouchableOpacity
+            style={styles.incomingCallBanner}
+            activeOpacity={0.9}
+            onPress={openIncomingCallFromBanner}
+            accessibilityRole="button"
+            accessibilityLabel="Incoming call notification"
+          >
+            <View style={styles.incomingCallBannerHeaderRow}>
+              <View style={styles.incomingCallBannerAvatarWrap}>
+                <Image
+                  source={partnerDisplaySource}
+                  style={styles.incomingCallBannerAvatar}
+                  resizeMode="cover"
+                />
+                <View style={styles.incomingCallBannerAvatarBadge}>
+                  <Image
+                    source={INCOMING_CALL_VIDEO_BADGE_ICON}
+                    style={styles.incomingCallBannerAvatarBadgeIcon}
+                    resizeMode="contain"
+                  />
+                </View>
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.incomingCallBannerTitle} numberOfLines={1}>
+                  {incomingCallBannerMode === 'voice'
+                    ? incomingVoiceCallerName || 'Incoming call'
+                    : incomingVideoCallerName || 'Incoming call'}
+                </Text>
+                <Text style={styles.incomingCallBannerSubtitle} numberOfLines={1}>
+                  {incomingCallBannerMode === 'voice' ? 'Incoming voice call' : 'Incoming video call'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.incomingCallBannerButtonsRow}>
+              <TouchableOpacity
+                onPress={
+                  incomingCallBannerMode === 'voice' ? declineIncomingVoiceCall : declineIncomingVideoCall
+                }
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Decline incoming call"
+                style={[styles.incomingCallBannerButtonPill, styles.incomingCallBannerDeclineButton]}
+              >
+                <View style={styles.incomingCallBannerButtonPillInner}>
+                  <Image
+                    source={INCOMING_CALL_VIDEO_DECLINE_ICON}
+                    style={styles.incomingCallBannerPillIcon}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.incomingCallBannerPillText}>Decline</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={
+                  incomingCallBannerMode === 'voice' ? acceptIncomingVoiceCall : acceptIncomingVideoCall
+                }
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Accept incoming call"
+                style={[styles.incomingCallBannerButtonPill, styles.incomingCallBannerAcceptButton]}
+              >
+                <View style={styles.incomingCallBannerButtonPillInner}>
+                  <Image
+                    source={INCOMING_CALL_VIDEO_ACCEPT_ICON}
+                    style={styles.incomingCallBannerPillIcon}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.incomingCallBannerPillText}>Accept</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </View>
+      ) : null}
       <Modal
         visible={incomingVoiceCallVisible}
         animationType="fade"
@@ -2324,11 +2937,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               { paddingBottom: incomingVoiceCenterBottomInset },
             ]}
           >
-            {avatar != null ? (
-              <Image source={avatar} style={styles.incomingVoiceAvatar} resizeMode="cover" />
-            ) : (
-              <View style={styles.incomingVoiceAvatar} />
-            )}
+            <Image source={partnerDisplaySource} style={styles.incomingVoiceAvatar} resizeMode="cover" />
             <Text style={styles.incomingVoiceTitle}>Incoming voice call...</Text>
           </View>
 
@@ -2365,15 +2974,19 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   </Text>
                 ))}
               </View>
-              <TouchableOpacity
-                style={[styles.incomingVoiceActionCircle, styles.incomingVoiceAcceptBtn]}
-                activeOpacity={0.8}
-                onPress={acceptIncomingVoiceCall}
-                accessibilityRole="button"
-                accessibilityLabel="Accept incoming call"
+              <Animated.View
+                style={{ transform: [{ translateY: incomingVoiceSwipeY }] }}
+                {...incomingVoiceAcceptPanResponder.panHandlers}
               >
-                <VoiceControlMicIcon size={24} color={colors.white} />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.incomingVoiceActionCircle, styles.incomingVoiceAcceptBtn]}
+                  activeOpacity={1}
+                  accessibilityRole="button"
+                  accessibilityLabel="Swipe up to accept incoming call"
+                >
+                  <VoiceControlMicIcon size={24} color={colors.white} />
+                </TouchableOpacity>
+              </Animated.View>
               <Text style={styles.incomingVoiceActionLabel}>Swipe up to accept</Text>
             </View>
 
@@ -2401,19 +3014,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       >
         <SafeAreaView style={styles.incomingVideoFullBackdrop} edges={['top', 'left', 'right', 'bottom']}>
           <StatusBar barStyle="light-content" backgroundColor="transparent" />
-          {avatar != null ? (
-            <Image source={avatar} style={styles.incomingVideoFullBgImage} resizeMode="cover" />
-          ) : (
-            <View style={styles.incomingVideoFullBgFallback} />
-          )}
+          <Image source={partnerDisplaySource} style={styles.incomingVideoFullBgImage} resizeMode="cover" />
           <View style={styles.incomingVideoFullOverlay} />
 
           <View style={styles.incomingVideoFullTopCenter}>
-            {avatar != null ? (
-              <Image source={avatar} style={styles.incomingVideoFullAvatar} resizeMode="cover" />
-            ) : (
-              <View style={styles.incomingVideoFullAvatar} />
-            )}
             <Text style={styles.incomingVideoFullName} numberOfLines={1}>
               {incomingVideoCallerName || name}
             </Text>
@@ -2456,15 +3060,19 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   </Text>
                 ))}
               </View>
-              <TouchableOpacity
-                style={[styles.incomingVideoFullActionCircle, styles.incomingVideoFullAcceptBtn]}
-                activeOpacity={0.8}
-                onPress={acceptIncomingVideoCall}
-                accessibilityRole="button"
-                accessibilityLabel="Accept incoming video call"
+              <Animated.View
+                style={{ transform: [{ translateY: incomingVideoSwipeY }] }}
+                {...incomingVideoAcceptPanResponder.panHandlers}
               >
-                <CallVideoIncomingIcon size={24} color={colors.white} />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.incomingVideoFullActionCircle, styles.incomingVideoFullAcceptBtn]}
+                  activeOpacity={1}
+                  accessibilityRole="button"
+                  accessibilityLabel="Swipe up to accept incoming video call"
+                >
+                  <CallVideoIncomingIcon size={20} color={colors.white} />
+                </TouchableOpacity>
+              </Animated.View>
               <Text style={styles.incomingVideoFullActionLabel}>Swipe up to accept</Text>
             </View>
 
@@ -2487,25 +3095,30 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       <Modal
         visible={callStateVisible}
         animationType="slide"
-        onRequestClose={closeCallState}
+        onRequestClose={minimizeCallState}
       >
         {activeCallMode === 'video' ? (
           <SafeAreaView style={styles.videoCallBackdrop} edges={['top', 'left', 'right', 'bottom']}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" />
-            {!isPartnerFullyOff && avatar != null ? (
-              <Image source={avatar} style={styles.videoCallBgImage} resizeMode="cover" />
+            {!isPartnerFullyOff && !showRemoteRtcVideo ? (
+              <Image source={partnerDisplaySource} style={styles.videoCallBgImage} resizeMode="cover" />
             ) : (
               <View style={styles.videoCallBgFallback} />
             )}
             {!videoCallUiHidden ? <View style={styles.videoCallTopGradient} /> : null}
             {!videoCallUiHidden ? (
-              <View style={styles.videoCallTopBar}>
+              <View
+                style={[
+                  styles.videoCallTopBar,
+                  { paddingTop: Math.max(8, insets.top + 4) },
+                ]}
+              >
                 <TouchableOpacity
                   style={styles.videoCallTopBackButton}
-                  onPress={closeCallState}
+                  onPress={minimizeCallState}
                   activeOpacity={0.8}
                   accessibilityRole="button"
-                  accessibilityLabel="End call and go back"
+                  accessibilityLabel="Go back to chat"
                 >
                   <BackArrowIcon size={48} backgroundColor="rgba(0,0,0,0.3)" strokeColor={colors.white} />
                 </TouchableOpacity>
@@ -2513,19 +3126,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   <Text style={styles.videoCallTopName} numberOfLines={1}>
                     {name}
                   </Text>
-                  {!callAudioEnabled || !partnerAudioEnabled ? (
-                    <View style={styles.videoCallTopMicOffPill}>
-                      <VoiceControlMicOffIcon
-                        size={12}
-                        color={!callAudioEnabled ? colors.semantic.error : colors.white}
-                      />
-                    </View>
-                  ) : null}
                 </View>
-                <View style={styles.videoCallTopTimerPill}>
-                  <View style={styles.videoCallTopTimerDot} />
-                  <Text style={styles.videoCallTopTimerText}>{callDurationLabel}</Text>
-                </View>
+                <View style={styles.videoCallTopHeaderSpacer} />
               </View>
             ) : null}
 
@@ -2533,26 +3135,27 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               {!videoCallUiHidden ? (
                 isPartnerFullyOff ? (
                   <View style={styles.videoCallPartnerFullyOffStateCompact}>
-                    {avatar != null ? (
-                      <Image
-                        source={avatar}
-                        style={styles.videoCallPartnerFullyOffAvatarCompact}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View style={styles.videoCallPartnerFullyOffAvatarCompact} />
-                    )}
+                    <Image
+                      source={partnerDisplaySource}
+                      style={styles.videoCallPartnerFullyOffAvatarCompact}
+                      resizeMode="cover"
+                    />
                   </View>
-                ) : callVideoEnabled ? (
-                  <View />
+                ) : showRemoteRtcVideo ? (
+                  (
+                    <AgoraRtcSurfaceView
+                      style={styles.videoCallRemoteSurface}
+                      canvas={{ uid: remoteRtcUid, renderMode: 1 }}
+                    />
+                  )
                 ) : (
                   <View style={styles.videoCallVideoOffState}>
                     <View style={styles.videoCallVideoOffAvatarWrap}>
-                      {avatar != null ? (
-                        <Image source={avatar} style={styles.videoCallVideoOffAvatar} resizeMode="cover" />
-                      ) : (
-                        <View style={styles.videoCallVideoOffAvatar} />
-                      )}
+                      <Image
+                        source={partnerDisplaySource}
+                        style={styles.videoCallVideoOffAvatar}
+                        resizeMode="cover"
+                      />
                     </View>
                     <Text style={styles.videoCallVideoOffName} numberOfLines={1}>
                       {name}
@@ -2564,6 +3167,17 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   </View>
                 )
               ) : null}
+              {!videoCallUiHidden && showPartnerMicOffState ? (
+                <View style={styles.videoCallPartnerMicOffState}>
+                  <View style={styles.videoCallPartnerMicOffIconWrap}>
+                    <VoiceControlMicOffIcon size={30} color={colors.white} />
+                  </View>
+                  <Text style={styles.videoCallPartnerMicOffTitle}>Partner microphone is off</Text>
+                  <Text style={styles.videoCallPartnerMicOffSubtitle} numberOfLines={2}>
+                    They cannot speak until they unmute.
+                  </Text>
+                </View>
+              ) : null}
 
               {!videoCallUiHidden || videoCallUiHidden ? (
                 <View
@@ -2573,22 +3187,26 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   ]}
                 >
                   {!showVideoPreviewOffSurface ? (
-                    avatar != null ? (
-                      <Image source={avatar} style={styles.videoCallLocalPreviewAvatar} resizeMode="cover" />
+                    AgoraRtcSurfaceView ? (
+                      <AgoraRtcSurfaceView
+                        style={styles.videoCallLocalPreviewAvatar}
+                        canvas={{ uid: localRtcUid, sourceType: 0, renderMode: 1, mirrorMode: 1 }}
+                        zOrderMediaOverlay
+                      />
                     ) : (
-                      <View style={styles.videoCallLocalPreviewAvatar} />
+                      <Image
+                        source={localVideoPreviewFallback}
+                        style={styles.videoCallLocalPreviewAvatar}
+                        resizeMode="cover"
+                      />
                     )
                   ) : (
                     <View style={styles.videoCallLocalPreviewOffSurface}>
-                      {avatar != null ? (
-                        <Image
-                          source={avatar}
-                          style={styles.videoCallLocalPreviewOffAvatar}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View style={styles.videoCallLocalPreviewOffAvatar} />
-                      )}
+                      <Image
+                        source={localVideoPreviewFallback}
+                        style={styles.videoCallLocalPreviewOffAvatar}
+                        resizeMode="cover"
+                      />
                     </View>
                   )}
                   {!callAudioEnabled || !partnerAudioEnabled || videoCallUiHidden ? (
@@ -2597,9 +3215,15 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                     </View>
                   ) : null}
                   {!videoCallUiHidden ? (
-                    <View style={styles.videoCallLocalPreviewSwitchIcon}>
+                    <TouchableOpacity
+                      style={styles.videoCallLocalPreviewSwitchIcon}
+                      activeOpacity={0.8}
+                      onPress={flipVideoCallCamera}
+                      accessibilityRole="button"
+                      accessibilityLabel="Switch camera"
+                    >
                       <CameraIcon size={20} color={colors.white} />
-                    </View>
+                    </TouchableOpacity>
                   ) : null}
                 </View>
               ) : null}
@@ -2687,13 +3311,18 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           <SafeAreaView style={styles.callStateBackdrop} edges={['top', 'left', 'right', 'bottom']}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" />
             <View style={[styles.callStateContent, styles.callStateContentRinging]}>
-              <View style={styles.callStateRingingHeader}>
+              <View
+                style={[
+                  styles.callStateRingingHeader,
+                  { paddingTop: Math.max(8, insets.top + 4) },
+                ]}
+              >
                 <TouchableOpacity
                   style={styles.callStateRingingBackButton}
-                  onPress={closeCallState}
+                  onPress={minimizeCallState}
                   activeOpacity={0.8}
                   accessibilityRole="button"
-                  accessibilityLabel="Cancel call and go back"
+                  accessibilityLabel="Go back to chat"
                 >
                   <BackArrowIcon
                     size={48}
@@ -2707,7 +3336,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 <View style={styles.callStateRingingHeaderSpacer} />
               </View>
 
-              <View style={styles.callStatePickedCenterWrap}>
+              <View
+                style={[
+                  styles.callStatePickedCenterWrap,
+                  isOutgoingVoiceRinging && styles.callStatePickedCenterWrapRinging,
+                ]}
+              >
                 <View style={styles.callStatePickedAvatarWrap}>
                   {!isOutgoingVoiceRinging ? (
                     <>
@@ -2715,27 +3349,16 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                       <View style={styles.callStatePickedInnerRing} />
                     </>
                   ) : null}
-                  {avatar != null ? (
-                    <Image
-                      source={avatar}
-                      style={[
-                        styles.callStateAvatar,
-                        isOutgoingVoiceRinging
-                          ? styles.callStateAvatarRinging
-                          : styles.callStateAvatarPicked,
-                      ]}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View
-                      style={[
-                        styles.callStateAvatar,
-                        isOutgoingVoiceRinging
-                          ? styles.callStateAvatarRinging
-                          : styles.callStateAvatarPicked,
-                      ]}
-                    />
-                  )}
+                  <Image
+                    source={partnerDisplaySource}
+                    style={[
+                      styles.callStateAvatar,
+                      isOutgoingVoiceRinging
+                        ? styles.callStateAvatarRinging
+                        : styles.callStateAvatarPicked,
+                    ]}
+                    resizeMode="cover"
+                  />
                 </View>
                 <View style={styles.callStateRingingWrap}>
                   <Text style={styles.callStateRingingTitle}>
