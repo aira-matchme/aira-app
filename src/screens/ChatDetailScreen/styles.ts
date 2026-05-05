@@ -649,12 +649,46 @@ export const styles = StyleSheet.create({
     bottom: undefined,
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
+  /** Figma: top fade black 80% → 40% @ mid → transparent over ~200pt */
+  videoCallTopGradientLinear: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 200,
+    zIndex: 8,
+  },
+  videoCallContentRoot: {
+    flex: 1,
+    position: 'relative',
+    backgroundColor: '#080808',
+  },
+  /** Remote / placeholder video — edge-to-edge under status bar (no SafeArea top padding). */
+  videoCallMediaLayer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#080808',
+    zIndex: 0,
+  },
+  videoCallForeground: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+    pointerEvents: 'box-none',
+  },
   videoCallTopBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
     paddingHorizontal: 16,
     paddingTop: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    zIndex: 40,
+    backgroundColor: 'transparent',
+    ...(Platform.OS === 'android' ? { elevation: 40 } : {}),
   },
   videoCallTopBackButton: {
     width: 48,
@@ -663,11 +697,22 @@ export const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
-  videoCallTopNameWrap: {
+  videoCallTopNameRow: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    maxWidth: 220,
+    gap: 8,
+    minHeight: 48,
+    paddingHorizontal: 4,
+    minWidth: 0,
+  },
+  videoCallTopNameWrap: {
+    flexShrink: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     minHeight: 48,
   },
   videoCallTopName: {
@@ -682,8 +727,10 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   videoCallTopHeaderSpacer: {
-    width: 48,
-    height: 48,
+    minWidth: 48,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    minHeight: 48,
   },
   videoCallTopMicOffPill: {
     width: 28,
@@ -768,6 +815,7 @@ export const styles = StyleSheet.create({
   },
   videoCallMainSurface: {
     flex: 1,
+    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -927,15 +975,13 @@ export const styles = StyleSheet.create({
   },
   videoCallLocalPreview: {
     position: 'absolute',
-    right: 16,
-    top: 500,
-    width: 127,
-    height: 200,
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
     backgroundColor: '#1A1A1A',
+    zIndex: 35,
+    ...(Platform.OS === 'android' ? { elevation: 35 } : {}),
   },
   videoCallLocalPreviewAvatar: {
     width: '100%',
@@ -957,21 +1003,18 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
+  /** Figma: 20×20 flip glyph inset ~16 from PIP bottom-right (no heavy pill). */
   videoCallLocalPreviewSwitchIcon: {
     position: 'absolute',
-    right: 8,
-    bottom: 8,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
+    minWidth: 36,
+    minHeight: 36,
   },
   videoCallLocalPreviewMicOffIcon: {
     position: 'absolute',
     left: 8,
-    bottom: 8,
+    top: 8,
     width: 28,
     height: 28,
     borderRadius: 14,
@@ -983,9 +1026,11 @@ export const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    top: 716,
+    bottom: 0,
     width: '100%',
     alignItems: 'center',
+    zIndex: 40,
+    ...(Platform.OS === 'android' ? { elevation: 40 } : {}),
   },
   videoCallSelfMicOffNotice: {
     marginBottom: 10,
@@ -1009,18 +1054,20 @@ export const styles = StyleSheet.create({
   videoCallAudioDevicePopoverWrap: {
     position: 'absolute',
     left: 71,
-    top: 580,
     width: 172,
+    zIndex: 45,
+    ...(Platform.OS === 'android' ? { elevation: 45 } : {}),
   },
   videoCallBottomControlsCapsule: {
     borderRadius: 100,
     padding: 6,
     borderWidth: 0.875,
     borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: '#000000',
+    backgroundColor: 'rgba(0,0,0,0.92)',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    zIndex: 4,
   },
   videoCallBottomAction: {
     width: 56,
@@ -1086,6 +1133,8 @@ export const styles = StyleSheet.create({
   },
   videoCallHiddenUiTapArea: {
     ...StyleSheet.absoluteFillObject,
+    zIndex: 50,
+    ...(Platform.OS === 'android' ? { elevation: 50 } : {}),
   },
   videoCallShowUiButton: {
     height: 40,
@@ -1498,6 +1547,15 @@ export const styles = StyleSheet.create({
     lineHeight: 32,
     color: colors.black,
     textAlign: 'center',
+  },
+  callStateSwitchPopupSubtitle: {
+    ...typography.body,
+    marginTop: 8,
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.text.muted,
+    textAlign: 'center',
+    paddingHorizontal: 8,
   },
   callStateSwitchPopupActions: {
     marginTop: 24,
@@ -2393,9 +2451,10 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
     minWidth: 160,
+    maxWidth: BUBBLE_MAX_WIDTH,
   },
   chatCallBubbleSent: {
     backgroundColor: colors.primary.purple,
@@ -2413,8 +2472,11 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 2,
   },
   chatCallBubbleTextWrap: {
+    flex: 1,
+    minWidth: 0,
     paddingBottom: 2,
   },
   chatCallBubbleTitle: {
@@ -2422,6 +2484,7 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     letterSpacing: 0.28,
+    flexShrink: 1,
   },
   chatCallBubbleTitleSent: {
     color: colors.white,
@@ -2438,6 +2501,7 @@ export const styles = StyleSheet.create({
     lineHeight: 18,
     letterSpacing: 0.48,
     marginTop: 0,
+    flexShrink: 1,
   },
   chatCallBubbleSubtitleSent: {
     color: colors.neutral[200],

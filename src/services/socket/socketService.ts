@@ -99,6 +99,23 @@ export interface CallPartnerVideoPayload {
   enabled: boolean;
 }
 
+/** Peer asks to upgrade/downgrade media in the same RTC channel (no new token / channel). */
+export interface CallSwitchRequestPayload {
+  callId: string;
+  targetType: 'video' | 'audio';
+  fromUserId?: string;
+  chatId?: string;
+  [key: string]: unknown;
+}
+
+/** Server confirmed switch — both sides apply Agora video on/off only after this. */
+export interface CallSwitchAppliedPayload {
+  callId: string;
+  callType?: 'audio' | 'video';
+  targetType?: 'audio' | 'video';
+  [key: string]: unknown;
+}
+
 export type SocketEventType =
   | 'join'
   | 'join_success'
@@ -112,7 +129,9 @@ export type SocketEventType =
   | 'call_partner_audio'
   | 'call_partner_video'
   | 'call_request_sent'
-  | 'call_failed';
+  | 'call_failed'
+  | 'call_switch_request'
+  | 'call_switch_applied';
 
 export type SocketEventListener<T = unknown> = (data: T) => void;
 
@@ -138,10 +157,12 @@ class SocketService {
     call_partner_video: new Set(),
     call_request_sent: new Set(),
     call_failed: new Set(),
+    call_switch_request: new Set(),
+    call_switch_applied: new Set(),
   };
 
-  /** Enable verbose socket logs while debugging call flows. */
-  private static readonly ENABLE_CALL_SOCKET_LOGS = true;
+  /** Set to `true` temporarily when debugging socket/call traffic (otherwise every event logs to Metro). */
+  private static readonly ENABLE_CALL_SOCKET_LOGS = false;
 
   private logCallSocket(direction: 'emit' | 'receive' | 'state', event: string, payload?: unknown) {
     if (!SocketService.ENABLE_CALL_SOCKET_LOGS) return;
@@ -150,8 +171,41 @@ class SocketService {
     console.log(`[socket:${direction}] ${ts} ${event}`, payload ?? '');
   }
 
+  private logPartnerRejectDebug(socketEvent: string, raw: unknown, payload: CallLifecyclePayload) {
+    if (!SocketService.ENABLE_CALL_SOCKET_LOGS) return;
+    // eslint-disable-next-line no-console
+    console.log(`[CALL_DEBUG] Partner rejected — socket: "${socketEvent}"`, {
+      rawServerPayload: raw,
+      normalizedPayload: payload,
+    });
+  }
+
   private onSocketReceive(event: string, payload: unknown) {
     this.logCallSocket('receive', event, payload);
+  }
+
+  /** Dedupe window targets for logical call emits (multiple raw socket names → one app event). */
+  private callEmitDedupeUntil = new Map<string, number>();
+
+  /**
+   * Some backends emit the same logical call under several event names (e.g. `incoming_call` +
+   * `incoming_video_call`, or `call_accept` + `call_accepted`). Returns true when this emit should
+   * be skipped as a duplicate within `windowMs`.
+   */
+  private isDuplicateCallSocketEmit(dedupeKey: string, windowMs: number): boolean {
+    const now = Date.now();
+    const until = this.callEmitDedupeUntil.get(dedupeKey);
+    if (until != null && until > now) {
+      this.logCallSocket('state', 'emit_deduped_skip', { dedupeKey, windowMs });
+      return true;
+    }
+    this.callEmitDedupeUntil.set(dedupeKey, now + windowMs);
+    if (this.callEmitDedupeUntil.size > 80) {
+      for (const [k, t] of this.callEmitDedupeUntil) {
+        if (t <= now) this.callEmitDedupeUntil.delete(k);
+      }
+    }
+    return false;
   }
 
   /** Backend contract (verify against your server):
@@ -330,6 +384,10 @@ class SocketService {
         createdAt,
         raw: d,
       });
+      const incomingDedupeKey = callId
+        ? `incoming_call:${callId}`
+        : `incoming_call:${senderId}:${receiverId}:${callType}:${channelName ?? ''}`;
+      if (this.isDuplicateCallSocketEmit(incomingDedupeKey, 1200)) return;
       this.emit('incoming_call', {
         senderId,
         receiverId,
@@ -400,6 +458,7 @@ class SocketService {
       this.logCallSocket('receive', 'call_lifecycle', { payload, raw: d });
       return payload;
     };
+
     this.socket.on('call_request_sent', (data) => {
       this.onSocketReceive('call_request_sent(raw)', data);
       this.emit('call_request_sent', handleCallLifecycle(data) as CallRequestSentPayload);
@@ -416,27 +475,65 @@ class SocketService {
     });
     this.socket.on('call_accepted', (data) => {
       this.onSocketReceive('call_accepted(raw)', data);
-      this.emit('call_accepted', handleCallLifecycle(data));
+      const payload = handleCallLifecycle(data);
+      const cid = payload.callId.trim();
+      const acceptKey = cid
+        ? `call_accepted:${cid}`
+        : `call_accepted:${payload.callerId ?? ''}:${payload.receiverId ?? ''}:${payload.channelName ?? ''}`;
+      if (this.isDuplicateCallSocketEmit(acceptKey, 800)) return;
+      this.emit('call_accepted', payload);
     });
     this.socket.on('call_accept', (data) => {
       this.onSocketReceive('call_accept(raw)', data);
-      this.emit('call_accepted', handleCallLifecycle(data));
+      const payload = handleCallLifecycle(data);
+      const cid = payload.callId.trim();
+      const acceptKey = cid
+        ? `call_accepted:${cid}`
+        : `call_accepted:${payload.callerId ?? ''}:${payload.receiverId ?? ''}:${payload.channelName ?? ''}`;
+      if (this.isDuplicateCallSocketEmit(acceptKey, 800)) return;
+      this.emit('call_accepted', payload);
     });
     this.socket.on('call_rejected', (data) => {
       this.onSocketReceive('call_rejected(raw)', data);
-      this.emit('call_rejected', handleCallLifecycle(data));
+      const payload = handleCallLifecycle(data);
+      this.logPartnerRejectDebug('call_rejected', data, payload);
+      const cid = payload.callId.trim();
+      const rejectKey = cid
+        ? `call_rejected:${cid}`
+        : `call_rejected:${payload.callerId ?? ''}:${payload.receiverId ?? ''}`;
+      if (this.isDuplicateCallSocketEmit(rejectKey, 800)) return;
+      this.emit('call_rejected', payload);
     });
     this.socket.on('call_reject', (data) => {
       this.onSocketReceive('call_reject(raw)', data);
-      this.emit('call_rejected', handleCallLifecycle(data));
+      const payload = handleCallLifecycle(data);
+      this.logPartnerRejectDebug('call_reject', data, payload);
+      const cid = payload.callId.trim();
+      const rejectKey = cid
+        ? `call_rejected:${cid}`
+        : `call_rejected:${payload.callerId ?? ''}:${payload.receiverId ?? ''}`;
+      if (this.isDuplicateCallSocketEmit(rejectKey, 800)) return;
+      this.emit('call_rejected', payload);
     });
     this.socket.on('call_end', (data) => {
       this.onSocketReceive('call_end(raw)', data);
-      this.emit('call_ended', handleCallLifecycle(data));
+      const payload = handleCallLifecycle(data);
+      const cid = payload.callId.trim();
+      const endedKey = cid
+        ? `call_ended:${cid}`
+        : `call_ended:${payload.callerId ?? ''}:${payload.receiverId ?? ''}`;
+      if (this.isDuplicateCallSocketEmit(endedKey, 800)) return;
+      this.emit('call_ended', payload);
     });
     this.socket.on('call_ended', (data) => {
       this.onSocketReceive('call_ended(raw)', data);
-      this.emit('call_ended', handleCallLifecycle(data));
+      const payload = handleCallLifecycle(data);
+      const cid = payload.callId.trim();
+      const endedKey = cid
+        ? `call_ended:${cid}`
+        : `call_ended:${payload.callerId ?? ''}:${payload.receiverId ?? ''}`;
+      if (this.isDuplicateCallSocketEmit(endedKey, 800)) return;
+      this.emit('call_ended', payload);
     });
 
     const handlePartnerAudio = (data: unknown, forceEnabled?: boolean) => {
@@ -457,6 +554,8 @@ class SocketService {
         enabled = !mutedRaw;
       }
       this.logCallSocket('receive', 'call_partner_audio', { callId, userId, enabled, raw: d });
+      const audioKey = `call_partner_audio:${callId ?? ''}:${userId}:${enabled ? '1' : '0'}`;
+      if (this.isDuplicateCallSocketEmit(audioKey, 400)) return;
       this.emit('call_partner_audio', { callId, userId, enabled });
     };
     this.socket.on('call_mic_update', (data) => {
@@ -498,6 +597,8 @@ class SocketService {
         enabled = !offRaw;
       }
       this.logCallSocket('receive', 'call_partner_video', { callId, userId, enabled, raw: d });
+      const videoKey = `call_partner_video:${callId ?? ''}:${userId}:${enabled ? '1' : '0'}`;
+      if (this.isDuplicateCallSocketEmit(videoKey, 400)) return;
       this.emit('call_partner_video', { callId, userId, enabled });
     };
     this.socket.on('call_video_state', (data) => {
@@ -519,6 +620,40 @@ class SocketService {
     this.socket.on('call_video_on', (data) => {
       this.onSocketReceive('call_video_on(raw)', data);
       handlePartnerVideo(data, true);
+    });
+
+    this.socket.on('call_switch_request', (data: unknown) => {
+      this.onSocketReceive('call_switch_request(raw)', data);
+      const d = (data ?? {}) as Record<string, unknown>;
+      const tt = String(d.targetType ?? d.target_type ?? 'video').toLowerCase();
+      const payload: CallSwitchRequestPayload = {
+        ...d,
+        callId: String(d.callId ?? d.call_id ?? '').trim(),
+        targetType: tt.includes('audio') && !tt.includes('video') ? 'audio' : 'video',
+        fromUserId: String(d.fromUserId ?? d.from_user_id ?? d.senderId ?? d.sender ?? '').trim() || undefined,
+        chatId: String(d.chatId ?? d.chat_id ?? '').trim() || undefined,
+      };
+      if (!payload.callId) return;
+      this.emit('call_switch_request', payload);
+    });
+
+    this.socket.on('call_switch_applied', (data: unknown) => {
+      this.onSocketReceive('call_switch_applied(raw)', data);
+      const d = (data ?? {}) as Record<string, unknown>;
+      const ct = String(d.callType ?? d.call_type ?? d.targetType ?? d.target_type ?? '').toLowerCase();
+      const callType: 'audio' | 'video' | undefined = ct.includes('video')
+        ? 'video'
+        : ct.includes('audio') || ct.includes('voice')
+        ? 'audio'
+        : undefined;
+      const payload: CallSwitchAppliedPayload = {
+        ...d,
+        callId: String(d.callId ?? d.call_id ?? '').trim(),
+        callType,
+        targetType: callType,
+      };
+      if (!payload.callId) return;
+      this.emit('call_switch_applied', payload);
     });
   }
 
@@ -615,7 +750,6 @@ class SocketService {
     if (callerName) payload.callerName = callerName;
     if (callerAvatar) payload.callerAvatar = callerAvatar;
 
-    console.log('callRequest', toUserId, chatId, callType, payload);
     this.logCallSocket('emit', 'call_request(method)', payload);
     this.send('call_request', payload);
   }
@@ -636,6 +770,20 @@ class SocketService {
   callEnd(callId: string) {
     this.logCallSocket('emit', 'call_end(method)', { callId });
     this.send('call_end', { callId });
+  }
+
+  /** In-call upgrade/downgrade (same channel, same token) — Step 1 requester. */
+  callSwitchRequest(callId: string, targetType: 'video' | 'audio' = 'video') {
+    const payload = { callId, targetType };
+    this.logCallSocket('emit', 'call_switch_request(method)', payload);
+    this.send('call_switch_request', payload);
+  }
+
+  /** In-call switch — Step 3 receiver response. */
+  callSwitchResponse(callId: string, accepted: boolean, targetType: 'video' | 'audio' = 'video') {
+    const payload = { callId, accepted, targetType };
+    this.logCallSocket('emit', 'call_switch_response(method)', payload);
+    this.send('call_switch_response', payload);
   }
 
   /** Broadcast local mic state so peer UI can reflect mute/unmute quickly. */
@@ -662,6 +810,8 @@ class SocketService {
   disconnect() {
     this.socket?.removeAllListeners();
     this.socket?.disconnect();
+    this.listeners = {};
+    this.connectionListeners.clear();
     this.socket = null;
     this.token = null;
     this.userId = null;

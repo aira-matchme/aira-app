@@ -5,16 +5,20 @@ interface BackArrowIconProps {
   size?: number;
   backgroundColor?: string;
   strokeColor?: string;
+  /** Fully circular mask (e.g. video call header in Figma). */
+  circular?: boolean;
 }
 
 export const BackArrowIcon: React.FC<BackArrowIconProps> = ({
   size = 48,
   backgroundColor = '#FFFFFF',
   strokeColor = '#000000',
+  circular = false,
 }) => {
+  const rx = circular ? size / 2 : 16;
   return (
     <Svg width={size} height={size} viewBox="0 0 48 48" fill="none">
-      <Rect width="48" height="48" rx="16" fill={backgroundColor} />
+      <Rect width="48" height="48" rx={rx} fill={backgroundColor} />
       <Path
         d="M15.875 24H32.75"
         stroke={strokeColor}

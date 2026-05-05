@@ -1,4 +1,6 @@
 declare module '@env' {
+  /** Sentry project DSN; leave empty to disable Sentry in local builds. */
+  export const SENTRY_DSN: string | undefined;
   export const API_BASE_URL: string;
   export const NODE_ENV: string;
   export const API_KEY: string;

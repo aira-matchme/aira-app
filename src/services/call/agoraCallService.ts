@@ -22,6 +22,8 @@ type AgoraEngineLike = {
     uid: number,
     options?: Record<string, unknown>
   ) => Promise<void> | void;
+  /** Toggle publish/subscribe video while staying in the same channel (voice → video switch). */
+  updateChannelMediaOptions?: (options: Record<string, unknown>) => number | void;
   leaveChannel?: () => Promise<void> | void;
   release?: () => Promise<void> | void;
   removeAllListeners?: () => Promise<void> | void;
@@ -228,6 +230,47 @@ class AgoraCallService {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log('[agora] local video toggle failed', error);
+    }
+  }
+
+  /**
+   * After `call_switch_applied` — same channel/token, no re-join.
+   * Uses updateChannelMediaOptions so camera publish matches join-time options.
+   */
+  async applyCallSwitchToVideoInChannel(enableVideo: boolean) {
+    if (!this.joinedChannelName) {
+      // eslint-disable-next-line no-console
+      console.log('[agora] applyCallSwitch skipped: not joined');
+      return;
+    }
+    await this.ensureInitialized();
+    if (!this.engine) return;
+    try {
+      if (enableVideo) {
+        await this.engine.enableVideo?.();
+        await this.engine.enableLocalVideo?.(true);
+        await this.engine.muteLocalVideoStream?.(false);
+        await this.engine.startPreview?.();
+        this.engine.updateChannelMediaOptions?.({
+          publishMicrophoneTrack: true,
+          publishCameraTrack: true,
+          autoSubscribeAudio: true,
+          autoSubscribeVideo: true,
+        });
+      } else {
+        await this.engine.muteLocalVideoStream?.(true);
+        await this.engine.enableLocalVideo?.(false);
+        await this.engine.stopPreview?.();
+        this.engine.updateChannelMediaOptions?.({
+          publishMicrophoneTrack: true,
+          publishCameraTrack: false,
+          autoSubscribeAudio: true,
+          autoSubscribeVideo: false,
+        });
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log('[agora] applyCallSwitch failed', error);
     }
   }
 
