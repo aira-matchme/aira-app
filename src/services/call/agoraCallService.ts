@@ -15,7 +15,13 @@ type AgoraEngineLike = {
   stopPreview?: () => Promise<void> | void;
   switchCamera?: () => Promise<void> | void;
   setDefaultAudioRouteToSpeakerphone?: (speaker: boolean) => Promise<void> | void;
-  setEnableSpeakerphone?: (speaker: boolean) => Promise<void> | void;
+  /** Current-channel speaker toggle (iOS + Android fallback). */
+  setEnableSpeakerphone?: (speaker: boolean) => number | Promise<void> | void;
+  /**
+   * Android-only: MODE_IN_COMMUNICATION route — 1 earpiece, 3 speaker, 5 BT, 0 wired headset mic.
+   * Prefer over mixing with setEnableSpeakerphone when available.
+   */
+  setRouteInCommunicationMode?: (route: number) => number | void;
   joinChannel?: (
     token: string,
     channelName: string,
@@ -28,10 +34,23 @@ type AgoraEngineLike = {
   release?: () => Promise<void> | void;
   removeAllListeners?: () => Promise<void> | void;
   registerEventHandler?: (handler: Record<string, unknown>) => Promise<void> | void;
+  /** True when playback is routed to built-in/external speaker vs earpiece/BT headset (communication mode). */
+  isSpeakerphoneEnabled?: () => boolean;
 };
 
 const AGORA_CHANNEL_PROFILE_COMMUNICATION = 0;
 const AGORA_CLIENT_ROLE_BROADCASTER = 1;
+
+export type AgoraAudioOutputRoute = 'speaker' | 'earpiece' | 'bluetooth' | 'wired';
+
+/** Agora `onAudioRoutingChanged` / `setRouteInCommunicationMode` routing codes (mobile). */
+function mapAgoraAudioRouting(routing: number): AgoraAudioOutputRoute | undefined {
+  if (routing === 3 || routing === 4) return 'speaker';
+  if (routing === 1) return 'earpiece';
+  if (routing === 5) return 'bluetooth';
+  if (routing === 0 || routing === 2) return 'wired';
+  return undefined;
+}
 
 class AgoraCallService {
   private engine: AgoraEngineLike | null = null;
@@ -39,10 +58,49 @@ class AgoraCallService {
   private joinedChannelName: string | null = null;
   private remoteUid: number | null = null;
   private remoteUidListeners = new Set<(uid: number | null) => void>();
+  private audioRouteListeners = new Set<(route: AgoraAudioOutputRoute) => void>();
+  private audioRouteEmitScheduled = false;
 
   private setRemoteUid(uid: number | null) {
     this.remoteUid = uid;
     this.remoteUidListeners.forEach((listener) => listener(uid));
+  }
+
+  private emitAudioRouteToUi(route: AgoraAudioOutputRoute) {
+    this.audioRouteListeners.forEach((listener) => listener(route));
+  }
+
+  /**
+   * Sync UI route with actual SDK/OS route (fixes default speaker while React state stays on earpiece).
+   */
+  subscribeAudioRoute(listener: (route: AgoraAudioOutputRoute) => void): () => void {
+    this.audioRouteListeners.add(listener);
+    return () => {
+      this.audioRouteListeners.delete(listener);
+    };
+  }
+
+  /** When actual output is loudspeaker but `isSpeakerphoneEnabled` is reliable; skips ambiguous false (BT/wired vs earpiece). */
+  private syncSpeakerMismatchFromEngine() {
+    try {
+      if (!this.engine?.isSpeakerphoneEnabled || !this.joinedChannelName) return;
+      if (this.engine.isSpeakerphoneEnabled() === true) {
+        this.emitAudioRouteToUi('speaker');
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  private scheduleAudioRouteConsistencyCheck() {
+    if (this.audioRouteEmitScheduled) return;
+    this.audioRouteEmitScheduled = true;
+    const run = () => {
+      this.audioRouteEmitScheduled = false;
+      this.syncSpeakerMismatchFromEngine();
+    };
+    setTimeout(run, 120);
+    setTimeout(run, 450);
   }
 
   private pickUid(...values: unknown[]): number | null {
@@ -141,6 +199,23 @@ class AgoraCallService {
         onLeaveChannel: () => {
           this.setRemoteUid(null);
         },
+        onAudioRoutingChanged: (routing: unknown) => {
+          const code = typeof routing === 'number' ? routing : Number(routing);
+          if (!Number.isFinite(code)) return;
+          let mapped = mapAgoraAudioRouting(code);
+          if (mapped === undefined && code === -1) {
+            mapped = this.engine?.isSpeakerphoneEnabled?.() === true ? 'speaker' : 'earpiece';
+          }
+          // Routing sometimes reports earpiece while loudspeaker is still active (Android ordering / OEM).
+          if (mapped === 'earpiece' && this.engine?.isSpeakerphoneEnabled?.() === true) {
+            mapped = 'speaker';
+          }
+          if (mapped !== undefined) {
+            // eslint-disable-next-line no-console
+            console.log('[agora] onAudioRoutingChanged', { routing: code, mapped });
+            this.emitAudioRouteToUi(mapped);
+          }
+        },
       });
       this.initialized = true;
     } catch (error) {
@@ -186,6 +261,7 @@ class AgoraCallService {
         publishCameraTrack: isVideoCall && localVideoEnabled,
       });
       this.joinedChannelName = channelName;
+      this.scheduleAudioRouteConsistencyCheck();
       // eslint-disable-next-line no-console
       console.log('[agora] joined rtc channel', { channelName, uid, isVideoCall, localVideoEnabled, platform: Platform.OS });
     } catch (error) {
@@ -205,15 +281,31 @@ class AgoraCallService {
     }
   }
 
-  async setSpeakerEnabled(enabled: boolean) {
+  /**
+   * Route playback to speaker, earpiece, Bluetooth, or wired (OS / Agora permitting).
+   * Avoids calling setDefaultAudioRouteToSpeakerphone + setEnableSpeakerphone together — that can mute speaker on some builds.
+   */
+  async applyAudioOutputRoute(route: AgoraAudioOutputRoute) {
+    await this.ensureInitialized();
     if (!this.engine) return;
     try {
-      await this.engine.setDefaultAudioRouteToSpeakerphone?.(enabled);
-      await this.engine.setEnableSpeakerphone?.(enabled);
+      if (Platform.OS === 'android') {
+        const routeCode =
+          route === 'speaker' ? 3 : route === 'bluetooth' ? 5 : route === 'wired' ? 0 : 1;
+        this.engine.setRouteInCommunicationMode?.(routeCode);
+      }
+      // Always apply loudspeaker toggle; returning early after setRouteInCommunicationMode skipped this
+      // on some builds so Speaker never stuck and callbacks kept overwriting UI as "earpiece".
+      await this.engine.setEnableSpeakerphone?.(route === 'speaker');
+      this.emitAudioRouteToUi(route);
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.log('[agora] speaker route failed', error);
+      console.log('[agora] applyAudioOutputRoute failed', error);
     }
+  }
+
+  async setSpeakerEnabled(enabled: boolean) {
+    await this.applyAudioOutputRoute(enabled ? 'speaker' : 'earpiece');
   }
 
   async setLocalVideoEnabled(enabled: boolean) {
@@ -291,6 +383,7 @@ class AgoraCallService {
     try {
       await this.engine.leaveChannel?.();
       this.joinedChannelName = null;
+      this.audioRouteEmitScheduled = false;
       this.setRemoteUid(null);
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -305,6 +398,7 @@ class AgoraCallService {
       this.remoteUidListeners.delete(listener);
     };
   }
+
 }
 
 export const agoraCallService = new AgoraCallService();

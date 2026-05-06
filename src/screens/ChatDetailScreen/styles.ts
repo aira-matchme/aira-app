@@ -1053,7 +1053,6 @@ export const styles = StyleSheet.create({
   },
   videoCallAudioDevicePopoverWrap: {
     position: 'absolute',
-    left: 71,
     width: 172,
     zIndex: 45,
     ...(Platform.OS === 'android' ? { elevation: 45 } : {}),
@@ -1074,6 +1073,14 @@ export const styles = StyleSheet.create({
     height: 56,
     borderRadius: 100,
     backgroundColor: colors.neutral[900],
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  /** Fixed slot so SVG glyphs sit on the same optical center in the 56pt circle. */
+  videoCallBottomActionIconSlot: {
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },

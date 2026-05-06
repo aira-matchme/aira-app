@@ -313,6 +313,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       return null;
     }
   }, []);
+  const callStateVisibleRef = useRef(callStateVisible);
+  callStateVisibleRef.current = callStateVisible;
+
   /** Bottom chrome + PIP (Figma 812). SafeAreaView already applies `bottom` inset — do not add insets.bottom again. */
   const videoControlsApproxHeight = Math.round((68 / 812) * windowHeight);
   const videoBottomChromeOffset = Math.max(10, Math.round((28 / 812) * windowHeight));
@@ -2678,10 +2681,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     void agoraCallService.flipCamera();
   }, [activeCallMode, callStateVisible, callVideoEnabled]);
 
-  const openAudioDeviceSheet = useCallback(() => {
-    setAudioDeviceSheetVisible((prev) => !prev);
-  }, []);
-
   const selectAudioDevice = useCallback((device: AudioDevice) => {
     const routeLabel =
       device === 'speaker'
@@ -2693,8 +2692,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         : 'Wired';
     setSelectedAudioDevice(device);
     setAudioDeviceSheetVisible(false);
-    // Agora SDK exposes direct speaker toggle; non-speaker routes fallback to OS default.
-    void agoraCallService.setSpeakerEnabled(device === 'speaker');
     // eslint-disable-next-line no-console
     console.log('[call][audio-route] selected', {
       route: device,
@@ -2706,6 +2703,16 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       showSuccessToast(`Audio route: ${routeLabel}`);
     }
   }, [activeCallId, activeCallMode]);
+
+  const openAudioDeviceSheet = useCallback(() => {
+    if (selectedAudioDevice !== 'speaker') {
+      // Directly switch to speaker — avoids opening the picker with earpiece highlighted.
+      selectAudioDevice('speaker');
+    } else {
+      // Already on speaker: open the picker so the user can choose earpiece / bluetooth.
+      setAudioDeviceSheetVisible((prev) => !prev);
+    }
+  }, [selectedAudioDevice, selectAudioDevice]);
 
   const getAgoraUidForCurrentUser = useCallback((): number => {
     const raw = String(currentUserId ?? '').trim();
@@ -2755,8 +2762,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
   useEffect(() => {
     if (!callStateVisible) return;
-    const speakerEnabled = selectedAudioDevice === 'speaker';
-    void agoraCallService.setSpeakerEnabled(speakerEnabled);
+    void agoraCallService.applyAudioOutputRoute(selectedAudioDevice);
   }, [selectedAudioDevice, callStateVisible]);
 
   useEffect(() => {
@@ -2769,6 +2775,15 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setRemoteRtcUid(uid);
     });
     return unsubscribe;
+  }, []);
+
+  /** Keep menu + FAB in sync with real Agora/OS route (e.g. speaker playing while UI still said earpiece). */
+  useEffect(() => {
+    const unsub = agoraCallService.subscribeAudioRoute((route) => {
+      if (!callStateVisibleRef.current) return;
+      setSelectedAudioDevice(route);
+    });
+    return unsub;
   }, []);
 
   useEffect(() => {
@@ -2859,6 +2874,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       : selectedAudioDevice === 'bluetooth'
       ? 'Audio on bluetooth'
       : 'Audio on wired headset';
+  /** Figma: white FAB when sheet open or when route is not default earpiece (speaker / Bluetooth / wired). */
+  const audioRouteFabHighlighted =
+    audioDeviceSheetVisible || selectedAudioDevice !== 'earpiece';
   const isPartnerFullyOff = !partnerAudioEnabled && !partnerVideoEnabled;
   const showPartnerMicOffState = partnerVideoEnabled && !partnerAudioEnabled;
   const showVideoPreviewOffSurface = !callVideoEnabled;
@@ -3467,17 +3485,24 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   <TouchableOpacity
                     style={[
                       styles.videoCallBottomAction,
-                      audioDeviceSheetVisible && styles.videoCallBottomActionSelected,
+                      audioRouteFabHighlighted && styles.videoCallBottomActionSelected,
                     ]}
                     onPress={openAudioDeviceSheet}
                     activeOpacity={0.8}
                     accessibilityRole="button"
                     accessibilityLabel="Choose audio device"
                   >
-                    <VoiceControlSpeakerIcon
-                      size={24}
-                      color={audioDeviceSheetVisible ? colors.black : colors.white}
-                    />
+                    {selectedAudioDevice === 'bluetooth' ? (
+                      <AudioBluetoothIcon
+                        size={24}
+                        color={audioRouteFabHighlighted ? colors.black : colors.white}
+                      />
+                    ) : (
+                      <VoiceControlSpeakerIcon
+                        size={24}
+                        color={audioRouteFabHighlighted ? colors.black : colors.white}
+                      />
+                    )}
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -3616,7 +3641,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   <TouchableOpacity
                     style={[
                       styles.callStateRingingActionButton,
-                      audioDeviceSheetVisible && styles.callStateRingingActionButtonSelected,
+                      audioRouteFabHighlighted && styles.callStateRingingActionButtonSelected,
                     ]}
                     onPress={openAudioDeviceSheet}
                     activeOpacity={0.8}
@@ -3629,10 +3654,17 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                         styles.callStateRingingIconWrapSpeaker,
                       ]}
                     >
-                      <VoiceControlSpeakerIcon
-                        size={24}
-                        color={audioDeviceSheetVisible ? colors.black : colors.white}
-                      />
+                      {selectedAudioDevice === 'bluetooth' ? (
+                        <AudioBluetoothIcon
+                          size={24}
+                          color={audioRouteFabHighlighted ? colors.black : colors.white}
+                        />
+                      ) : (
+                        <VoiceControlSpeakerIcon
+                          size={24}
+                          color={audioRouteFabHighlighted ? colors.black : colors.white}
+                        />
+                      )}
                     </View>
                   </TouchableOpacity>
                   <TouchableOpacity
