@@ -77,4 +77,7 @@ export const endpoints = {
     markSeen: (notificationId: string) =>
       `/notifications/${encodeURIComponent(notificationId)}/seen`,
   },
+  rtc: {
+    agoraToken: '/agora/token',
+  },
 };

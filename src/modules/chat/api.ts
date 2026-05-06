@@ -557,7 +557,7 @@ export async function uploadChatFileApi(
 export type ChatMessageApiItem = {
   _id?: string;
   chatId?: string;
-  messageType?: 'text' | 'voice' | 'audio' | 'image' | 'file' | 'document';
+  messageType?: 'text' | 'voice' | 'audio' | 'image' | 'file' | 'document' | 'system_call';
   content?: string | { text?: string; type?: string };
   files?: Array<{ url?: string; uri?: string; name?: string; filename?: string }>;
   isMedia?: boolean;
@@ -635,7 +635,19 @@ export type ChatMessageUi =
     }
   | { type: 'voice'; uri: string; timestamp: string; sent: boolean; messageId?: string }
   | { type: 'image'; uri: string; timestamp: string; sent: boolean; messageId?: string }
-  | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean; messageId?: string };
+  | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean; messageId?: string }
+  | {
+      type: 'call_log';
+      callId: string;
+      callType: 'audio' | 'video';
+      callStatus: string;
+      durationSec: number;
+      label: string;
+      displayAsSummaryLine?: boolean;
+      timestamp: string;
+      sent: boolean;
+      messageId?: string;
+    };
 
 function formatMessageTime(iso?: string): string {
   if (!iso) return '';
@@ -684,6 +696,20 @@ function getSenderIdFromMessage(item: ChatMessageApiItem): string | null {
   return null;
 }
 
+function getReceiverIdFromMessage(item: ChatMessageApiItem): string | null {
+  const receiver = item.receiver;
+  if (typeof receiver === 'string') return receiver;
+  if (receiver && typeof receiver === 'object') {
+    const receiverObj = receiver as { _id?: unknown; id?: unknown };
+    if (typeof receiverObj._id === 'string') return receiverObj._id;
+    if (typeof receiverObj.id === 'string') return receiverObj.id;
+  }
+  if (typeof (item as { receiverId?: unknown }).receiverId === 'string') {
+    return (item as { receiverId: string }).receiverId;
+  }
+  return null;
+}
+
 function getTextFromApiMessage(
   item: ChatMessageApiItem,
   currentUserId?: string,
@@ -719,6 +745,97 @@ export function mapApiMessageToChatMessage(
   const timestamp = formatMessageTime(item.messageTimeStamp ?? item.createdAt);
 
   const messageId = item._id ?? undefined;
+
+  if (type === 'system_call') {
+    const rawBlocks = (item as { contentBlocks?: unknown }).contentBlocks;
+    const firstLog = Array.isArray(rawBlocks)
+      ? rawBlocks.find((b) => {
+          if (!b || typeof b !== 'object') return false;
+          return (b as { type?: unknown }).type === 'call_log';
+        })
+      : undefined;
+    if (firstLog && typeof firstLog === 'object') {
+      const b = firstLog as {
+        callId?: unknown;
+        callType?: unknown;
+        callStatus?: unknown;
+        duration?: unknown;
+        callerId?: unknown;
+        caller_id?: unknown;
+        receiverId?: unknown;
+        receiver_id?: unknown;
+        textForCaller?: unknown;
+        text_for_caller?: unknown;
+        textForReceiver?: unknown;
+        text_for_receiver?: unknown;
+      };
+      const callId = String(b.callId ?? '').trim();
+      if (callId.length > 0) {
+        const ct = String(b.callType ?? 'audio').toLowerCase();
+        const callType: 'audio' | 'video' = ct.includes('video') ? 'video' : 'audio';
+        const durRaw = b.duration;
+        const durationSec =
+          typeof durRaw === 'number' && !Number.isNaN(durRaw)
+            ? durRaw
+            : typeof durRaw === 'string'
+            ? Number.parseInt(durRaw, 10) || 0
+            : 0;
+        const callStatusUpper = String(b.callStatus ?? '').toUpperCase();
+
+        const textCaller = firstNonEmptyString(b.textForCaller, b.text_for_caller);
+        const textReceiver = firstNonEmptyString(b.textForReceiver, b.text_for_receiver);
+        const callerIdResolved = firstNonEmptyString(b.callerId, b.caller_id, getSenderIdFromMessage(item));
+        const receiverIdResolved = firstNonEmptyString(b.receiverId, b.receiver_id, getReceiverIdFromMessage(item));
+
+        let label: string;
+        let displayAsSummaryLine = false;
+        const contentFallback = firstNonEmptyString(
+          typeof item.content === 'string' ? item.content : undefined,
+          getTextFromApiMessage(item, currentUserId, options?.chatStatus)
+        );
+
+        if (textCaller != null && textReceiver != null) {
+          if (typeof currentUserId === 'string' && currentUserId.length > 0) {
+            if (callerIdResolved != null && callerIdResolved === currentUserId) {
+              label = textCaller;
+              /** ENDED: subtitle/duration always from `duration` in UI (`formatCallDurationSec`), not from these strings. */
+              displayAsSummaryLine = callStatusUpper !== 'ENDED';
+            } else if (receiverIdResolved != null && receiverIdResolved === currentUserId) {
+              label = textReceiver;
+              displayAsSummaryLine = callStatusUpper !== 'ENDED';
+            } else {
+              label = firstNonEmptyString(contentFallback, textCaller, textReceiver) ?? 'Call';
+            }
+          } else {
+            label = firstNonEmptyString(contentFallback, textCaller, textReceiver) ?? 'Call';
+          }
+        } else {
+          label = firstNonEmptyString(contentFallback, textCaller, textReceiver) ?? 'Call';
+        }
+
+        return {
+          type: 'call_log',
+          callId,
+          callType,
+          callStatus: String(b.callStatus ?? ''),
+          durationSec,
+          label,
+          displayAsSummaryLine,
+          timestamp,
+          sent,
+          messageId,
+        };
+      }
+    }
+    return {
+      type: 'text',
+      text: getTextFromApiMessage(item, currentUserId, options?.chatStatus),
+      timestamp,
+      sent,
+      messageId,
+    };
+  }
+
   if (type === 'text') {
     return {
       type: 'text',

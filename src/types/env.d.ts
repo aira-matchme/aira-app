@@ -1,4 +1,6 @@
 declare module '@env' {
+  /** Sentry project DSN; leave empty to disable Sentry in local builds. */
+  export const SENTRY_DSN: string | undefined;
   export const API_BASE_URL: string;
   export const NODE_ENV: string;
   export const API_KEY: string;
@@ -12,5 +14,6 @@ declare module '@env' {
    * is in dev mode (for UI / store-check debugging only; remove before shipping).
    */
   export const STORE_UPDATE_CHECK_IN_DEV: string | undefined;
+  export const AGORA_APP_ID: string | undefined;
 }
 

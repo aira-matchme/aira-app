@@ -22,7 +22,22 @@ export type ChatMessage =
     }
   | { type: 'voice'; uri: string; timestamp: string; sent: boolean; messageId?: string }
   | { type: 'image'; uri: string; timestamp: string; sent: boolean; messageId?: string }
-  | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean; messageId?: string };
+  | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean; messageId?: string }
+  /** Persisted call row from API `messageType: system_call` + `contentBlocks[].type === call_log`. */
+  | {
+      type: 'call_log';
+      callId: string;
+      callType: 'audio' | 'video';
+      callStatus: string;
+      durationSec: number;
+      /** Resolved copy: `textForCaller` / `textForReceiver` by role, or server `content` fallback. */
+      label: string;
+      /** When true, show `label` as one line from `textForCaller` / `textForReceiver`. Not used for `ENDED` (duration subtitle comes from `durationSec`). */
+      displayAsSummaryLine?: boolean;
+      timestamp: string;
+      sent: boolean;
+      messageId?: string;
+    };
 
 export type PendingAttachment =
   | { type: 'image'; uri: string; name?: string; mimeType?: string }

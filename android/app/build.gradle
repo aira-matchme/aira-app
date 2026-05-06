@@ -6,6 +6,22 @@ react {
     autolinkLibrariesWithApp()
 }
 
+// RN 0.83 + some libraries (Agora/Nitro) can hit CMake configure before
+// library codegen JNI directories are generated. Ensure codegen runs first.
+afterEvaluate {
+    tasks.matching { it.name.startsWith("configureCMake") || it.name.startsWith("configureNdkBuild") }.configureEach { t ->
+        def agoraCodegen = project.rootProject.findProject(":react-native-agora")?.tasks?.findByName("generateCodegenArtifactsFromSchema")
+        if (agoraCodegen != null) {
+            t.dependsOn(agoraCodegen)
+        }
+
+        def nitroCodegen = project.rootProject.findProject(":react-native-nitro-modules")?.tasks?.findByName("generateCodegenArtifactsFromSchema")
+        if (nitroCodegen != null) {
+            t.dependsOn(nitroCodegen)
+        }
+    }
+}
+
 def enableProguardInReleaseBuilds = false
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
@@ -55,12 +71,24 @@ sourceSets {
         }
     }
 
+    // Keep debug packaging stable with New Arch + native libs.
+    // ABI splits can trigger packageDebug splitter failures in this setup.
     splits {
         abi {
-            enable true
+            enable false
             reset()
-            include "armeabi-v7a", "arm64-v8a"
-            universalApk true   // ✅ IMPORTANT
+        }
+    }
+
+    packagingOptions {
+        resources {
+            excludes += ["META-INF/*"]
+        }
+        jniLibs {
+            pickFirsts += [
+                "**/libc++_shared.so",
+                "**/libfbjni.so"
+            ]
         }
     }
 }
