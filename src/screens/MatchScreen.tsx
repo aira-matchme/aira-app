@@ -49,7 +49,15 @@ type AiraBlock =
     };
 
 type ChatItem =
-  | { id: string; from: 'user'; text: string }
+  | {
+      id: string;
+      from: 'user';
+      text: string;
+      profileSelection?: {
+        nickname: string;
+        profileUrl?: string;
+      };
+    }
   | { id: string; from: 'aira'; blocks: AiraBlock[] };
 
 /** Keyboard overlap with the app window — works across iOS/Android OEM quirks. */
@@ -133,6 +141,20 @@ export const MatchScreen = () => {
   const lastUserMessageRef = React.useRef<string>('');
   const [isTyping, setIsTyping] = React.useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = React.useState(false);
+  const historyPageRef = React.useRef(1);
+  const historyHasMoreRef = React.useRef(true);
+  const isLoadingMoreHistoryRef = React.useRef(false);
+  const historyLimit = 10;
+  const scrollYRef = React.useRef(0);
+  const lastScrollYRef = React.useRef(0);
+  const userHasScrolledRef = React.useRef(false);
+  const shouldAutoScrollRef = React.useRef(true);
+  const reenableAutoScrollTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contentHeightRef = React.useRef(0);
+  const pendingRestoreScrollRef = React.useRef<{
+    beforeY: number;
+    beforeContentH: number;
+  } | null>(null);
   const [composerHeight, setComposerHeight] = React.useState(100);
   const [keyboardHeight, setKeyboardHeight] = React.useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = React.useState(false);
@@ -154,12 +176,18 @@ export const MatchScreen = () => {
     return lastUserMessageRef.current;
   }, [chatItems]);
 
-  const loadChatHistory = React.useCallback(async () => {
+  const loadChatHistory = React.useCallback(async (opts?: { page?: number; mode?: 'replace' | 'prepend' }) => {
     try {
-      setIsLoadingHistory(true);
+      const page = opts?.page ?? 1;
+      const mode = opts?.mode ?? 'replace';
+      if (mode === 'replace') {
+        setIsLoadingHistory(true);
+      } else {
+        isLoadingMoreHistoryRef.current = true;
+      }
       const response = await apiClient.post(
         endpoints.chatbot.getChatbotMessages,
-        { page: 1, limit: 10 },
+        { page, limit: historyLimit },
         { timeout: 60000 }
       );
 
@@ -167,6 +195,10 @@ export const MatchScreen = () => {
         response.data?.data?.list ??
         response.data?.list ??
         [];
+
+      const receivedCount = Array.isArray(rawList) ? rawList.length : 0;
+      historyHasMoreRef.current = receivedCount >= historyLimit;
+      historyPageRef.current = page;
 
       // Backend returns newest first; sort by _id so we always render oldest → newest.
       const items = Array.isArray(rawList)
@@ -184,14 +216,34 @@ export const MatchScreen = () => {
             const from: 'user' | 'aira' = role === 'user' ? 'user' : 'aira';
 
             if (from === 'user') {
+              const userContent = item.content;
+              const profileSelection =
+                Array.isArray(userContent)
+                  ? userContent.find((entry: any) => entry?.type === 'profile_selection')
+                  : undefined;
               const text: string =
-                typeof item.content === 'string'
-                  ? item.content
-                  : item.message ?? item.text ?? '';
+                typeof userContent === 'string'
+                  ? userContent
+                  : profileSelection?.nickname ??
+                    profileSelection?.name ??
+                    item.message ??
+                    item.text ??
+                    '';
               return {
                 id: String(item._id ?? item.id ?? index),
                 from: 'user',
                 text,
+                profileSelection: profileSelection
+                  ? {
+                      nickname: String(
+                        profileSelection?.nickname ?? profileSelection?.name ?? 'Selected profile'
+                      ),
+                      profileUrl:
+                        typeof profileSelection?.profileUrl === 'string'
+                          ? profileSelection.profileUrl
+                          : undefined,
+                    }
+                  : undefined,
               };
             }
 
@@ -207,7 +259,6 @@ export const MatchScreen = () => {
                 : undefined);
 
             const responseType = String(rawResponseTypeCandidate ?? '').toLowerCase();
-
             // Backend sometimes nests the real payload under `content.content`.
             const contentArray: any[] | undefined = Array.isArray(rawContentCandidate)
               ? rawContentCandidate
@@ -239,6 +290,19 @@ export const MatchScreen = () => {
 
               if (options.length > 0) {
                 blocks.push({ type: 'missing_info_list', options });
+              } else {
+                // Backend can return missing_info as explanatory text blocks (e.g. type: info_missing).
+                for (const block of contentArray) {
+                  const infoText =
+                    typeof block?.text === 'string'
+                      ? block.text
+                      : typeof block?.message === 'string'
+                        ? block.message
+                        : '';
+                  if (infoText) {
+                    blocks.push({ type: 'paragraph', text: infoText });
+                  }
+                }
               }
             } else if (responseType === 'rich_content' && contentArray) {
               for (const block of contentArray) {
@@ -288,11 +352,22 @@ export const MatchScreen = () => {
           })
         : [];
 
-      setChatItems(mapped);
+      setChatItems((prev) => {
+        if (mode === 'replace') return mapped;
+        if (mapped.length === 0) return prev;
+        const seen = new Set<string>();
+        const merged = [...mapped, ...prev].filter((it) => {
+          if (seen.has(it.id)) return false;
+          seen.add(it.id);
+          return true;
+        });
+        return merged;
+      });
     } catch {
       // ignore history errors for now
     } finally {
       setIsLoadingHistory(false);
+      isLoadingMoreHistoryRef.current = false;
     }
   }, []);
 
@@ -343,6 +418,19 @@ export const MatchScreen = () => {
 
         if (options.length > 0) {
           blocks.push({ type: 'missing_info_list', options });
+        } else {
+          // Handle text-only missing_info payloads returned by backend.
+          for (const block of contentArray) {
+            const infoText =
+              typeof block?.text === 'string'
+                ? block.text
+                : typeof block?.message === 'string'
+                  ? block.message
+                  : '';
+            if (infoText) {
+              blocks.push({ type: 'paragraph', text: infoText });
+            }
+          }
         }
       } else if (responseType === 'rich_content' && contentArray) {
         for (const block of contentArray) {
@@ -506,8 +594,20 @@ export const MatchScreen = () => {
 
   useFocusEffect(
     React.useCallback(() => {
-      loadChatHistory();
+      historyPageRef.current = 1;
+      historyHasMoreRef.current = true;
+      pendingRestoreScrollRef.current = null;
+      shouldAutoScrollRef.current = true;
+      if (reenableAutoScrollTimeoutRef.current) {
+        clearTimeout(reenableAutoScrollTimeoutRef.current);
+        reenableAutoScrollTimeoutRef.current = null;
+      }
+      void loadChatHistory({ page: 1, mode: 'replace' });
       return () => {
+        if (reenableAutoScrollTimeoutRef.current) {
+          clearTimeout(reenableAutoScrollTimeoutRef.current);
+          reenableAutoScrollTimeoutRef.current = null;
+        }
         setIsKeyboardVisible(false);
         setKeyboardHeight(0);
         Keyboard.dismiss();
@@ -515,13 +615,25 @@ export const MatchScreen = () => {
     }, [loadChatHistory])
   );
 
+  // React.useEffect(() => {
+  //   if (!hasChat) return;
+  //   if (suppressAutoScrollToEndRef.current) return;
+  //   const id = setTimeout(() => {
+  //     scrollRef.current?.scrollToEnd({ animated: true });
+  //   }, 120);
+  //   return () => clearTimeout(id);
+  // }, [hasChat, chatItems.length]);
+
   React.useEffect(() => {
     if (!hasChat) return;
+    // Never auto-scroll while we're prepending older history (prevents jump-to-bottom).
+    if (pendingRestoreScrollRef.current) return;
+    if (!shouldAutoScrollRef.current) return;
     const id = setTimeout(() => {
       scrollRef.current?.scrollToEnd({ animated: true });
     }, 120);
     return () => clearTimeout(id);
-  }, [hasChat, chatItems.length]);
+  }, [chatItems]);
 
   const handleComposerLayout = React.useCallback((event: LayoutChangeEvent) => {
     const nextHeight = Math.round(event.nativeEvent.layout.height);
@@ -635,6 +747,57 @@ export const MatchScreen = () => {
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               showsVerticalScrollIndicator={false}
+              scrollEventThrottle={16}
+              onScrollBeginDrag={() => {
+                userHasScrolledRef.current = true;
+              }}
+              onScroll={(e) => {
+                const y = e.nativeEvent.contentOffset.y;
+                scrollYRef.current = y;
+                const isScrollingUp = y < lastScrollYRef.current;
+                lastScrollYRef.current = y;
+
+                // Load older messages only when the user scrolls up near the top.
+                // Prevents accidental pagination when content doesn't fill the screen (y stays 0 at "bottom").
+                if (userHasScrolledRef.current && isScrollingUp && y < 80 && hasChat) {
+                  if (isLoadingHistory) return;
+                  if (isLoadingMoreHistoryRef.current) return;
+                  if (!historyHasMoreRef.current) return;
+                  const nextPage = historyPageRef.current + 1;
+                  shouldAutoScrollRef.current = false;
+                  pendingRestoreScrollRef.current = {
+                    beforeY: y,
+                    beforeContentH: contentHeightRef.current,
+                  };
+                  void loadChatHistory({ page: nextPage, mode: 'prepend' });
+                }
+              }}
+              onContentSizeChange={(_, h) => {
+                const prevH = contentHeightRef.current;
+                contentHeightRef.current = h;
+                const restore = pendingRestoreScrollRef.current;
+                if (!restore) return;
+                // Restore viewport after prepending older items.
+                const delta = h - restore.beforeContentH;
+                if (delta > 0) {
+                  requestAnimationFrame(() => {
+                    scrollRef.current?.scrollTo({
+                      y: restore.beforeY + delta,
+                      animated: false,
+                    });
+                  });
+                }
+                pendingRestoreScrollRef.current = null;
+                // Re-enable auto scroll AFTER restore has applied (next tick),
+                // otherwise the chatItems effect can still scroll-to-end.
+                if (reenableAutoScrollTimeoutRef.current) {
+                  clearTimeout(reenableAutoScrollTimeoutRef.current);
+                }
+                reenableAutoScrollTimeoutRef.current = setTimeout(() => {
+                  shouldAutoScrollRef.current = true;
+                  reenableAutoScrollTimeoutRef.current = null;
+                }, 250);
+              }}
             >
               {!hasChat && !isLoadingHistory ? (
                 <View style={styles.hero}>
@@ -664,6 +827,36 @@ export const MatchScreen = () => {
                 <View style={styles.thread}>
                   {chatItems.map((item) => {
                     if (item.from === 'user') {
+                      if (item.profileSelection) {
+                        const nickname =
+                          item.profileSelection.nickname?.trim() || 'Selected profile';
+                        const avatarText = nickname.slice(0, 1).toUpperCase();
+                        return (
+                          <View key={item.id} style={styles.userMessageRow}>
+                            <View style={styles.userProfileSelectionCard}>
+                              <View style={styles.userProfileSelectionThumbWrap}>
+                                {item.profileSelection.profileUrl ? (
+                                  <Image
+                                    source={{ uri: item.profileSelection.profileUrl }}
+                                    style={styles.userProfileSelectionThumb}
+                                  />
+                                ) : (
+                                  <View style={styles.userProfileSelectionThumbFallback}>
+                                    <Text style={styles.userProfileSelectionThumbFallbackText}>
+                                      {avatarText}
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+                              <View style={styles.userProfileSelectionTextWrap}>
+                                <Text style={styles.userProfileSelectionLabel}>Selected profile</Text>
+                                <Text style={styles.userProfileSelectionName}>{nickname}</Text>
+                              </View>
+                            </View>
+                          </View>
+                        );
+                      }
+
                       return (
                         <View key={item.id} style={styles.userMessageRow}>
                           <View style={styles.userBubble}>
@@ -944,6 +1137,52 @@ export const MatchScreen = () => {
       color: colors.white,
       letterSpacing: 0.32,
       lineHeight: 22,
+    },
+    userProfileSelectionCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      width: 230,
+      borderRadius: 18,
+      padding: 10,
+      gap: 10,
+      backgroundColor: colors.primary.purple,
+    },
+    userProfileSelectionThumbWrap: {
+      width: 52,
+      height: 52,
+      borderRadius: 14,
+      overflow: 'hidden',
+      backgroundColor: 'rgba(255,255,255,0.28)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    userProfileSelectionThumb: {
+      width: '100%',
+      height: '100%',
+    },
+    userProfileSelectionThumbFallback: {
+      width: '100%',
+      height: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    userProfileSelectionThumbFallbackText: {
+      ...typography.h4,
+      color: colors.white,
+      fontWeight: '700',
+    },
+    userProfileSelectionTextWrap: {
+      flex: 1,
+      gap: 2,
+    },
+    userProfileSelectionLabel: {
+      ...typography.label,
+      color: 'rgba(255,255,255,0.82)',
+    },
+    userProfileSelectionName: {
+      ...typography.bodyMedium,
+      color: colors.white,
+      fontWeight: '600',
     },
     airaMessageWrap: {
       width: '100%',
