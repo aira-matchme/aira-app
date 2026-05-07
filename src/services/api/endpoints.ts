@@ -14,6 +14,8 @@ export const endpoints = {
     appleLogin: '/auth/apple',
     fcmToken: '/auth/fcm-token',
     supportEmailChange: '/auth/support/email-change',
+    /** PATCH — body `{ isAppTourDone: true }` */
+    appTour: '/auth/app-tour',
   },
   user: {
     profile: '/auth/profile',

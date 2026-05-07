@@ -84,6 +84,8 @@ export interface UserProfileResponse {
     livenessCheck?: boolean;
     galleryPhotosUploaded?: boolean;
     questionnaireCompleted?: boolean;
+    /** When `false`, show dashboard tab walkthrough until completed. */
+    isAppTourDone?: boolean;
   };
 }
 

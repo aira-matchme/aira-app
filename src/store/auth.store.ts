@@ -20,6 +20,7 @@ export interface User {
   livenessCheck?: boolean;
   galleryPhotosUploaded?: boolean;
   questionnaireCompleted?: boolean;
+  isAppTourDone?: boolean;
 }
 
 const TOKEN_STORAGE_KEY = '@auth_tokens';
@@ -81,6 +82,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     const normalized = { ...user };
     if (typeof (user as any)?.profileCompleted === 'boolean') {
       normalized.isProfileComplete = (user as any).profileCompleted;
+    }
+    if (typeof (user as any)?.is_app_tour_done === 'boolean') {
+      normalized.isAppTourDone = (user as any).is_app_tour_done;
     }
     syncSentryUser(normalized);
     set({ user: normalized, isAuthenticated: true });

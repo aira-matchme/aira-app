@@ -17,10 +17,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STRINGS } from '../constants/strings';
 import { colors } from '../theme';
-import { DASHBOARD_WALKTHROUGH_STORAGE_KEY } from '../constants/dashboardWalkthroughStorage';
+import { markAppTourCompleted } from '../services/appTour/markAppTourCompleted';
 
 const w = STRINGS.DASHBOARD_WALKTHROUGH;
 
@@ -69,8 +68,12 @@ type TabWalkthroughContextValue = {
 
 const TabWalkthroughContext = createContext<TabWalkthroughContextValue | null>(null);
 
-async function persistWalkthroughDone() {
-  await AsyncStorage.setItem(DASHBOARD_WALKTHROUGH_STORAGE_KEY, 'true');
+async function finalizeWalkthrough() {
+  try {
+    await markAppTourCompleted();
+  } catch {
+    // Retry next session if network fails; user can complete tour again from welcome.
+  }
 }
 
 const HOLE_VISUAL_PADDING = 0;
@@ -329,14 +332,14 @@ export function TabWalkthroughProvider({ children }: { children: React.ReactNode
   }, []);
 
   const skip = useCallback(() => {
-    void persistWalkthroughDone();
+    void finalizeWalkthrough();
     stop();
   }, [stop]);
 
   const goNext = useCallback(() => {
     const i = stepIndexRef.current;
     if (i >= STEP_ORDER.length - 1) {
-      void persistWalkthroughDone();
+      void finalizeWalkthrough();
       stop();
       return;
     }

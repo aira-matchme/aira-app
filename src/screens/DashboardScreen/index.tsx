@@ -39,12 +39,12 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { postAIMessagesApi, blockUserApi, reportUserApi } from '../../modules/chat/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTabWalkthrough } from '../../navigation/TabWalkthroughContext';
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
 import { STRINGS } from '../../constants/strings';
-import { DASHBOARD_WALKTHROUGH_STORAGE_KEY } from '../../constants/dashboardWalkthroughStorage';
+import { useAuthStore } from '../../store/auth.store';
+import { markAppTourCompleted } from '../../services/appTour/markAppTourCompleted';
 import { showErrorToast, showSuccessToast } from '../../services/toast.srvice';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -124,6 +124,7 @@ type CursorPageResult = {
 export const DashboardScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const isAppTourDone = useAuthStore((s) => s.user?.isAppTourDone);
   const { active: tabWalkthroughActive, startFromProfile } = useTabWalkthrough();
   const scrollRef = useRef<ScrollView | null>(null);
   /** Prevents calling start() again when the tab walkthrough modal causes a focus/blur cycle (resets welcome to step 1). */
@@ -464,11 +465,12 @@ export const DashboardScreen = () => {
       if (tabWalkthroughActive) {
         return;
       }
+      // Profile from GET /auth/profile: only auto-show when server says tour is not done.
+      if (isAppTourDone !== false) return;
       let cancelled = false;
       const run = async () => {
         try {
-          const seen = await AsyncStorage.getItem(DASHBOARD_WALKTHROUGH_STORAGE_KEY);
-          if (cancelled || seen === 'true') return;
+          if (cancelled) return;
           if (walkthroughAutoStartLockRef.current) return;
           walkthroughAutoStartLockRef.current = true;
 
@@ -486,7 +488,7 @@ export const DashboardScreen = () => {
       return () => {
         cancelled = true;
       };
-    }, [tabWalkthroughActive]),
+    }, [tabWalkthroughActive, isAppTourDone]),
   );
 
   useEffect(() => {
@@ -558,7 +560,13 @@ export const DashboardScreen = () => {
   const handleWalkthroughSkip = useCallback(() => {
     setShowWalkthroughWelcome(false);
     walkthroughAutoStartLockRef.current = false;
-    void AsyncStorage.setItem(DASHBOARD_WALKTHROUGH_STORAGE_KEY, 'true');
+    void (async () => {
+      try {
+        await markAppTourCompleted();
+      } catch {
+        // Welcome may reappear until PATCH succeeds and profile reflects `isAppTourDone: true`.
+      }
+    })();
   }, []);
 
   const handleWalkthroughGetStarted = useCallback(() => {
