@@ -54,6 +54,7 @@ export function useAiraSuggestions({
   const [airaSuggestionsTotalLimit, setAiraSuggestionsTotalLimit] = useState<number | null>(null);
   const [selectedReplyIndex, setSelectedReplyIndex] = useState(0);
   const aiSuggestionsRequestIdRef = useRef(0);
+  const generatingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem(DONT_SHOW_ASK_AIRA_CONFIRM_KEY).then((value) => {
@@ -127,16 +128,38 @@ export function useAiraSuggestions({
       if (!chatId) return;
       const requestId = ++aiSuggestionsRequestIdRef.current;
       setAskAiraConfirmLoading(true);
-      setAskAiraGenerating(true);
+
       if (opts?.closeConfirmSheetOnStart) {
+        // Close the confirm sheet first, then wait for iOS modal dismiss animation
+        // (~300 ms) before presenting the generating modal. Showing two Modals
+        // transitioning at the same time deadlocks iOS's presentation queue and
+        // causes the intermittent app hang.
         setAskAiraConfirmVisible(false);
+        generatingTimerRef.current = setTimeout(() => {
+          generatingTimerRef.current = null;
+          if (requestId !== aiSuggestionsRequestIdRef.current) return;
+          setAskAiraGenerating(true);
+        }, 400);
+      } else {
+        setAskAiraGenerating(true);
       }
+
       getAiSuggestionsApi(chatId)
         .then((res) => {
+          // Cancel the delayed generating modal — API responded fast enough that
+          // we can skip straight from the confirm sheet to the result modal.
+          if (generatingTimerRef.current) {
+            clearTimeout(generatingTimerRef.current);
+            generatingTimerRef.current = null;
+          }
           if (requestId !== aiSuggestionsRequestIdRef.current) return;
           applyAiSuggestionsResponse(res, { closeConfirmSheet: true });
         })
         .catch((err) => {
+          if (generatingTimerRef.current) {
+            clearTimeout(generatingTimerRef.current);
+            generatingTimerRef.current = null;
+          }
           if (requestId !== aiSuggestionsRequestIdRef.current) return;
           if (isAiraLimitError(err)) {
             setAskAiraConfirmVisible(false);
@@ -154,6 +177,10 @@ export function useAiraSuggestions({
   );
 
   const handleCancelAiSuggestions = useCallback(() => {
+    if (generatingTimerRef.current) {
+      clearTimeout(generatingTimerRef.current);
+      generatingTimerRef.current = null;
+    }
     aiSuggestionsRequestIdRef.current += 1;
     setAskAiraGenerating(false);
     setAskAiraConfirmLoading(false);

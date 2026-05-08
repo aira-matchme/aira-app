@@ -136,6 +136,7 @@ export const MatchScreen = () => {
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [message, setMessage] = React.useState('');
+  const [inputResetKey, setInputResetKey] = React.useState(0);
   const [chatItems, setChatItems] = React.useState<ChatItem[]>([]);
   const scrollRef = React.useRef<ScrollView>(null);
   const lastUserMessageRef = React.useRef<string>('');
@@ -489,13 +490,14 @@ export const MatchScreen = () => {
       ]);
       setIsTyping(true);
       setMessage('');
+      setInputResetKey((k) => k + 1);
 
       requestAnimationFrame(() => {
         scrollRef.current?.scrollToEnd({ animated: true });
       });
 
       try {
-       
+
         const response = await apiClient.post(
           endpoints.chatbot.postChatbotMessages,
           {
@@ -543,6 +545,7 @@ export const MatchScreen = () => {
       ]);
       setIsTyping(true);
       setMessage('');
+      setInputResetKey((k) => k + 1);
 
       requestAnimationFrame(() => {
         scrollRef.current?.scrollToEnd({ animated: true });
@@ -994,6 +997,7 @@ export const MatchScreen = () => {
               <View style={[styles.composerRow, { paddingBottom: 12 }]}>
                 <View style={styles.inputPill}>
                   <TextInput
+                    key={inputResetKey}
                     value={message}
                     onChangeText={setMessage}
                     placeholder="Ask me anything..."

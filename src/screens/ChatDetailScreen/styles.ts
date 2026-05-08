@@ -2598,18 +2598,19 @@ export const styles = StyleSheet.create({
     paddingVertical: 0,
     minHeight: INPUT_BAR_HEIGHT,
     maxHeight: INPUT_MAX_HEIGHT + 80,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
   },
   inputRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     minHeight: MESSAGE_COMPOSER_ACTION_SIZE,
   },
   /** Wraps TextInput + placeholder; centers short field with attach + send. */
   composerInputOuter: {
     flex: 1,
     minHeight: CHAT_INPUT_MIN_HEIGHT,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
+    alignSelf: 'stretch',
     position: 'relative',
   },
   composerPlaceholder: {
@@ -2650,6 +2651,23 @@ export const styles = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 0,
     margin: 0,
+  },
+  chatInput: {
+    width: '100%',
+    alignSelf: 'stretch',
+    minHeight: CHAT_INPUT_MIN_HEIGHT,
+    maxHeight: CHAT_INPUT_MAX_HEIGHT,
+    paddingTop: Platform.OS === 'ios' ? 10 : 6,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 6,
+    paddingHorizontal: 0,
+    fontSize: 16,
+    color: '#000',
+    ...Platform.select({
+      android: {
+        includeFontPadding: false,
+      },
+    }),
+    textAlignVertical: 'top',
   },
   askAiraChipGradientWrap: {
     alignSelf: 'center',

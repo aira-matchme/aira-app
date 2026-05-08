@@ -545,7 +545,7 @@ export const STRINGS = {
     DELETE_MESSAGE_TITLE: 'Delete This Message?',
     DELETE_MESSAGE_DESCRIPTION: 'This message will be removed from your conversation.',
     CANCEL: 'Cancel',
-    START_CHAT_PLACEHOLDER: 'Start chat..',
+    START_CHAT_PLACEHOLDER: 'Start chat...',
     INSERT: 'Insert',
     ASK_AIRA: 'Ask AIRA',
     GENERATING_REPLIES: 'Generating replies..',

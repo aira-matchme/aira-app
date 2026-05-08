@@ -405,6 +405,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [composerHeight, setComposerHeight] = useState(120);
   /** Growing multiline composer: expands until CHAT_INPUT_MAX_HEIGHT, then scrolls inside. */
   const [composerInputHeight, setComposerInputHeight] = useState(CHAT_INPUT_MIN_HEIGHT);
+  const [composerSelection, setComposerSelection] = useState({ start: 0, end: 0 });
   const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
   const [imagePreviewZoomed, setImagePreviewZoomed] = useState(false);
   const imagePreviewLastTapRef = useRef<number>(0);
@@ -2403,17 +2404,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
   }, []);
 
-  const handleComposerTextContentSizeChange = useCallback(
-    (e: { nativeEvent: { contentSize: { height: number } } }) => {
-      const raw = e.nativeEvent.contentSize.height;
-      const h = typeof raw === 'number' && Number.isFinite(raw) ? raw : CHAT_INPUT_MIN_HEIGHT;
-      setComposerInputHeight(
-        Math.min(CHAT_INPUT_MAX_HEIGHT, Math.max(CHAT_INPUT_MIN_HEIGHT, h)),
-      );
-    },
-    [],
-  );
-
   const handleHeaderVideoCallPress = useCallback(() => {
     const start = async () => {
       const permission = await checkCameraPermission();
@@ -3011,6 +3001,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             style={styles.headerAskAiraButton}
             onPress={() => {
               if (dontShowAskAiraPersisted && chatId) {
+                console.log('requestAiSuggestions');
                 requestAiSuggestions();
               } else {
                 setAskAiraConfirmVisible(true);
@@ -4657,19 +4648,37 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 )}
                 <TextInput
                   style={[
-                    styles.input,
-                    {
-                      height: composerInputHeight,
-                      maxHeight: CHAT_INPUT_MAX_HEIGHT,
-                      flexGrow: 0,
-                      flexShrink: 0,
-                    },
+                    styles.chatInput,
+                    Platform.OS === 'android' && { height: composerInputHeight },
                   ]}
                   ref={inputRef}
-                  placeholder=""
+                  placeholder="Type a message..."
                   value={inputText}
+                  selection={composerSelection}
+                  autoCorrect={false}
                   onChangeText={setInputText}
-                  onContentSizeChange={handleComposerTextContentSizeChange}
+                  onSelectionChange={(event) => {
+                    const { start, end } = event.nativeEvent.selection;
+                    setComposerSelection({ start, end });
+                  }}
+                  onKeyPress={(event) => {
+                    if (Platform.OS !== 'ios' || event.nativeEvent.key !== 'Enter') return;
+                    const { start, end } = composerSelection;
+                    const safeStart = Math.max(0, Math.min(start, inputText.length));
+                    const safeEnd = Math.max(safeStart, Math.min(end, inputText.length));
+                    const nextText = `${inputText.slice(0, safeStart)}\n${inputText.slice(safeEnd)}`;
+                    const nextCursor = safeStart + 1;
+                    setInputText(nextText);
+                    setComposerSelection({ start: nextCursor, end: nextCursor });
+                  }}
+                  onContentSizeChange={(event) => {
+                    const height = event.nativeEvent.contentSize.height;
+                    const newHeight = Math.max(
+                      CHAT_INPUT_MIN_HEIGHT,
+                      Math.min(CHAT_INPUT_MAX_HEIGHT, height),
+                    );
+                    setComposerInputHeight(newHeight);
+                  }}
                   onFocus={() => {
                     if (currentUserId && otherUserId) {
                       if (typingStopRef.current) clearTimeout(typingStopRef.current);
@@ -4687,16 +4696,13 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                     }
                   }}
                   multiline
+                  blurOnSubmit={false}
                   scrollEnabled={composerInputHeight >= CHAT_INPUT_MAX_HEIGHT}
                   underlineColorAndroid="transparent"
-                  textAlignVertical={
-                    inputText.trim().length > 0 || composerInputHeight > CHAT_INPUT_MIN_HEIGHT + 4
-                      ? 'top'
-                      : 'center'
-                  }
-                  {...(Platform.OS === 'android' ? { includeFontPadding: false } : {})}
+                  textAlignVertical="top"
                   disableFullscreenUI
                   returnKeyType="default"
+                  keyboardType="default"
                   cursorColor={colors.primary.purple}
                   selectionColor={colors.primary[50]}
                 />
