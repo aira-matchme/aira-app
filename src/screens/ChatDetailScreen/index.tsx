@@ -4652,7 +4652,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                     Platform.OS === 'android' && { height: composerInputHeight },
                   ]}
                   ref={inputRef}
-                  placeholder="Type a message..."
+                  placeholder=""
                   value={inputText}
                   selection={composerSelection}
                   autoCorrect={false}
