@@ -1,6 +1,7 @@
 package com.aira.app.face;
 
 import android.app.Activity;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.media.Image;
 import android.util.Log;
@@ -9,6 +10,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.camera.core.*;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
@@ -20,6 +22,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.face.*;
 
+import java.io.File;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -182,8 +185,12 @@ public class FaceDetectionModule extends ReactContextBaseJavaModule {
                 .addOnSuccessListener(faces -> {
 
                     if (faces.size() != 1) {
+                        // After VERIFIED, brief face loss is common; do not reset or we race JS (ALIGN_FACE clears frame URI).
+                        if (currentStep == Step.VERIFIED) {
+                            return;
+                        }
                         reset();
-                        emit("ALIGN_FACE");
+                        emit("ALIGN_FACE", null, null);
                         return;
                     }
 
@@ -203,7 +210,7 @@ public class FaceDetectionModule extends ReactContextBaseJavaModule {
                         case HOLD_STEADY:
                             stableFrames++;
                             if (stableFrames >= REQUIRED_FRAMES) {
-                                moveTo(Step.TURN_LEFT);
+                                goHoldSteadyToTurnLeft(proxy);
                             }
                             break;
 
@@ -220,7 +227,7 @@ public class FaceDetectionModule extends ReactContextBaseJavaModule {
                             if (yaw > 15) {
                                 stableFrames++;
                                 if (stableFrames >= REQUIRED_FRAMES) {
-                                    moveTo(Step.VERIFIED);
+                                    goToVerifiedWithFrame(proxy);
                                 }
                             } else stableFrames = 0;
                             break;
@@ -241,7 +248,55 @@ public class FaceDetectionModule extends ReactContextBaseJavaModule {
     private void moveTo(Step next) {
         currentStep = next;
         stableFrames = 0;
-        emit(next.name());
+        emit(next.name(), null, null);
+    }
+
+    /** Frontal frame after “hold steady” — used for liveness selfie vs reference photos. */
+    private void goHoldSteadyToTurnLeft(ImageProxy proxy) {
+        currentStep = Step.TURN_LEFT;
+        stableFrames = 0;
+        File out =
+                new File(
+                        reactContext.getCacheDir(),
+                        "liveness_straight_" + System.currentTimeMillis() + ".jpg");
+        String straightUri = LivenessImageEncoder.encodeYuv420888ToJpegFile(proxy, out, 88);
+        emit("TURN_LEFT", null, straightUri);
+    }
+
+    /**
+     * Encode current analysis frame to JPEG (reliable) and emit VERIFIED. Falls back to
+     * {@link PreviewView#getBitmap()} when YUV encode fails.
+     */
+    private void goToVerifiedWithFrame(ImageProxy proxy) {
+        currentStep = Step.VERIFIED;
+        stableFrames = 0;
+
+        File out =
+                new File(
+                        reactContext.getCacheDir(),
+                        "liveness_verify_" + System.currentTimeMillis() + ".jpg");
+        String uri = LivenessImageEncoder.encodeYuv420888ToJpegFile(proxy, out, 88);
+        if (uri != null) {
+            emit("VERIFIED", uri, null);
+            return;
+        }
+
+        Activity activity = getCurrentActivity();
+        if (activity != null && previewView != null) {
+            File out2 =
+                    new File(
+                            reactContext.getCacheDir(),
+                            "liveness_verify_fb_" + System.currentTimeMillis() + ".jpg");
+            activity.runOnUiThread(
+                    () -> {
+                        Bitmap bmp = previewView.getBitmap();
+                        String u = LivenessImageEncoder.bitmapToJpegFile(bmp, out2, 88);
+                        emit("VERIFIED", u, null);
+                    });
+            return;
+        }
+
+        emit("VERIFIED", null, null);
     }
 
     private void reset() {
@@ -249,9 +304,18 @@ public class FaceDetectionModule extends ReactContextBaseJavaModule {
         stableFrames = 0;
     }
 
-    private void emit(String step) {
+    private void emit(
+            String step,
+            @Nullable String imageUri,
+            @Nullable String straightHeadImageUri) {
         WritableMap map = Arguments.createMap();
         map.putString("step", step);
+        if (imageUri != null) {
+            map.putString("imageUri", imageUri);
+        }
+        if (straightHeadImageUri != null) {
+            map.putString("straightHeadImageUri", straightHeadImageUri);
+        }
 
         reactContext
                 .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)

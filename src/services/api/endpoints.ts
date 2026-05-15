@@ -9,7 +9,10 @@ export const endpoints = {
     verifyOtp: '/auth/verify-otp',
     resendOtp: '/auth/resend-otp',
     socialLogin: '/auth/social-login',
-    liveness: '/auth/liveness-check',
+    /** POST multipart `file` (JPEG) — liveness selfie vs reference photos */
+    livenessVerify: '/auth/liveness/verify',
+    /** POST `{ livenessCheck: true }` — mark liveness step complete on profile */
+    livenessCheck: '/auth/liveness-check',
     googleLogin: '/auth/google',
     appleLogin: '/auth/apple',
     fcmToken: '/auth/fcm-token',

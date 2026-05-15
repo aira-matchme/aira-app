@@ -130,11 +130,25 @@ export interface SelfieResponse {
   };
 }
 
-export interface LivenessRequest {
+export interface LivenessVerifyData {
+  success?: boolean;
+  verified?: boolean;
+  all_match?: boolean;
+  selfie_face_found?: boolean;
+  details?: string;
+}
+
+export interface LivenessVerifyResponse {
+  statusCode: number;
+  message: string;
+  data?: LivenessVerifyData;
+}
+
+export interface LivenessCheckRequest {
   livenessCheck: boolean;
 }
 
-export interface LivenessResponse {
+export interface LivenessCheckResponse {
   statusCode: number;
   message: string;
   data?: Record<string, unknown>;

@@ -52,6 +52,13 @@ export const styles = StyleSheet.create({
     lineHeight: 36,
     marginBottom: spacing.md,
   },
+  verificationError: {
+    fontSize: 14,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.semantic.error,
+    lineHeight: 20,
+    marginBottom: spacing.sm,
+  },
   description: {
     fontSize: 14,
     fontFamily: typography.fontFamily.regular,

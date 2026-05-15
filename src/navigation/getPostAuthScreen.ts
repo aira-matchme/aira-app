@@ -50,7 +50,8 @@ export function getPostAuthScreen(
 ): PostAuthScreen {
   if (!user) return 'ProfileIntro';
   if (!user.isProfileComplete) return 'ProfileIntro';
-  if (!user.livenessCheck) return 'FaceVerification';
+  if (!user.profilePhoto) return 'FaceVerification';
+  if (!user.livenessCheck) return 'VideoVerification';
   if (!user.galleryPhotosUploaded) return 'ProfilePhotos';
   if (!user.questionnaireCompleted) return 'OnboardingIntro';
   if (!user.preferenceIsCompleted && !user.PreferenceIsCompleted) return 'PreferencesStart';

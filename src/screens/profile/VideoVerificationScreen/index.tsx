@@ -27,13 +27,15 @@ import {
   checkCameraPermission,
   requestCameraPermission,
 } from '../../../config/permissions';
-import { submitLivenessApi } from '../../../modules/auth/api';
+import {
+  verifyLivenessSelfieApi,
+  completeLivenessCheckApi,
+} from '../../../modules/auth/api';
 import type { AuthStackParamList } from '../../../navigation/types';
-import { colors } from '../../../theme';
 import { styles } from './styles';
 import { PROFILE_SCREEN_EDGES } from '../profileScreenLayout';
-import { useAuthStore } from '../../../store/auth.store';
 import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
+import { useAuthStore } from '../../../store/auth.store';
 
 const { FaceDetection } = NativeModules;
 
@@ -73,7 +75,7 @@ const cameraStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   successText: { color: '#34C759', fontSize: 22, fontWeight: '700' },
-  errorText: { color: '#E50000', fontSize: 16 },
+  errorText: { color: '#E50000', fontSize: 16, textAlign: 'center', paddingHorizontal: 24 },
 });
 
 let FaceDetectionView: any = null;
@@ -89,12 +91,14 @@ type LivenessStep =
   | 'TURN_RIGHT'
   | 'VERIFIED';
 
-const LIVENESS_STEP_TEXT: Record<LivenessStep, string> = {
+const LIVENESS_STEP_TEXT: Record<
+  Exclude<LivenessStep, 'VERIFIED'>,
+  string
+> = {
   ALIGN_FACE: 'Position your face clearly in front of the camera',
   HOLD_STEADY: 'Hold steady',
   TURN_LEFT: 'Slowly turn your head to the left',
   TURN_RIGHT: 'Now turn your head to the right',
-  VERIFIED: '✅ Verification successful',
 };
 
 const LIVENESS_STEP_INDEX: Record<LivenessStep, number> = {
@@ -107,11 +111,21 @@ const LIVENESS_STEP_INDEX: Record<LivenessStep, number> = {
 
 /** User-facing instruction for the current native step. Android: swap left/right so copy matches mirrored front-camera + native head-pose checks. */
 function getLivenessInstructionLabel(step: LivenessStep): string {
+  if (step === 'VERIFIED') {
+    return 'Verifying your identity...';
+  }
   if (Platform.OS === 'android') {
     if (step === 'TURN_LEFT') return LIVENESS_STEP_TEXT.TURN_RIGHT;
     if (step === 'TURN_RIGHT') return LIVENESS_STEP_TEXT.TURN_LEFT;
   }
   return LIVENESS_STEP_TEXT[step];
+}
+
+function closeLivenessCamera() {
+  if (Platform.OS === 'android') {
+    FaceDetection?.stopCamera();
+  }
+  StatusBar.setHidden(false);
 }
 
 export const VideoVerificationScreen: React.FC = () => {
@@ -129,8 +143,44 @@ export const VideoVerificationScreen: React.FC = () => {
     useState(false);
   const [livenessError, setLivenessError] =
     useState<string | null>(null);
+  const [livenessComplete, setLivenessComplete] = useState(false);
 
   const livenessSubmittedRef = useRef(false);
+  const failureExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** JPEG path from native on VERIFIED (post-turn); fallback if straight capture failed. */
+  const [verifiedFrameUri, setVerifiedFrameUri] = useState<string | null>(null);
+  /** Frontal frame after “hold steady” — sent to `/auth/liveness/verify`. */
+  const [straightHeadFrameUri, setStraightHeadFrameUri] = useState<string | null>(
+    null,
+  );
+
+  /** 1) Show error on camera overlay → 2) close camera → 3) VideoVerification intro with error */
+  const exitCameraAfterFailure = (message: string) => {
+    if (failureExitTimerRef.current) {
+      clearTimeout(failureExitTimerRef.current);
+    }
+    setLivenessSubmitting(false);
+    setLivenessComplete(false);
+    livenessSubmittedRef.current = false;
+    setLivenessError(message);
+
+    failureExitTimerRef.current = setTimeout(() => {
+      failureExitTimerRef.current = null;
+      closeLivenessCamera();
+      setShowCamera(false);
+      setLivenessStep('ALIGN_FACE');
+      setVerifiedFrameUri(null);
+      setStraightHeadFrameUri(null);
+    }, 2500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (failureExitTimerRef.current) {
+        clearTimeout(failureExitTimerRef.current);
+      }
+    };
+  }, []);
 
   const showCameraDeniedSettingsAlert = () => {
     Alert.alert(
@@ -143,6 +193,16 @@ export const VideoVerificationScreen: React.FC = () => {
     );
   };
 
+  useEffect(() => {
+    if (!showCamera) return;
+    setVerifiedFrameUri(null);
+    setStraightHeadFrameUri(null);
+    livenessSubmittedRef.current = false;
+    setLivenessStep('ALIGN_FACE');
+    setLivenessError(null);
+    setLivenessComplete(false);
+  }, [showCamera]);
+
   /* ------------------------------------------------------------------ */
   /* ---------------- ANDROID CAMERA LISTENER ------------------------- */
   /* ------------------------------------------------------------------ */
@@ -152,9 +212,29 @@ export const VideoVerificationScreen: React.FC = () => {
 
     const sub = DeviceEventEmitter.addListener(
       'LIVENESS_STEP',
-      (e: { step?: string }) => {
+      (e: {
+        step?: string;
+        imageUri?: string;
+        straightHeadImageUri?: string;
+      }) => {
         const step = (e?.step ?? '').toUpperCase();
-        if (step) setLivenessStep(step as LivenessStep);
+        if (!step) return;
+        const straight =
+          typeof e?.straightHeadImageUri === 'string' &&
+          e.straightHeadImageUri.trim().length > 0
+            ? e.straightHeadImageUri.trim()
+            : null;
+        if (straight) {
+          setStraightHeadFrameUri(straight);
+        }
+        if (step === 'VERIFIED') {
+          setVerifiedFrameUri(
+            typeof e?.imageUri === 'string' && e.imageUri.trim().length > 0
+              ? e.imageUri.trim()
+              : null,
+          );
+        }
+        setLivenessStep(step as LivenessStep);
       },
     );
 
@@ -168,31 +248,74 @@ export const VideoVerificationScreen: React.FC = () => {
 
   /* ------------------------------------------------------------------ */
   /* ---------------- LIVENESS API (iOS + Android) --------------------- */
-  /* Both platforms: when native emits VERIFIED, we call liveness-check API */
+  /* VERIFIED: verify selfie → if verified, liveness-check → success UI → next screen */
   /* ------------------------------------------------------------------ */
 
   useEffect(() => {
     if (livenessStep !== 'VERIFIED' || livenessSubmittedRef.current) return;
 
+    const imageUri = straightHeadFrameUri ?? verifiedFrameUri;
+    if (!imageUri) {
+      exitCameraAfterFailure(
+        'Could not capture verification photo. Please try again.',
+      );
+      return;
+    }
+
     livenessSubmittedRef.current = true;
     setLivenessSubmitting(true);
     setLivenessError(null);
+    setLivenessComplete(false);
 
-    submitLivenessApi({ livenessCheck: true })
+    let navigateTimer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+
+    verifyLivenessSelfieApi(imageUri)
+      .then((verifyRes) => {
+        if (verifyRes?.data?.verified !== true) {
+          const details =
+            verifyRes?.data?.details ??
+            verifyRes?.message ??
+            'Face verification failed. Please try again.';
+          throw new Error(details);
+        }
+        return completeLivenessCheckApi({ livenessCheck: true });
+      })
       .then(() => {
+        if (cancelled) return;
+        // Important: don't depend on `user` in this effect, otherwise updating the store
+        // will re-run the effect and its cleanup will clear the navigation timeout.
+        const currentUser = useAuthStore.getState().user;
+        if (currentUser) {
+          useAuthStore.getState().setUser({ ...currentUser, livenessCheck: true });
+        }
         setLivenessSubmitting(false);
-        setShowCamera(false);
-        navigation.navigate('ProfilePhotos');
+        setLivenessComplete(true);
+        navigateTimer = setTimeout(() => {
+          closeLivenessCamera();
+          setShowCamera(false);
+          navigation.navigate('ProfilePhotos');
+        }, 900);
       })
       .catch((err) => {
-        setLivenessSubmitting(false);
+        if (cancelled) return;
         const message =
           err?.response?.data?.message ??
           err?.message ??
           'Liveness submission failed';
-        setLivenessError(message);
+        exitCameraAfterFailure(message);
       });
-  }, [livenessStep]);
+
+    return () => {
+      cancelled = true;
+      if (navigateTimer) clearTimeout(navigateTimer);
+    };
+  }, [
+    livenessStep,
+    straightHeadFrameUri,
+    verifiedFrameUri,
+    navigation,
+  ]);
 
   const handleAllow = async () => {
     setIsRequesting(true);
@@ -201,6 +324,7 @@ export const VideoVerificationScreen: React.FC = () => {
 
       if (status === 'granted') {
         setShowPermissionSheet(false);
+        setLivenessError(null);
         setShowCamera(true);
         StatusBar.setHidden(true);
       } else {
@@ -220,6 +344,7 @@ export const VideoVerificationScreen: React.FC = () => {
   };
 
   const handleStartVerification = async () => {
+    setLivenessError(null);
     setIsRequesting(true);
     try {
       const existing = await checkCameraPermission();
@@ -247,9 +372,33 @@ export const VideoVerificationScreen: React.FC = () => {
         {Platform.OS === 'ios' && (
           <FaceDetectionView
             style={StyleSheet.absoluteFill}
-            onLivenessStep={(event: { nativeEvent: { step?: string } }) => {
-              const step = (event?.nativeEvent?.step ?? '').toUpperCase();
-              if (step) setLivenessStep(step as LivenessStep);
+            onLivenessStep={(event: {
+              nativeEvent: {
+                step?: string;
+                imageUri?: string;
+                straightHeadImageUri?: string;
+              };
+            }) => {
+              const ne = event?.nativeEvent;
+              const step = (ne?.step ?? '').toUpperCase();
+              if (!step) return;
+              const straight =
+                typeof ne?.straightHeadImageUri === 'string' &&
+                ne.straightHeadImageUri.trim().length > 0
+                  ? ne.straightHeadImageUri.trim()
+                  : null;
+              if (straight) {
+                setStraightHeadFrameUri(straight);
+              }
+              const uri = ne?.imageUri;
+              if (step === 'VERIFIED') {
+                setVerifiedFrameUri(
+                  typeof uri === 'string' && uri.trim().length > 0
+                    ? uri.trim()
+                    : null,
+                );
+              }
+              setLivenessStep(step as LivenessStep);
             }}
           />
         )}
@@ -275,18 +424,17 @@ export const VideoVerificationScreen: React.FC = () => {
           ))}
         </View>
 
-        {/* Success Overlay */}
-        {livenessStep === 'VERIFIED' && (
+        {/* API overlay: spinner → error (then exit) → success (then navigate) */}
+        {livenessStep === 'VERIFIED' &&
+          (livenessSubmitting || livenessComplete || livenessError) && (
           <View style={cameraStyles.successOverlay}>
             {livenessSubmitting ? (
               <ActivityIndicator size="large" color="#7742F0" />
             ) : livenessError ? (
-              <Text style={cameraStyles.errorText}>
-                {livenessError}
-              </Text>
+              <Text style={cameraStyles.errorText}>{livenessError}</Text>
             ) : (
               <Text style={cameraStyles.successText}>
-                ✔ Identity Verified
+                Verification complete
               </Text>
             )}
           </View>
@@ -322,6 +470,9 @@ export const VideoVerificationScreen: React.FC = () => {
             <Text style={styles.title}>
               {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.TITLE}
             </Text>
+            {livenessError ? (
+              <Text style={styles.verificationError}>{livenessError}</Text>
+            ) : null}
             <Text style={styles.description}>
               {STRINGS.PROFILE_SETUP.VIDEO_VERIFICATION.DESCRIPTION}
             </Text>

@@ -1,6 +1,7 @@
 import UIKit
 import AVFoundation
 import Vision
+import CoreImage
 import React
 
 @objc(FaceDetectionView)
@@ -109,16 +110,50 @@ class FaceDetectionView: UIView, AVCaptureVideoDataOutputSampleBufferDelegate {
 
   // MARK: - Liveness Logic
 
-  private func moveTo(_ next: Step) {
+  private func emitStep(
+    _ step: Step,
+    imageUri: String? = nil,
+    straightHeadImageUri: String? = nil
+  ) {
+    DispatchQueue.main.async {
+      var payload: [String: Any] = ["step": step.rawValue]
+      if let imageUri = imageUri { payload["imageUri"] = imageUri }
+      if let straightHeadImageUri = straightHeadImageUri {
+        payload["straightHeadImageUri"] = straightHeadImageUri
+      }
+      self.onLivenessStep?(payload as [AnyHashable: Any])
+    }
+  }
+
+  private func moveTo(_ next: Step, imageUri: String? = nil) {
     currentStep = next
     stableFrames = 0
-    onLivenessStep?(["step": next.rawValue])
+    emitStep(next, imageUri: imageUri)
   }
 
   private func reset() {
     currentStep = .ALIGN_FACE
     stableFrames = 0
-    onLivenessStep?(["step": Step.ALIGN_FACE.rawValue])
+    emitStep(.ALIGN_FACE)
+  }
+
+  /// Encode upright portrait JPEG (same orientation as Vision / on-screen preview).
+  private func saveVerificationJPEG(from pixelBuffer: CVPixelBuffer) -> String? {
+    // Front camera portrait: sensor buffer is landscape; bake .leftMirrored into pixels for upload.
+    let ciImage = CIImage(cvPixelBuffer: pixelBuffer).oriented(.leftMirrored)
+    let context = CIContext()
+    guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return nil }
+    let uiImage = UIImage(cgImage: cgImage)
+    guard let data = uiImage.jpegData(compressionQuality: 0.88) else { return nil }
+
+    let url = FileManager.default.temporaryDirectory
+      .appendingPathComponent("liveness_verify_\(UUID().uuidString).jpg")
+    do {
+      try data.write(to: url)
+      return url.absoluteString
+    } catch {
+      return nil
+    }
   }
 
   // MARK: - Frame Processing
@@ -134,15 +169,13 @@ class FaceDetectionView: UIView, AVCaptureVideoDataOutputSampleBufferDelegate {
     let request = VNDetectFaceLandmarksRequest { req, _ in
       guard let faces = req.results as? [VNFaceObservation],
             faces.count == 1 else {
+        if self.currentStep == .VERIFIED { return }
         self.reset()
         return
       }
 
       let yaw = faces[0].yaw?.floatValue ?? 0
-
-      DispatchQueue.main.async {
-        self.handleYaw(yaw)
-      }
+      self.handleYaw(yaw, pixelBuffer: pixelBuffer)
     }
 
     let handler = VNImageRequestHandler(
@@ -154,7 +187,8 @@ class FaceDetectionView: UIView, AVCaptureVideoDataOutputSampleBufferDelegate {
     try? handler.perform([request])
   }
 
-  private func handleYaw(_ yaw: Float) {
+  /// Runs on the same serial queue as `captureOutput` so `pixelBuffer` stays valid for JPEG export.
+  private func handleYaw(_ yaw: Float, pixelBuffer: CVPixelBuffer) {
 
     switch currentStep {
 
@@ -167,7 +201,11 @@ class FaceDetectionView: UIView, AVCaptureVideoDataOutputSampleBufferDelegate {
     case .HOLD_STEADY:
       stableFrames += 1
       if stableFrames >= REQUIRED_FRAMES {
-        moveTo(.TURN_LEFT)
+        // Frontal “head straight” frame — best match for reference-photo APIs vs. post-turn capture.
+        let straightUri = saveVerificationJPEG(from: pixelBuffer)
+        currentStep = .TURN_LEFT
+        stableFrames = 0
+        emitStep(.TURN_LEFT, straightHeadImageUri: straightUri)
       }
 
     case .TURN_LEFT:
@@ -184,7 +222,8 @@ class FaceDetectionView: UIView, AVCaptureVideoDataOutputSampleBufferDelegate {
       if yaw > 0.25 {
         stableFrames += 1
         if stableFrames >= REQUIRED_FRAMES {
-          moveTo(.VERIFIED)
+          let uri = saveVerificationJPEG(from: pixelBuffer)
+          moveTo(.VERIFIED, imageUri: uri)
         }
       } else {
         stableFrames = 0

@@ -9,8 +9,9 @@ import {
   SocialLoginRequest,
   UserProfileResponse,
   SelfieResponse,
-  LivenessRequest,
-  LivenessResponse,
+  LivenessVerifyResponse,
+  LivenessCheckRequest,
+  LivenessCheckResponse,
 } from './types';
 
 export const loginApi = async (
@@ -128,12 +129,46 @@ export const uploadSelfieApi = async (
   }
 };
 
-export const submitLivenessApi = async (
-  payload: LivenessRequest
-): Promise<LivenessResponse> => {
-  const { data } = await apiClient.post<LivenessResponse>(
-    endpoints.auth.liveness,
-    payload
+/** POST `/auth/liveness/verify` with multipart field `file` (JPEG). */
+export const verifyLivenessSelfieApi = async (
+  imageUri: string,
+): Promise<LivenessVerifyResponse> => {
+  const trimmed = String(imageUri ?? '').trim();
+  if (!trimmed) {
+    throw new Error('Missing liveness verification image');
+  }
+
+  const formData = new FormData();
+  formData.append('file', {
+    uri: trimmed.startsWith('ph://')
+      ? trimmed
+      : trimmed.startsWith('file://')
+        ? trimmed
+        : `file://${trimmed}`,
+    type: 'image/jpeg',
+    name: `liveness_${Date.now()}.jpg`,
+  } as any);
+
+  const { data } = await apiClient.post<LivenessVerifyResponse>(
+    endpoints.auth.livenessVerify,
+    formData,
+    {
+      timeout: 60000,
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    },
+  );
+  return data;
+};
+
+/** POST `/auth/liveness-check` — sets `livenessCheck` on the user profile. */
+export const completeLivenessCheckApi = async (
+  payload: LivenessCheckRequest,
+): Promise<LivenessCheckResponse> => {
+  const { data } = await apiClient.post<LivenessCheckResponse>(
+    endpoints.auth.livenessCheck,
+    payload,
   );
   return data;
 };
