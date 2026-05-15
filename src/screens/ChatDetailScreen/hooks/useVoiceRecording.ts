@@ -152,6 +152,8 @@ export function useVoiceRecording({ onSendVoice }: UseVoiceRecordingParams): Use
       setVoiceSeconds(0);
       setVoicePaused(false);
       setRecordFilePath(null);
+    } catch {
+      // Errors are toasted in onSendVoice; keep recording UI so the user can retry or discard.
     } finally {
       setVoiceSendLoading(false);
     }

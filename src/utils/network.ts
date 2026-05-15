@@ -24,3 +24,46 @@ export const getAdjustedApiUrl = (baseUrl: string): string => {
   return baseUrl;
 };
 
+/**
+ * Resolves the Socket.IO client URL for the current build.
+ *
+ * - If `SOCKET_URL` is set in `.env`, it is used (scheme optional; host-only defaults to `wss://`).
+ * - Otherwise derives from `apiBaseUrl`: same host, `https`→`wss`, `http`→`ws`, path/search stripped.
+ *
+ * Use an explicit `SOCKET_URL` when the socket runs on a different host than the REST API
+ * (e.g. `wss://prod-socket.example.com` while API is `https://api.example.com`).
+ */
+export function getSocketIoUrl(apiBaseUrl: string, explicitSocketUrl?: string): string {
+  const fromEnv = (explicitSocketUrl ?? '').trim();
+  if (fromEnv) {
+    if (/^(https?|wss?|ws):\/\//i.test(fromEnv)) {
+      return fromEnv;
+    }
+    return `wss://${fromEnv}`;
+  }
+
+  const api = (apiBaseUrl ?? '').trim();
+  if (!api) {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(api);
+    if (parsed.protocol === 'https:') {
+      parsed.protocol = 'wss:';
+    } else if (parsed.protocol === 'http:') {
+      parsed.protocol = 'ws:';
+    }
+    parsed.pathname = '';
+    parsed.search = '';
+    parsed.hash = '';
+    let out = parsed.toString();
+    if (out.endsWith('/')) {
+      out = out.slice(0, -1);
+    }
+    return out;
+  } catch {
+    return '';
+  }
+}
+

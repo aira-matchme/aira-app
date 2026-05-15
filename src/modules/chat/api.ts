@@ -245,7 +245,8 @@ export type GetChatListParams = {
 
 export async function getChatListApi(params: GetChatListParams): Promise<GetChatListResponse> {
   const { data } = await apiClient.post<GetChatListResponse>(endpoints.chat.getChats, {
-    params: { page: params.page, limit: params.limit },
+    page: params.page,
+    limit: params.limit,
   });
   return data;
 }

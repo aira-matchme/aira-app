@@ -58,6 +58,9 @@ const getCardHeightRatio = (screenHeight: number, screenWidth: number) => {
 };
 const SLIDE_GAP = 5;
 
+/** Only cards within this index distance of the focused snap slide mount `Image` (remote decode). */
+const CARD_IMAGE_WINDOW_RADIUS = 2;
+
 const PHOTO_COUNT = 5;
 const PHOTO_INTERVAL_MS = 4000;
 
@@ -161,8 +164,16 @@ export const DashboardScreen = () => {
   const [photoIndexByMatchId, setPhotoIndexByMatchId] = useState<Record<string, number>>({});
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentIndexRef = useRef(0);
+  /** Snap-scroller center index; used to lazy-mount card photos (± window only). */
+  const [imageWindowCenterIndex, setImageWindowCenterIndex] = useState(0);
 
   const CURSOR_PAGE_LIMIT = 4;
+
+  useEffect(() => {
+    setImageWindowCenterIndex((c) =>
+      matches.length === 0 ? 0 : Math.min(c, matches.length - 1),
+    );
+  }, [matches.length]);
 
   const mapMatches = useCallback((items: GetMatchesItem[]): MatchItem[] => {
     return items.map((item) => {
@@ -450,10 +461,6 @@ export const DashboardScreen = () => {
     }
   }, [fetchCursorPage, getCursorFromMatch, getCursorId]);
 
-  useEffect(() => {
-    bootstrapMatches();
-  }, [bootstrapMatches]);
-
   useFocusEffect(
     useCallback(() => {
       bootstrapMatches();
@@ -685,6 +692,7 @@ export const DashboardScreen = () => {
               const lastMatchIdx = Math.max(0, matches.length - 1);
               const matchIdx = Math.min(idx, lastMatchIdx);
               currentIndexRef.current = matchIdx;
+              setImageWindowCenterIndex(matchIdx);
 
               const m = matches[matchIdx];
               const matchIdToSave = m?.matchId ?? m?.id;
@@ -709,7 +717,17 @@ export const DashboardScreen = () => {
               }
             }}
           >
-            {matches?.map((match, index) => (
+            {matches?.map((match, index) => {
+              const withinImageWindow =
+                matches.length > 0 &&
+                Math.abs(index - imageWindowCenterIndex) <= CARD_IMAGE_WINDOW_RADIUS;
+              const cardImageSource =
+                match.images && match.images.length > 0
+                  ? match.images[
+                      (photoIndexByMatchId[match.id] ?? 0) % match.images.length
+                    ]
+                  : match.image;
+              return (
               <View
                 key={getRenderKey(match, index)}
                 style={[
@@ -728,17 +746,15 @@ export const DashboardScreen = () => {
                 >
                   <View style={styles.card}>
                     <View style={StyleSheet.absoluteFill}>
+                      {withinImageWindow ? (
                       <Image
-                        source={
-                          (match.images && match.images.length > 0)
-                            ? match.images[
-                                (photoIndexByMatchId[match.id] ?? 0) % match.images.length
-                              ]
-                            : match.image
-                        }
+                        source={cardImageSource}
                         style={styles.cardImage}
                         resizeMode="cover"
                       />
+                      ) : (
+                        <View style={styles.cardImage} />
+                      )}
                       <LinearGradient
                         colors={[
                           'transparent',
@@ -912,7 +928,8 @@ export const DashboardScreen = () => {
                   </View>
                 </View>
               </View>
-            ))}
+            );
+            })}
             {pagingBootstrapped && pagingLoading && (
               <View style={{ paddingVertical: 14 }}>
                 <ActivityIndicator size="small" color={colors.primary.purple} />

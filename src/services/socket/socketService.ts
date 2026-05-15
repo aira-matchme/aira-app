@@ -1,5 +1,8 @@
 /** Payloads for socket events (adjust to match your backend) */
 import { io, type Socket } from 'socket.io-client';
+import { env } from '../../config/env';
+import { appConfig } from '../../config/app.config';
+import { getSocketIoUrl } from '../../utils/network';
 
 export interface JoinPayload {
   chatId: string;
@@ -212,7 +215,9 @@ class SocketService {
    * - Client emit: join({ chatId } | { userId }) | typing({ sender, receiver, isTyping }) | message_send({ sender, receiver, message }) | message_delete({ sender, receiver, messageId })
    * - Server emit: join_success (presence/online), typing({ sender, receiver, isTyping }), message_send/message_receive({ sender, receiver, message?, messageId?, timestamp? }), message_delete
    */
-  private static readonly SOCKET_URL = 'wss://dev-socket.airamatchme.com';
+  private resolveSocketUrl(): string {
+    return getSocketIoUrl(appConfig.apiBaseUrl, env.SOCKET_URL);
+  }
 
   private getBearerToken() {
     if (!this.token) return null;
@@ -252,8 +257,18 @@ class SocketService {
     this.token = token;
     const bearer = this.getBearerToken();
 
+    const socketUrl = this.resolveSocketUrl();
+    if (!socketUrl) {
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[SocketService] Missing API_BASE_URL / SOCKET_URL — cannot open socket connection.',
+        );
+      }
+      return;
+    }
 
-    this.socket = io(SocketService.SOCKET_URL, {
+    this.socket = io(socketUrl, {
       transports: ['websocket'],
       reconnection: true,
       auth: bearer

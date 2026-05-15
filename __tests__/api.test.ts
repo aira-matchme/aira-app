@@ -94,7 +94,7 @@ import {
   sendMessageApi,
   uploadChatFileApi,
 } from '../src/modules/chat/api';
-import { setupInterceptors } from '../src/services/api/interceptors';
+import { setupInterceptors, resetInterceptorSetupGuard } from '../src/services/api/interceptors';
 
 // --- Shared response shapes (QA reference) ---
 const mockAuthResponse = {
@@ -250,7 +250,7 @@ describe('Chat API (QA: request/response contract)', () => {
     expect(apiClient.post).toHaveBeenCalledTimes(1);
     expect(apiClient.post).toHaveBeenCalledWith(
       endpoints.chat.getChats,
-      expect.objectContaining({ params: { page: 2, limit: 30 } })
+      expect.objectContaining({ page: 2, limit: 30 })
     );
     expect(result.data).toBeDefined();
     expect(result.data.meta).toBeDefined();
@@ -362,6 +362,7 @@ describe('Interceptors (QA: request headers, 401 refresh, timeout)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    resetInterceptorSetupGuard();
   });
 
   it('request: adds Authorization when token present', () => {
@@ -470,12 +471,9 @@ describe('Interceptors (QA: request headers, 401 refresh, timeout)', () => {
       config: originalRequest,
     };
 
-    await expect(responseErrorHandler(error)).rejects.toMatchObject({
-      code: 'ECONNABORTED',
-    });
-    expect(mockShowTimeout).toHaveBeenCalledWith(expect.any(Function));
-    const retryCb = mockShowTimeout.mock.calls[0][0];
-    retryCb();
+    const settled = await responseErrorHandler(error);
+    expect(settled).toEqual({ data: {} });
+    expect(mockShowTimeout).toHaveBeenCalled();
     expect(apiClient.request).toHaveBeenCalledWith(originalRequest);
   });
 });

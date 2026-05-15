@@ -4,7 +4,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
 import { QueryProvider } from './src/app/QueryProvider';
-import { toastConfig } from './src/services/toast.srvice';
+import { ErrorBoundary } from './src/app/ErrorBoundary';
+import { toastConfig } from './src/services/toast.srvice.tsx'
 import { AppProvider } from './src/app/AppProvider';
 import { AuthProvider } from './src/app/AuthProvider';
 import { RootNavigator } from './src/navigation/RootNavigator';
@@ -51,13 +52,15 @@ const App = () => {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" />
-      <QueryProvider>
-        <AppProvider>
-          <AuthProvider>
-            <RootNavigator />
-          </AuthProvider>
-        </AppProvider>
-      </QueryProvider>
+      <ErrorBoundary>
+        <QueryProvider>
+          <AppProvider>
+            <AuthProvider>
+              <RootNavigator />
+            </AuthProvider>
+          </AppProvider>
+        </QueryProvider>
+      </ErrorBoundary>
 
       <Toast config={toastConfig} />
     </SafeAreaProvider>

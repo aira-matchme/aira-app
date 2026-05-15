@@ -24,10 +24,14 @@ export const RequestTimeoutModal: React.FC = () => {
     hideTimeout();
   };
 
+  const handleDismiss = () => {
+    hideTimeout({ cancelled: true });
+  };
+
   return (
     <ReusableBottomSheet
       isOpen={visible}
-      onClose={hideTimeout}
+      onClose={handleDismiss}
       snapPoints={['42%']}
       showDragHandle={true}
       showCloseButton={false}
