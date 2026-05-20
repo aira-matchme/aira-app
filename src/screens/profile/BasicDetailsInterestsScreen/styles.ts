@@ -37,7 +37,7 @@ export const styles = StyleSheet.create({
   title: {
     fontSize: 36,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    // fontFamily: typography.fontFamily.medium,
     color: colors.neutral[900],
     lineHeight: 44,
   },
@@ -75,7 +75,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    fontFamily: typography.fontFamily.semibold,
+    // fontFamily: typography.fontFamily.regular,
     color: colors.neutral[900],
   },
   categoryCountText: {
