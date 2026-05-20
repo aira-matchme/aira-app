@@ -5,7 +5,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const H_PADDING = 16;
 const INPUT_PILL_BG = '#f3f3f3';
-const INPUT_RADIUS = 22;
+const INPUT_RADIUS = 999;
 export const INPUT_BAR_HEIGHT = 56;
 /** Min/max for composer TextInput: grows with text, then scrolls inside at max. */
 export const CHAT_INPUT_MIN_HEIGHT = 36;

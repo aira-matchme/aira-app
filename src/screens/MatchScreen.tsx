@@ -1397,7 +1397,7 @@ export const MatchScreen = () => {
     },
     inputPill: {
       flex: 1,
-      borderRadius: 22,
+      borderRadius: 999,
       backgroundColor: '#F3F3F3',
       justifyContent: 'flex-start',
       paddingHorizontal: 16,
