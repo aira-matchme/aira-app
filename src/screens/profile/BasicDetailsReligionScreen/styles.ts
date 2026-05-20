@@ -40,6 +40,7 @@ export const styles = StyleSheet.create({
   },
   title: {
     fontSize: 36,
+    fontWeight: '500',
     fontFamily: typography.fontFamily.medium,
     color: colors.black,
     lineHeight: 44,
@@ -50,6 +51,7 @@ export const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.regular,
     color: colors.neutral[600],
     lineHeight: 22,
+    letterSpacing: 0.32,
     paddingBottom: spacing.sm * 2,
   },
   optionsContainer: {
@@ -71,7 +73,7 @@ export const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 16,
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.black,
   },
   optionTextSelected: {

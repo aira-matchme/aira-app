@@ -171,6 +171,7 @@ export const BasicDetailsHeightScreen: React.FC = () => {
 
           <View style={styles.pickerContainer}>
             <View style={styles.pickerColumn}>
+              <View style={styles.selectionHighlight} pointerEvents="none" />
               <ScrollView
                 ref={feetScrollRef}
                 showsVerticalScrollIndicator={false}
@@ -215,6 +216,7 @@ export const BasicDetailsHeightScreen: React.FC = () => {
             </View>
 
             <View style={styles.pickerColumn}>
+              <View style={styles.selectionHighlight} pointerEvents="none" />
               <ScrollView
                 ref={inchesScrollRef}
                 showsVerticalScrollIndicator={false}

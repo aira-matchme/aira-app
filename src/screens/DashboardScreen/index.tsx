@@ -577,9 +577,8 @@ export const DashboardScreen = () => {
   return (
     
     <View style={styles.container}>
-    
-            <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-           
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+      <ProfileScreenGradient />
       <View style={[styles.header, { paddingTop: Math.max(12, insets.top) }]}>
         <View style={styles.logoWrap}>
           <LogoWordmarkGradient />
@@ -592,7 +591,7 @@ export const DashboardScreen = () => {
             accessibilityRole="button"
             accessibilityLabel="Notifications"
           >
-            <BellIcon color={colors.neutral[800]} size={20} />
+            <BellIcon color={colors.black} size={24} />
           </TouchableOpacity>
         </View>
       </View>

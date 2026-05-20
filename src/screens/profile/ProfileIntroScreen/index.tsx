@@ -1,12 +1,10 @@
 import React from 'react';
-import { View, Text, Image, StatusBar, StyleSheet, Platform } from 'react-native';
+import { View, Text, Image, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import LinearGradient from 'react-native-linear-gradient';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Button } from '../../../components/Button';
-import { ProfileScreenGradient } from '../../../components/ProfileScreenGradient';
-import { colors } from '../../../theme';
 import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './styles';
@@ -24,11 +22,24 @@ export const ProfileIntroScreen: React.FC = () => {
 
   return (
     <View style={styles.wrapper}>
-      <ProfileScreenGradient />
+      {/* Bottom-right radial glow matching Figma ellipse */}
+      <View style={styles.bottomGlow}>
+        <Svg height="100%" width="100%">
+          <Defs>
+            <RadialGradient id="introGlow" cx="100%" cy="100%" rx="100%" ry="100%" fx="100%" fy="100%">
+              <Stop offset="0%" stopColor="#C87BF5" stopOpacity="0.4" />
+              <Stop offset="70%" stopColor="#C87BF5" stopOpacity="0.08" />
+              <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#introGlow)" />
+        </Svg>
+      </View>
+
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
         <View style={styles.container}>
-          {/* Header Video Section */}
+          {/* Hero image */}
           <View style={styles.headerCard}>
             <Image
               source={PROFILE_IMAGE}
@@ -37,23 +48,13 @@ export const ProfileIntroScreen: React.FC = () => {
             />
           </View>
 
-          {/* Bottom Gradient Card Section */}
-          <View style={styles.bottomGradient}>
-            <LinearGradient
-              colors={[colors.white, colors.secondary.lavenderLight, colors.secondary[200]]}
-              locations={[0, 0.5, 1]}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-
-            {/* Content */}
-            <View style={styles.content} pointerEvents="none">
+          {/* Text + button below image */}
+          <View style={styles.bottomSection}>
+            <View style={styles.content}>
               <Text style={styles.title}>{STRINGS.PROFILE_INTRO.TITLE}</Text>
               <Text style={styles.subtitle}>{STRINGS.PROFILE_INTRO.SUBTITLE}</Text>
             </View>
 
-            {/* Button */}
             <View style={styles.actions}>
               <Button
                 title={STRINGS.PROFILE_INTRO.PRIMARY_CTA}

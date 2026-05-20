@@ -51,7 +51,7 @@ export const styles = StyleSheet.create({
   },
   stepBadgeText: {
     fontSize: 10,
-    fontFamily: typography.fontFamily.medium,
+    
     letterSpacing: 0.8,
     color: colors.black,
   },
@@ -71,7 +71,7 @@ export const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.black,
     lineHeight: 36,
     marginBottom: spacing.sm,
@@ -118,7 +118,7 @@ export const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 14,
-    fontFamily: typography.fontFamily.medium,
+    
     letterSpacing: 0.28,
     color: colors.neutral[800],
   },

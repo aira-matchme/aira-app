@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   labelText: {
     fontSize: 14,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.primary[800],
   },
   triangle: {

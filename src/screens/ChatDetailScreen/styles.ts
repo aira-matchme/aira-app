@@ -12,7 +12,7 @@ export const CHAT_INPUT_MIN_HEIGHT = 36;
 export const CHAT_INPUT_MAX_HEIGHT = 120;
 const INPUT_MAX_HEIGHT = CHAT_INPUT_MAX_HEIGHT;
 /** Figma 3339-7411 / Match AI composer: 48px circular actions + 12px row inset */
-const MESSAGE_COMPOSER_ACTION_SIZE = 48;
+const MESSAGE_COMPOSER_ACTION_SIZE = 52;
 const MESSAGE_COMPOSER_ROW_PADDING_H = 12;
 const ATTACH_BUTTON_SIZE = MESSAGE_COMPOSER_ACTION_SIZE;
 const IMAGE_BUBBLE_SIZE = 200;
@@ -1395,7 +1395,7 @@ export const styles = StyleSheet.create({
     lineHeight: 18,
     letterSpacing: 0.48,
     color: colors.neutral[100],
-    fontFamily: typography.fontFamily.medium,
+    
   },
   callStateRingingSubtitle: {
     ...typography.body,
@@ -1519,7 +1519,7 @@ export const styles = StyleSheet.create({
     lineHeight: 18,
     letterSpacing: 0.48,
     color: colors.neutral[600],
-    fontFamily: typography.fontFamily.medium,
+    
   },
   callStateAudioDeviceOptionTextActive: {
     color: colors.primary.purple,
@@ -2598,12 +2598,20 @@ export const styles = StyleSheet.create({
     paddingVertical: 0,
     minHeight: INPUT_BAR_HEIGHT,
     maxHeight: INPUT_MAX_HEIGHT + 80,
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
+  },
+  /** Vertically center composer row in pill when there are no attachment previews */
+  inputWrapCentered: {
+    justifyContent: 'center',
   },
   inputRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     minHeight: MESSAGE_COMPOSER_ACTION_SIZE,
+  },
+  /** Multiline: pin + and field to bottom of growing pill */
+  inputRowExpanded: {
+    alignItems: 'flex-end',
   },
   /** Wraps TextInput + placeholder; centers short field with attach + send. */
   composerInputOuter: {
@@ -2613,11 +2621,14 @@ export const styles = StyleSheet.create({
     alignSelf: 'stretch',
     position: 'relative',
   },
-  composerPlaceholder: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: Platform.OS === 'ios' ? 12 : 11,
+  composerInputOuterSingleLine: {
+    justifyContent: 'center',
+  },
+  composerPlaceholderWrap: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+  },
+  composerPlaceholderText: {
     ...typography.body,
     letterSpacing: 0.32,
     lineHeight: 22,
@@ -2632,14 +2643,13 @@ export const styles = StyleSheet.create({
   },
   /** Plus sits on pill surface — no nested ring (Figma 3339-7411 / Match composer) */
   attachButton: {
-    width: ATTACH_BUTTON_SIZE,
-    height: ATTACH_BUTTON_SIZE,
-    borderRadius: ATTACH_BUTTON_SIZE / 2,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: colors.white,
-    // borderWidth: 1,
-    // borderColor: colors.neutral[200],
     justifyContent: 'center',
     alignItems: 'center',
+    alignSelf: 'center',
     marginRight: 8,
   },
   input: {
@@ -2668,6 +2678,12 @@ export const styles = StyleSheet.create({
       },
     }),
     textAlignVertical: 'top',
+  },
+  chatInputSingleLine: {
+    paddingTop: 0,
+    paddingBottom: 0,
+    minHeight: CHAT_INPUT_MIN_HEIGHT,
+    maxHeight: CHAT_INPUT_MIN_HEIGHT,
   },
   askAiraChipGradientWrap: {
     alignSelf: 'center',
@@ -2807,8 +2823,6 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: colors.white,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.neutral[200],
     zIndex: 10,
   },
   replyToBar: {

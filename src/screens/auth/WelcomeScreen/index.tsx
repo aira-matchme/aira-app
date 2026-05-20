@@ -402,9 +402,9 @@ export const WelcomeScreen: React.FC = () => {
         scrollEnabled={false}
         enablePanDownToClose={true}
       >
-        <View style={sheetStyles.titleContainer}>
-          <Text style={sheetStyles.title}>{STRINGS.EMAIL_LOGIN.TITLE}</Text>
-          <Text style={sheetStyles.subtitle}>{STRINGS.EMAIL_LOGIN.SUBTITLE}</Text>
+        <View style={sheetStyles.emailLoginTitleContainer}>
+          <Text style={sheetStyles.emailLoginTitle}>{STRINGS.EMAIL_LOGIN.TITLE}</Text>
+          <Text style={sheetStyles.emailLoginSubtitle}>{STRINGS.EMAIL_LOGIN.SUBTITLE}</Text>
         </View>
 
         <View style={sheetStyles.emailInputContainer}>
@@ -444,7 +444,7 @@ export const WelcomeScreen: React.FC = () => {
 
 const sheetStyles = StyleSheet.create({
   titleContainer: {
-    alignItems: 'center',
+    alignItems:'center',
     marginTop: 24,
     marginBottom: spacing.xl,
   },
@@ -454,8 +454,8 @@ const sheetStyles = StyleSheet.create({
     lineHeight: 36,
     letterSpacing: 0,
     color: colors.text.dark,
-    textAlign: 'center',
-    fontFamily: typography.fontFamily.medium,
+    textAlign: 'left',
+    // 
     marginBottom: spacing.sm,
   },
   titleGradient: {
@@ -464,7 +464,7 @@ const sheetStyles = StyleSheet.create({
     lineHeight: 36,
     letterSpacing: 0,
     color: colors.primary.purple,
-    fontFamily: typography.fontFamily.medium,
+    
   },
   subtitle: {
     fontSize: 16,
@@ -535,7 +535,7 @@ const sheetStyles = StyleSheet.create({
     lineHeight: 22,
     letterSpacing: 0.32,
     color: colors.neutral[500],
-    fontFamily: typography.fontFamily.medium,
+    
   },
   lostAccessLink: {
     paddingVertical: spacing.xs,
@@ -548,6 +548,29 @@ const sheetStyles = StyleSheet.create({
     color: colors.neutral[500],
     fontFamily: typography.fontFamily.regular,
     textAlign: 'center',
+  },
+  emailLoginTitleContainer: {
+    alignItems: 'flex-start',
+    marginTop: 24,
+    marginBottom: spacing.xl,
+  },
+  emailLoginTitle: {
+    fontSize: 28,
+    fontWeight: '500',
+    lineHeight: 36,
+    letterSpacing: 0,
+    color: colors.text.dark,
+    textAlign: 'left',
+    marginBottom: spacing.sm,
+  },
+  emailLoginSubtitle: {
+    fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 22,
+    letterSpacing: 0.32,
+    color: colors.neutral[400],
+    textAlign: 'left',
+    fontFamily: typography.fontFamily.regular,
   },
 });
 

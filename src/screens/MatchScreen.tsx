@@ -995,18 +995,16 @@ export const MatchScreen = () => {
               ]}
             >
               <View style={[styles.composerRow, { paddingBottom: 12 }]}>
-                <View style={styles.inputPill}>
+                <View style={[styles.inputPill, !hasText && styles.inputPillEmpty]}>
                   <TextInput
                     key={inputResetKey}
                     value={message}
                     onChangeText={setMessage}
                     placeholder="Ask me anything..."
                     placeholderTextColor={colors.neutral[600]}
-                    style={[
-                      styles.input,
-                      { textAlignVertical: hasText ? 'top' : 'center' },
-                    ]}
-                    multiline
+                    style={[styles.input, !hasText && styles.inputEmpty]}
+                    multiline={hasText}
+                    textAlignVertical={hasText ? 'top' : 'center'}
                   />
                 </View>
 
@@ -1366,8 +1364,8 @@ export const MatchScreen = () => {
       bottom: 0,
       backgroundColor: colors.white,
       zIndex: 5,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: colors.neutral[200],
+      // borderTopWidth: StyleSheet.hairlineWidth,
+      // borderTopColor: colors.neutral[200],
     },
     composerRow: {
       flexDirection: 'row',
@@ -1407,6 +1405,9 @@ export const MatchScreen = () => {
       // Allow the composer to grow but stop it from covering too much of the screen.
       maxHeight: 200,
     },
+    inputPillEmpty: {
+      justifyContent: 'center',
+    },
     input: {
       ...typography.body,
       color: colors.black,
@@ -1415,6 +1416,12 @@ export const MatchScreen = () => {
       paddingVertical: 13,
       paddingHorizontal: 0,
       includeFontPadding: false,
+    },
+    inputEmpty: {
+      paddingVertical: 0,
+      margin: 0,
+      minHeight: 22,
+      maxHeight: 22,
     },
     homeIndicatorArea: {
       height: 24,

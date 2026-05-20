@@ -1,7 +1,7 @@
 import React from 'react';
 import Svg, { Path, SvgProps } from 'react-native-svg';
 
-type TabLikesIconProps = SvgProps & { color?: string; filled?: boolean };
+type TabLikesIconProps = SvgProps & { color?: string };
 
 // From AIRA_icon Like.svg - heart path
 const likePath =
@@ -9,7 +9,6 @@ const likePath =
 
 export const TabLikesIcon: React.FC<TabLikesIconProps> = ({
   color = '#8C8C8C',
-  filled = false,
   width = 24,
   height = 24,
   ...props
@@ -17,9 +16,8 @@ export const TabLikesIcon: React.FC<TabLikesIconProps> = ({
   <Svg width={width} height={height} viewBox="0 0 24 24" fill="none" {...props}>
     <Path
       d={likePath}
-      fill={filled ? color : 'none'}
       stroke={color}
-      strokeWidth={filled ? 0 : 1.5}
+      strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
     />

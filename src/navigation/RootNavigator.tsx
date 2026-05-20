@@ -26,6 +26,7 @@ export const RootNavigator = () => {
     visible: apiErrorVisible,
     message: apiErrorMessage,
     variant: apiErrorVariant,
+    onRetry: apiErrorRetry,
     hideError: hideApiError,
   } = useApiErrorStore();
   const postAuthScreen = getPostAuthScreen(user ?? null, shouldShowEnableNotifications);
@@ -53,6 +54,7 @@ export const RootNavigator = () => {
       <ApiErrorModal
         visible={apiErrorVisible}
         onClose={hideApiError}
+        onRetry={apiErrorRetry}
         message={apiErrorMessage}
         variant={apiErrorVariant}
       />

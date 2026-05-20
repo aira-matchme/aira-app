@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     color: colors.text.dark,
     textAlign: 'center',
-    fontFamily: typography.fontFamily.medium, // Clash Grotesk Medium
+     // Clash Grotesk Medium
     marginBottom: spacing.sm, // 8px gap between title and subtitle
   },
   titleGradient: {
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
     lineHeight: 36,
     letterSpacing: 0,
     color: colors.primary.purple, // Gradient color - matches Figma gradient
-    fontFamily: typography.fontFamily.medium,
+    
   },
   subtitle: {
     fontSize: 16, // Exact match with Figma: text-[16px]

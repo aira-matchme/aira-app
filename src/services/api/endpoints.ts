@@ -85,4 +85,11 @@ export const endpoints = {
   rtc: {
     agoraToken: '/agora/token',
   },
+  iap: {
+    appleAppAccountToken: '/iap/apple/app-account-token',
+    appleSync: '/iap/apple/sync',
+    googleSync: '/iap/google/sync',
+    entitlements: '/iap/entitlements',
+    transactions: '/iap/transactions',
+  },
 };

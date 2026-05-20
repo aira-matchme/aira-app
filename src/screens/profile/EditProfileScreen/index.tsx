@@ -775,7 +775,7 @@ const sheetStyles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '600',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.neutral[900],
     textAlign: 'center',
     marginBottom: 24,
@@ -805,7 +805,7 @@ const sheetStyles = StyleSheet.create({
   actionLabel: {
     fontSize: 16,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.neutral[900],
   },
   removeButton: {
@@ -847,7 +847,7 @@ const permissionSheetStyles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.neutral[900],
     textAlign: 'center',
     marginBottom: 8,
@@ -889,7 +889,7 @@ const permissionSheetStyles = StyleSheet.create({
   primaryButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.white,
     letterSpacing: 0.32,
   },
@@ -905,7 +905,7 @@ const permissionSheetStyles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.neutral[900],
     letterSpacing: 0.32,
   },

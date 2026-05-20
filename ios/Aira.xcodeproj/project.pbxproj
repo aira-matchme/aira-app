@@ -14,6 +14,7 @@
 		1841A81F2F3EDD0100A0085E /* FaceDetectionViewManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1841A81E2F3EDCEF00A0085E /* FaceDetectionViewManager.swift */; };
 		1841A8232F3EDDF600A0085E /* FaceDetectionViewManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 1841A8222F3EDDF600A0085E /* FaceDetectionViewManager.m */; };
 		185A9B672F8E0D0F003D15C7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 185A9B662F8E0D0F003D15C7 /* GoogleService-Info.plist */; };
+		18A43D8B2FBB11C900CB7200 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 18A43D8A2FBB11C900CB7200 /* StoreKit.framework */; };
 		53A50EA41FCB8A58D8FBBFCC /* Pods_Aira.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D0259364D1F773FFA54CDAFA /* Pods_Aira.framework */; };
 		54C66BE17E0A4350A5481740 /* ClashGrotesk-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 8908B46B184F4EC980A3574E /* ClashGrotesk-Bold.otf */; };
 		77FB6810AB5E9C14356EB2E7 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
@@ -35,6 +36,7 @@
 		1841A8222F3EDDF600A0085E /* FaceDetectionViewManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FaceDetectionViewManager.m; sourceTree = "<group>"; };
 		1841A8242F3F24D500A0085E /* Aira.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = Aira.entitlements; path = Aira/Aira.entitlements; sourceTree = "<group>"; };
 		185A9B662F8E0D0F003D15C7 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		18A43D8A2FBB11C900CB7200 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		259664964E7240BE9BE99154 /* ClashGrotesk-Light.otf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "ClashGrotesk-Light.otf"; path = "../src/assets/fonts/ClashGrotesk-Light.otf"; sourceTree = "<group>"; };
 		6F01AC92D5C74A7F94CC24F8 /* ClashGrotesk-Semibold.otf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "ClashGrotesk-Semibold.otf"; path = "../src/assets/fonts/ClashGrotesk-Semibold.otf"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Aira/AppDelegate.swift; sourceTree = "<group>"; };
@@ -55,6 +57,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				53A50EA41FCB8A58D8FBBFCC /* Pods_Aira.framework in Frameworks */,
+				18A43D8B2FBB11C900CB7200 /* StoreKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -77,6 +80,7 @@
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				18A43D8A2FBB11C900CB7200 /* StoreKit.framework */,
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				D0259364D1F773FFA54CDAFA /* Pods_Aira.framework */,
 			);

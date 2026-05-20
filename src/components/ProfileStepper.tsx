@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 10,
-    fontFamily: typography.fontFamily.medium,
+    
     letterSpacing: 0.8,
     color: colors.black,
   },

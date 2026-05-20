@@ -1,7 +1,7 @@
 import React from 'react';
 import Svg, { Path, SvgProps } from 'react-native-svg';
 
-type TabHomeIconProps = SvgProps & { color?: string; filled?: boolean };
+type TabHomeIconProps = SvgProps & { color?: string };
 
 const homePath =
   'M22 10.499L12.8825 2.82109C12.6355 2.61309 12.3229 2.49902 12 2.49902C11.6771 2.49902 11.3645 2.61309 11.1175 2.82109L2 10.499';
@@ -10,7 +10,6 @@ const homePath2 =
 
 export const TabHomeIcon: React.FC<TabHomeIconProps> = ({
   color = '#8C8C8C',
-  filled: _filled = false,
   width = 24,
   height = 24,
   ...props

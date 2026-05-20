@@ -17,7 +17,7 @@ export const styles = StyleSheet.create({
     lineHeight: 36,
     letterSpacing: 0,
     color: colors.text.dark,
-    fontFamily: typography.fontFamily.medium,
+    
   },
   subtitle: {
     fontSize: 16,
@@ -58,7 +58,7 @@ export const styles = StyleSheet.create({
     lineHeight: 22,
     letterSpacing: 0.32,
     color: colors.neutral[500],
-    fontFamily: typography.fontFamily.medium,
+    
   },
 });
 

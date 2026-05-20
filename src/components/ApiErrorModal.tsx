@@ -22,8 +22,10 @@ const AUTO_CLOSE_MS = 5000;
 export interface ApiErrorModalProps {
   /** Whether the modal is visible */
   visible: boolean;
-  /** Called when the user taps OK or when the modal auto-closes */
+  /** Called when the user taps Retry or when the modal auto-closes */
   onClose: () => void;
+  /** Called when the user taps Retry (in addition to closing). If omitted, Retry just closes. */
+  onRetry?: () => void;
   /** Error message to show (default: generic message) */
   message?: string;
   /** Optional title (default: "Something went wrong") */
@@ -39,6 +41,7 @@ const DEFAULT_MESSAGE =
 export const ApiErrorModal: React.FC<ApiErrorModalProps> = ({
   visible,
   onClose,
+  onRetry,
   message,
   title,
   variant = 'generic',
@@ -74,6 +77,12 @@ export const ApiErrorModal: React.FC<ApiErrorModalProps> = ({
     onClose();
   };
 
+  const handleRetry = () => {
+    clearAutoClose();
+    onRetry?.();
+    onClose();
+  };
+
   return (
     <ReusableBottomSheet
       isOpen={visible}
@@ -97,8 +106,8 @@ export const ApiErrorModal: React.FC<ApiErrorModalProps> = ({
         <Text style={styles.title}>{resolvedTitle}</Text>
         <Text style={styles.message}>{resolvedMessage}</Text>
         <Button
-          title="OK"
-          onPress={handleClose}
+          title="Retry"
+          onPress={handleRetry}
           variant="primary"
           style={styles.button}
         />
@@ -131,11 +140,12 @@ const styles = StyleSheet.create({
     ...typography.h3,
     color: colors.black,
     textAlign: 'center',
+    textTransform: 'capitalize',
     marginBottom: spacing.sm,
   },
   message: {
-    ...typography.body,
     fontSize: 16,
+    fontFamily: typography.fontFamily.medium,
     color: colors.neutral[400],
     textAlign: 'center',
     lineHeight: 24,

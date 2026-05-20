@@ -15,7 +15,6 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ScrollView } from 'react-native';
 import { z } from 'zod';
-import LinearGradient from 'react-native-linear-gradient';
 
 import { TextInput } from '../../../components/TextInput';
 import { Button } from '../../../components/Button';
@@ -180,19 +179,6 @@ export const BasicDetailsPincodeScreen: React.FC = () => {
       keyboardVerticalOffset={0}
     >
       <ProfileScreenGradient />
-      <LinearGradient
-        colors={[
-          'rgba(203, 123, 245, 0)',
-          'rgba(203, 123, 245, 0.08)',
-          'rgba(203, 123, 245, 0.14)',
-          'rgba(203, 123, 245, 0.08)',
-          'rgba(203, 123, 245, 0)',
-        ]}
-        locations={[0, 0.15, 0.3, 0.5, 1]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={styles.middleGradient}
-      />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
       <SafeAreaView style={styles.safeArea} edges={PROFILE_SCREEN_EDGES}>

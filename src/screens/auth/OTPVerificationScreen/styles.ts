@@ -17,7 +17,7 @@ export const styles = StyleSheet.create({
     lineHeight: 36,
     letterSpacing: 0,
     color: colors.text.dark,
-    fontFamily: typography.fontFamily.medium,
+    // 
   },
   subtitle: {
     fontSize: 16,
@@ -50,7 +50,7 @@ export const styles = StyleSheet.create({
     lineHeight: 20,
     letterSpacing: 0.28,
     color: colors.neutral[900],
-    fontFamily: typography.fontFamily.medium,
+    
   },
   resendButton: {
     paddingVertical: spacing.xs,

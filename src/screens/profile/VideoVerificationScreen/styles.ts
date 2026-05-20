@@ -47,7 +47,7 @@ export const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.black,
     lineHeight: 36,
     marginBottom: spacing.md,
@@ -113,7 +113,7 @@ export const styles = StyleSheet.create({
   permissionTitle: {
     fontSize: 24,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.black,
     textAlign: 'center',
     lineHeight: 32,
@@ -156,7 +156,7 @@ export const styles = StyleSheet.create({
   allowButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.white,
     letterSpacing: 0.32,
     lineHeight: 24,
@@ -171,7 +171,7 @@ export const styles = StyleSheet.create({
   dontAllowButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.black,
     letterSpacing: 0.32,
     lineHeight: 24,

@@ -405,6 +405,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [composerHeight, setComposerHeight] = useState(120);
   /** Growing multiline composer: expands until CHAT_INPUT_MAX_HEIGHT, then scrolls inside. */
   const [composerInputHeight, setComposerInputHeight] = useState(CHAT_INPUT_MIN_HEIGHT);
+  const isSingleLineComposer = useMemo(
+    () =>
+      inputText.length === 0 &&
+      composerInputHeight <= CHAT_INPUT_MIN_HEIGHT + 4,
+    [inputText.length, composerInputHeight],
+  );
   const [composerSelection, setComposerSelection] = useState({ start: 0, end: 0 });
   const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
   const [imagePreviewZoomed, setImagePreviewZoomed] = useState(false);
@@ -4605,7 +4611,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           </TouchableOpacity>
           </View> */}
                     <View style={[styles.inputBar, { paddingBottom: 12 + bottomSafeInset }]}>
-            <View style={styles.inputWrap}>
+            <View
+              style={[
+                styles.inputWrap,
+                pendingAttachments.length === 0 && styles.inputWrapCentered,
+              ]}
+            >
             {pendingAttachments.length > 0 && (
               <View style={styles.attachmentsInsidePill}>
                 {pendingAttachments.map((att, i) => (
@@ -4632,24 +4643,37 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 ))}
               </View>
             )}
-            <View style={styles.inputRow}>
+            <View
+              style={[
+                styles.inputRow,
+                composerInputHeight > CHAT_INPUT_MIN_HEIGHT + 4 && styles.inputRowExpanded,
+              ]}
+            >
               <TouchableOpacity style={styles.attachButton} activeOpacity={0.7} onPress={() => setAttachmentSheetOpen(true)}>
-                <PlusIcon size={20} color={colors.black}  />
+                <PlusIcon size={20} color={colors.black} />
               </TouchableOpacity>
-              <View style={styles.composerInputOuter}>
+              <View
+                style={[
+                  styles.composerInputOuter,
+                  isSingleLineComposer && styles.composerInputOuterSingleLine,
+                ]}
+              >
                 {inputText.length === 0 && (
-                  <Text
-                    pointerEvents="none"
-                    style={styles.composerPlaceholder}
-                    numberOfLines={1}
-                  >
-                    {otherUserTyping ? 'typing…' : STRINGS.CHAT.START_CHAT_PLACEHOLDER}
-                  </Text>
+                  <View style={styles.composerPlaceholderWrap} pointerEvents="none">
+                    <Text style={styles.composerPlaceholderText} numberOfLines={1}>
+                      {otherUserTyping ? 'typing…' : STRINGS.CHAT.START_CHAT_PLACEHOLDER}
+                    </Text>
+                  </View>
                 )}
                 <TextInput
                   style={[
                     styles.chatInput,
-                    Platform.OS === 'android' && { height: composerInputHeight },
+                    isSingleLineComposer && styles.chatInputSingleLine,
+                    Platform.OS === 'android' && {
+                      height: isSingleLineComposer
+                        ? CHAT_INPUT_MIN_HEIGHT
+                        : composerInputHeight,
+                    },
                   ]}
                   ref={inputRef}
                   placeholder=""
@@ -4695,11 +4719,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                       socketService.typing(currentUserId, otherUserId, false);
                     }
                   }}
-                  multiline
+                  multiline={!isSingleLineComposer}
                   blurOnSubmit={false}
                   scrollEnabled={composerInputHeight >= CHAT_INPUT_MAX_HEIGHT}
                   underlineColorAndroid="transparent"
-                  textAlignVertical="top"
+                  textAlignVertical={isSingleLineComposer ? 'center' : 'top'}
                   disableFullscreenUI
                   returnKeyType="default"
                   keyboardType="default"
@@ -5049,7 +5073,7 @@ const permissionSheetStyles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.neutral[900],
     textAlign: 'center',
     marginBottom: 8,
@@ -5091,7 +5115,7 @@ const permissionSheetStyles = StyleSheet.create({
   primaryButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.white,
     letterSpacing: 0.32,
   },
@@ -5107,7 +5131,7 @@ const permissionSheetStyles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.black,
     letterSpacing: 0.32,
   },
@@ -5133,7 +5157,7 @@ const reportSheetStyles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.black,
     textAlign: 'center',
     marginBottom: 16,
@@ -5172,7 +5196,7 @@ const reportSheetStyles = StyleSheet.create({
   reasonLabel: {
     fontSize: 14,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.neutral[800],
     flex: 1,
   },
@@ -5207,7 +5231,7 @@ const reportSheetStyles = StyleSheet.create({
   cancelButtonLabel: {
     fontSize: 16,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.black,
   },
   submitButton: {
@@ -5224,7 +5248,7 @@ const reportSheetStyles = StyleSheet.create({
   submitButtonLabel: {
     fontSize: 16,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.white,
   },
 });

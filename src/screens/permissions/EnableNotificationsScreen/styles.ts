@@ -122,7 +122,7 @@ export const styles = StyleSheet.create({
   permissionTitle: {
     fontSize: 24,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.text.dark,
     textAlign: 'center',
     lineHeight: 32,
@@ -154,7 +154,7 @@ export const styles = StyleSheet.create({
   dontAllowButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.text.dark,
     letterSpacing: 0.32,
     lineHeight: 22,

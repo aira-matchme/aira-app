@@ -168,4 +168,5 @@ export type ProfileStackParamList = {
   PreferencesBodyType: { returnToSummary?: boolean };
   ReferenceImageIntro: { returnToProfileMain?: boolean } | undefined;
   ReferenceImagePreference: { returnToProfileMain?: boolean } | undefined;
+  Subscription: undefined;
 };

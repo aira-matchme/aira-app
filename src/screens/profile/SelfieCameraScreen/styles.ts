@@ -47,7 +47,7 @@ export const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.white,
     lineHeight: 36,
     marginBottom: spacing.sm,
@@ -222,7 +222,7 @@ export const styles = StyleSheet.create({
   },
   verifyingButtonText: {
     fontSize: 16,
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.white,
   },
   spinner: {
@@ -230,7 +230,7 @@ export const styles = StyleSheet.create({
   },
   verifyingTitle: {
     fontSize: 24,
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.white,
     lineHeight: 32,
     textAlign: 'center',
@@ -288,7 +288,7 @@ export const styles = StyleSheet.create({
   },
   verifiedButtonText: {
     fontSize: 18,
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.white,
   },
   verifiedIconWrapper: {
@@ -302,7 +302,7 @@ export const styles = StyleSheet.create({
   },
   verifiedTitle: {
     fontSize: 28,
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.white,
     lineHeight: 36,
     textAlign: 'center',

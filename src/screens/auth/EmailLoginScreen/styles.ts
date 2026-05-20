@@ -9,6 +9,7 @@ export const styles = StyleSheet.create({
   titleContainer: {
     marginTop: 24,
     marginBottom: spacing.xl,
+    
     gap: 4,
   },
   title: {
@@ -17,7 +18,7 @@ export const styles = StyleSheet.create({
     lineHeight: 36,
     letterSpacing: 0,
     color: colors.text.dark,
-    fontFamily: typography.fontFamily.medium,
+    
   },
   subtitle: {
     fontSize: 16,
@@ -32,30 +33,18 @@ export const styles = StyleSheet.create({
     minHeight: 78, // Input 54 + error slot 24 — keeps Continue button position fixed
   },
   actionContainer: {
+    width: '100%',
+    marginTop: spacing.lg,
     gap: spacing.sm,
     alignItems: 'center',
   },
-  continueButtonActive: {
+  /** Figma email login — full-width pill CTA (disabled + enabled) */
+  continueButton: {
     width: '100%',
-    height: 54,
-  },
-  continueButtonDisabled: {
-    width: '100%',
-    height: 54,
-    backgroundColor: colors.neutral[50],
-    borderRadius: 100,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignSelf: 'stretch',
   },
   continueButtonTextDisabled: {
-    fontSize: 16,
-    fontWeight: '500' as const,
-    lineHeight: 22,
-    letterSpacing: 0.32,
     color: colors.neutral[500],
-    fontFamily: typography.fontFamily.medium,
   },
   lostAccessLink: {
     paddingVertical: spacing.xs,
@@ -70,4 +59,3 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-

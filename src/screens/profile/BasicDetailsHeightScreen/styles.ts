@@ -69,6 +69,16 @@ export const styles = StyleSheet.create({
   pickerColumn: {
     height: PICKER_VISIBLE_HEIGHT,
     minWidth: 80,
+    position: 'relative',
+  },
+  selectionHighlight: {
+    position: 'absolute',
+    top: (PICKER_VISIBLE_HEIGHT - PICKER_ROW_HEIGHT) / 2,
+    left: 0,
+    right: 0,
+    height: PICKER_ROW_HEIGHT,
+    borderRadius: 40,
+    backgroundColor: colors.primary[50],
   },
   scrollContent: {
     paddingVertical: (PICKER_VISIBLE_HEIGHT - PICKER_ROW_HEIGHT) / 2,
@@ -80,10 +90,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  pickerRowSelected: {
-    backgroundColor: colors.primary[50],
-    paddingHorizontal: spacing.lg,
-  },
+  pickerRowSelected: {},
   pickerText: {
     fontSize: 22,
     fontFamily: typography.fontFamily.regular,
@@ -93,7 +100,7 @@ export const styles = StyleSheet.create({
   },
   pickerTextSelected: {
     fontSize: 28,
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.primary.purple,
     lineHeight: 36,
   },

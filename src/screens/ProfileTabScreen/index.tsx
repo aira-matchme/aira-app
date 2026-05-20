@@ -72,7 +72,13 @@ const MENU_ITEMS: Array<{
     iconColor: colors.primary.purple,
   },
   // { id: 'referral', label: 'Referral Points', Icon: ProfileReferralIcon },
-  // { id: 'subscription', label: 'My Subscription', Icon: ProfileSubscriptionIcon },
+  {
+    id: 'subscription',
+    label: 'My Subscription',
+    Icon: ProfileSubscriptionIcon,
+    screen: 'Subscription',
+    iconColor: colors.primary.purple,
+  },
   { id: 'help', label: 'Help Center', Icon: ProfileHelpIcon, url: SUPPORT_EMAIL_URL },
   { id: 'privacy', label: 'Privacy & Terms', Icon: ProfileHelpIcon, url: PRIVACY_POLICY_URL },
   // {

@@ -3,15 +3,12 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Keyboard,
-  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ReusableBottomSheet } from '../../../components/BottomSheet';
 import { EmailInput, validateEmail } from '../../../components/EmailInput';
 import { Button } from '../../../components/Button';
-import { spacing } from '../../../theme';
 import { STRINGS } from '../../../constants/strings';
 import type { AuthStackParamList } from '../../../navigation/types';
 import { useSendOtp } from '../../../modules/auth/hooks';
@@ -25,7 +22,6 @@ export const EmailLoginScreen: React.FC = () => {
   const navigation = useNavigation<EmailLoginNavigationProp>();
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string | undefined>();
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isClosingRef = useRef(false);
   
@@ -103,29 +99,6 @@ export const EmailLoginScreen: React.FC = () => {
 
   const isEmailValid = validateEmail(email).isValid;
 
-  useEffect(() => {
-    const keyboardWillShow = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
-      }
-    );
-
-    const keyboardWillHide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        setKeyboardHeight(0);
-      }
-    );
-
-    return () => {
-      keyboardWillShow.remove();
-      keyboardWillHide.remove();
-    };
-  }, []);
-
-  const dynamicSpacing = keyboardHeight > 0 ? spacing.xxl * 3 : spacing.md;
-
   return (
     <View style={styles.container}>
       <ReusableBottomSheet
@@ -154,27 +127,16 @@ export const EmailLoginScreen: React.FC = () => {
           />
         </View>
 
-        <View style={[styles.actionContainer, { marginTop: dynamicSpacing }]}>
-          {isEmailValid ? (
-            <Button
-              title={STRINGS.EMAIL_LOGIN.CONTINUE}
-              onPress={handleContinue}
-              variant="primary"
-              disabled={sendOtpMutation.isPending}
-              loading={sendOtpMutation.isPending}
-              style={styles.continueButtonActive}
-            />
-          ) : (
-            <TouchableOpacity
-              style={styles.continueButtonDisabled}
-              disabled={true}
-              activeOpacity={1}
-            >
-              <Text style={styles.continueButtonTextDisabled}>
-                {STRINGS.EMAIL_LOGIN.CONTINUE}
-              </Text>
-            </TouchableOpacity>
-          )}
+        <View style={styles.actionContainer}>
+          <Button
+            title={STRINGS.EMAIL_LOGIN.CONTINUE}
+            onPress={handleContinue}
+            variant="primary"
+            disabled={!isEmailValid}
+            loading={sendOtpMutation.isPending}
+            style={styles.continueButton}
+            textStyle={!isEmailValid ? styles.continueButtonTextDisabled : undefined}
+          />
 
           <TouchableOpacity
             style={styles.lostAccessLink}

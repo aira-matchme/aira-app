@@ -47,7 +47,7 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     letterSpacing: 0.28,
-    fontFamily: typography.fontFamily.medium,
+    
     fontWeight: '500',
     color: colors.neutral[600],
   },
@@ -110,7 +110,7 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     letterSpacing: 0.28,
-    fontFamily: typography.fontFamily.medium,
+    
     fontWeight: '500',
     color: colors.black,
   },
@@ -131,7 +131,7 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     letterSpacing: 0.48,
-    fontFamily: typography.fontFamily.medium,
+    
     fontWeight: '500',
     color: colors.primary.purple,
   },

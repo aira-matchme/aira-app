@@ -35,7 +35,7 @@ export const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.black,
     lineHeight: 36,
     letterSpacing: 0,

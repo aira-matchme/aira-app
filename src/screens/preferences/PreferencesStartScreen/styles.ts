@@ -66,7 +66,7 @@ export const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.black,
     lineHeight: 36,
     letterSpacing: 0,
@@ -75,7 +75,7 @@ export const styles = StyleSheet.create({
   description: {
     fontSize: 14,
     fontWeight: '500',
-    fontFamily: typography.fontFamily.medium,
+    
     lineHeight: 20,
     letterSpacing: 0.28,
     color: colors.neutral[600], // #737373

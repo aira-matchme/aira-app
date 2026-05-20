@@ -29,11 +29,13 @@ import {
   type TabWalkthroughStepId,
 } from './TabWalkthroughContext';
 
+import { TabBarIcon } from '../assets/icons/tabs/TabBarIcon';
 import { TabHomeIcon } from '../assets/icons/tabs/TabHomeIcon';
 import { TabChatIcon } from '../assets/icons/tabs/TabChatIcon';
 import { TabLikesIcon } from '../assets/icons/tabs/TabLikesIcon';
 import { TabProfileIcon } from '../assets/icons/tabs/TabProfileIcon';
 import { TabAICenterIcon } from '../assets/icons/tabs/TabAICenterIcon';
+import { TAB_BAR_ACTIVE_ICONS } from '../assets/icons/tabs/tabBarActiveIcons';
 
 const Tab = createBottomTabNavigator<TabStackParamList>();
 
@@ -188,12 +190,17 @@ function TabNavigatorInner() {
             tabBarLabel: 'Home',
             tabBarIcon: ({ color, focused }) => (
               <WalkthroughTabIcon id="tab_home">
-                <TabHomeIcon
-                  color={color}
-                  filled={focused}
-                  width={TAB_ICON_SIZE}
-                  height={TAB_ICON_SIZE}
-                />
+                <TabBarIcon
+                  focused={focused}
+                  ActiveIcon={TAB_BAR_ACTIVE_ICONS.home}
+                  size={TAB_ICON_SIZE}
+                >
+                  <TabHomeIcon
+                    color={color}
+                    width={TAB_ICON_SIZE}
+                    height={TAB_ICON_SIZE}
+                  />
+                </TabBarIcon>
               </WalkthroughTabIcon>
             ),
             tabBarStyle: hideTabBar ? { display: 'none' } : tabBarStyle,
@@ -210,9 +217,19 @@ function TabNavigatorInner() {
           return {
             tabBarLabel: 'Chat',
             sceneStyle: { backgroundColor: colors.neutral[50] },
-            tabBarIcon: ({ color }) => (
+            tabBarIcon: ({ color, focused }) => (
               <WalkthroughTabIcon id="tab_chat">
-                <TabChatIcon color={color} width={TAB_ICON_SIZE} height={TAB_ICON_SIZE} />
+                <TabBarIcon
+                  focused={focused}
+                  ActiveIcon={TAB_BAR_ACTIVE_ICONS.chat}
+                  size={TAB_ICON_SIZE}
+                >
+                  <TabChatIcon
+                    color={color}
+                    width={TAB_ICON_SIZE}
+                    height={TAB_ICON_SIZE}
+                  />
+                </TabBarIcon>
               </WalkthroughTabIcon>
             ),
             tabBarStyle: isChatDetail ? { display: 'none' } : tabBarStyle,
@@ -238,12 +255,17 @@ function TabNavigatorInner() {
           sceneStyle: { backgroundColor: colors.neutral[50] },
           tabBarIcon: ({ color, focused }) => (
             <WalkthroughTabIcon id="tab_likes">
-              <TabLikesIcon
-                color={color}
-                filled={focused}
-                width={TAB_ICON_SIZE}
-                height={TAB_ICON_SIZE}
-              />
+              <TabBarIcon
+                focused={focused}
+                ActiveIcon={TAB_BAR_ACTIVE_ICONS.likes}
+                size={TAB_ICON_SIZE}
+              >
+                <TabLikesIcon
+                  color={color}
+                  width={TAB_ICON_SIZE}
+                  height={TAB_ICON_SIZE}
+                />
+              </TabBarIcon>
             </WalkthroughTabIcon>
           ),
           tabBarButton: renderTabBarPressable,
@@ -257,9 +279,19 @@ function TabNavigatorInner() {
           const hideTabBar = routeName !== 'ProfileMain';
           return {
             tabBarLabel: 'Profile',
-            tabBarIcon: ({ color }) => (
+            tabBarIcon: ({ color, focused }) => (
               <WalkthroughTabIcon id="tab_profile">
-                <TabProfileIcon color={color} width={TAB_ICON_SIZE} height={TAB_ICON_SIZE} />
+                <TabBarIcon
+                  focused={focused}
+                  ActiveIcon={TAB_BAR_ACTIVE_ICONS.profile}
+                  size={TAB_ICON_SIZE}
+                >
+                  <TabProfileIcon
+                    color={color}
+                    width={TAB_ICON_SIZE}
+                    height={TAB_ICON_SIZE}
+                  />
+                </TabBarIcon>
               </WalkthroughTabIcon>
             ),
             tabBarStyle: hideTabBar ? { display: 'none' } : tabBarStyle,

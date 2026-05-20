@@ -163,6 +163,7 @@ export const BasicDetailsDobScreen: React.FC = () => {
               name="day"
               render={({ field: { value } }) => (
                 <View style={styles.dateColumn}>
+                  <View style={[styles.selectionHighlight, { top: TOP_BOTTOM_SPACER }]} pointerEvents="none" />
                   <ScrollView
                     ref={dayScrollRef}
                     showsVerticalScrollIndicator={false}
@@ -230,6 +231,7 @@ export const BasicDetailsDobScreen: React.FC = () => {
               name="month"
               render={({ field: { value } }) => (
                 <View style={styles.dateColumn}>
+                  <View style={[styles.selectionHighlight, { top: TOP_BOTTOM_SPACER }]} pointerEvents="none" />
                   <ScrollView
                     ref={monthScrollRef}
                     showsVerticalScrollIndicator={false}
@@ -302,6 +304,7 @@ export const BasicDetailsDobScreen: React.FC = () => {
               name="year"
               render={({ field: { value } }) => (
                 <View style={styles.dateColumn}>
+                  <View style={[styles.selectionHighlight, { top: TOP_BOTTOM_SPACER }]} pointerEvents="none" />
                   <ScrollView
                     ref={yearScrollRef}
                     showsVerticalScrollIndicator={false}

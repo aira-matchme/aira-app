@@ -19,11 +19,11 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.md * 2,
   },
   title: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: '500',
     fontFamily: typography.fontFamily.medium,
     color: colors.neutral[900],
-    lineHeight: 40,
+    lineHeight: 44,
     marginBottom: spacing.sm,
   },
   subtitle: {
@@ -58,7 +58,7 @@ export const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 16,
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.neutral[900],
   },
   optionTextSelected: {

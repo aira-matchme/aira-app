@@ -80,7 +80,7 @@ export const styles = StyleSheet.create({
   },
   categoryCountText: {
     fontSize: 13,
-    fontFamily: typography.fontFamily.medium,
+    
   },
   categoryTags: {
     flexDirection: 'row',
@@ -107,7 +107,7 @@ export const styles = StyleSheet.create({
   },
   chipText: {
     fontSize: 14,
-    fontFamily: typography.fontFamily.medium,
+    
     color: colors.neutral[900],
   },
   chipTextSelected: {

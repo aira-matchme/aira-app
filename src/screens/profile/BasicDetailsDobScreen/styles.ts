@@ -1,6 +1,8 @@
 import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../../theme';
 
+const PICKER_ITEM_HEIGHT = 52;
+
 export const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
@@ -46,6 +48,7 @@ export const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.regular,
     color: colors.neutral[600],
     lineHeight: 22,
+    letterSpacing: 0.32,
   },
   datePickerContainer: {
     flexDirection: 'row',
@@ -56,7 +59,16 @@ export const styles = StyleSheet.create({
   },
   dateColumn: {
     flex: 1,
-    height: 180, // approx. 3 rows visible
+    height: 180,
+    position: 'relative',
+  },
+  selectionHighlight: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: PICKER_ITEM_HEIGHT,
+    borderRadius: 40,
+    backgroundColor: colors.primary[50],
   },
   scrollContent: {
     // Symmetric vertical padding so the selected row sits in the middle.
@@ -69,13 +81,10 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  dateOptionSelected: {
-    // Light purple pill behind the selected value
-    backgroundColor: 'rgba(107, 92, 255, 0.1)',
-  },
+  dateOptionSelected: {},
   dateText: {
     fontSize: 28,
-    fontFamily: typography.fontFamily.medium,
+    
     color: 'rgba(0,0,0,0.15)',
     lineHeight: 36,
   },

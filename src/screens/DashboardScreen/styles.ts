@@ -10,7 +10,9 @@ const CARD_BORDER_RADIUS_TOP = 20;
 const CARD_BORDER_RADIUS_BOTTOM = 28;
 const CARD_HORIZONTAL_MARGIN = 10;
 const CARD_WIDTH = SCREEN_WIDTH - CARD_HORIZONTAL_MARGIN * 2;
-const HEADER_BUTTON_SIZE = 40;
+/** Figma Home header — notification bell in white squircle (matches Chat/Likes) */
+const HEADER_BUTTON_SIZE = 48;
+const HEADER_BUTTON_RADIUS = 16;
 const OVERLAY_TOP_RADIUS = 16;
 const ACTION_BUTTON_SIZE = 56;
 const MATCH_CHIP_BORDER_RADIUS = 12;
@@ -27,7 +29,8 @@ export const styles = StyleSheet.create({
     paddingHorizontal: H_PADDING,
     marginTop: 8,
     marginBottom: 8,
-    backgroundColor: colors.white,
+    backgroundColor: 'transparent',
+    zIndex: 2,
   },
   logoWrap: {
     width: 100,
@@ -94,12 +97,21 @@ export const styles = StyleSheet.create({
   headerButton: {
     width: HEADER_BUTTON_SIZE,
     height: HEADER_BUTTON_SIZE,
-    borderRadius: HEADER_BUTTON_SIZE / 2,
+    borderRadius: HEADER_BUTTON_RADIUS,
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.neutral[200],
+    borderColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.07,
+        shadowRadius: 14,
+      },
+      android: { elevation: 3 },
+    }),
   },
   /** Figma 2101-24831: match actions pill (chat + heart) */
   matchActionsContainer: {

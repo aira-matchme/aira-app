@@ -8,8 +8,21 @@ const { withSentryConfig } = require('@sentry/react-native/metro');
  *
  * @type {import('@react-native/metro-config').MetroConfig}
  */
-const config = {};
+const defaultConfig = getDefaultConfig(__dirname);
+const { assetExts, sourceExts } = defaultConfig.resolver;
 
-module.exports = withSentryConfig(
-  mergeConfig(getDefaultConfig(__dirname), config),
-);
+const config = {
+  transformer: {
+    ...defaultConfig.transformer,
+    babelTransformerPath: require.resolve(
+      'react-native-svg-transformer/react-native',
+    ),
+  },
+  resolver: {
+    ...defaultConfig.resolver,
+    assetExts: assetExts.filter((ext) => ext !== 'svg'),
+    sourceExts: [...sourceExts, 'svg'],
+  },
+};
+
+module.exports = withSentryConfig(mergeConfig(defaultConfig, config));

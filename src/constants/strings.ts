@@ -150,7 +150,7 @@ export const STRINGS = {
     NAME: {
       TITLE: 'What should we call you?',
       SUBTITLE: 'This is how your name will appear on your profile.',
-      PLACEHOLDER: 'Enter your user name',
+      PLACEHOLDER: 'Enter your name',
     },
     DOB: {
       TITLE: "When's your birthday?",

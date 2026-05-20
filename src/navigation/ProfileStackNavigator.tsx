@@ -31,6 +31,7 @@ import { PreferencesMaritalStatusScreen } from '../screens/preferences/Preferenc
 import { PreferencesRelationshipIntentScreen } from '../screens/preferences/PreferencesRelationshipIntentScreen';
 import { ReferenceImageIntroScreen } from '../screens/preferences/ReferenceImageIntroScreen';
 import { ReferenceImagePreferenceScreen } from '../screens/preferences/ReferenceImagePreferenceScreen';
+import { SubscriptionScreen } from '../screens/Subscription';
 import type { ProfileStackParamList } from './types';
 
 const PreferencesBodyTypeScreenLazy = React.lazy(() =>
@@ -211,6 +212,11 @@ export const ProfileStackNavigator = () => (
     <Stack.Screen
       name="ReferenceImagePreference"
       component={ReferenceImagePreferenceScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="Subscription"
+      component={SubscriptionScreen}
       options={profileScreenOptions}
     />
   </Stack.Navigator>
