@@ -15,6 +15,7 @@ import type { RootStackParamList, AuthStackParamList } from '../../../navigation
 import { useVerifyOtp, useSendOtp, useResendOtp } from '../../../modules/auth/hooks';
 import { getProfileApi } from '../../../modules/auth/api';
 import { useAuthStore } from '../../../store/auth.store';
+import { useSubscriptionStore } from '../../../store/subscription.store';
 import {
   checkNotificationPermission,
 } from '../../../config/permissions';
@@ -63,6 +64,7 @@ export const OTPVerificationScreen: React.FC = () => {
   const sendOtpMutation = useSendOtp();
   const resendOtpMutation = useResendOtp();
   const { setTokens, setUser, setShouldShowEnableNotifications } = useAuthStore();
+  const syncFromProfile = useSubscriptionStore((s) => s.syncFromProfile);
 
   const {
     control,
@@ -192,6 +194,7 @@ export const OTPVerificationScreen: React.FC = () => {
           if (profileResponse?.data) {
             userData = profileResponse.data as unknown as PostAuthUser;
             setUser(profileResponse.data as any);
+            syncFromProfile(profileResponse.data as Record<string, unknown>);
           } else if (response.data?.user) {
             setUser(response.data.user as any);
           }

@@ -44,6 +44,7 @@ import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
 import { STRINGS } from '../../constants/strings';
 import { useAuthStore } from '../../store/auth.store';
+import { useSubscriptionStore } from '../../store/subscription.store';
 import { markAppTourCompleted } from '../../services/appTour/markAppTourCompleted';
 import { showErrorToast, showSuccessToast } from '../../services/toast.srvice';
 
@@ -125,6 +126,7 @@ export const DashboardScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const isAppTourDone = useAuthStore((s) => s.user?.isAppTourDone);
+  const isSubscribed = useSubscriptionStore((s) => s.isSubscribed);
   const { active: tabWalkthroughActive, startFromProfile } = useTabWalkthrough();
   const scrollRef = useRef<ScrollView | null>(null);
   /** Prevents calling start() again when the tab walkthrough modal causes a focus/blur cycle (resets welcome to step 1). */
@@ -963,15 +965,17 @@ export const DashboardScreen = () => {
                   pressed && styles.firstMoveButtonActive,
                 ]}
                 onPress={() => {
+                  if (!isSubscribed) {
+                    setShowFirstMovePopup(false);
+                    navigation.navigate('Profile', { screen: 'Subscription' });
+                    return;
+                  }
                   const m = selectedMatch;
                   if (!m) return;
                   setShowFirstMovePopup(false);
                   navigation.navigate('Chat', {
                     screen: 'ChatDetail',
                     params: {
-                      
-                      // If a chat already exists, use its id; otherwise let ChatDetail
-                      // handle creating the chat on first send.
                       chatId: m.chatId ?? null,
                       avatar: m.image,
                       name: m.name,
@@ -993,6 +997,11 @@ export const DashboardScreen = () => {
                 ]}
                 disabled={firstMoveLoading}
                 onPress={async () => {
+                  if (!isSubscribed) {
+                    setShowFirstMovePopup(false);
+                    navigation.navigate('Profile', { screen: 'Subscription' });
+                    return;
+                  }
                   const m = selectedMatch;
                   if (!m || firstMoveLoading) return;
                   try {

@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   StatusBar,
   Platform,
-  useWindowDimensions,
   ImageBackground,
   StyleSheet,
 } from 'react-native';
@@ -33,7 +32,7 @@ import { useAuthStore } from '../../store/auth.store';
 import type { ProfileStackParamList } from '../../navigation/types';
 import { colors } from '../../theme';
 import { styles } from './styles';
-const SUBSCRIPTION_BG = require('../../assets/images/subscription-bg.png');
+const SUBSCRIPTION_BG = require('../../assets/images/subscription.jpg');
 
 // ─── Feature icons (exact paths from Figma) ───────────────────────────────────
 
@@ -96,10 +95,12 @@ const PlusGemIcon: React.FC = () => (
       </SvgLinearGradient>
     </Defs>
     <Circle cx={13} cy={13} r={13} fill="url(#pgGrad)" />
-    <Path
-      d="M13 6.5L14.2 10L18 10.3L15.2 12.7L16.2 16.5L13 14.5L9.8 16.5L10.8 12.7L8 10.3L11.8 10L13 6.5Z"
-      fill="white"
-    />
+    <G transform="translate(6, 6)">
+      <Path
+        d="M7 0L7.5387 2.39157C7.9957 4.42015 9.5798 6.00431 11.6084 6.46127L14 7L11.6084 7.53873C9.5798 7.99569 7.9957 9.5798 7.5387 11.6084L7 14L6.4613 11.6084C6.0043 9.5798 4.4202 7.99569 2.3916 7.53873L0 7L2.3916 6.46127C4.4201 6.00431 6.0043 4.42015 6.4613 2.39158L7 0Z"
+        fill="white"
+      />
+    </G>
   </Svg>
 );
 
@@ -157,7 +158,6 @@ export const SubscriptionScreen: React.FC = () => {
     [buySubscription, user?.id],
   );
 
-  const { width, height } = useWindowDimensions();
   const storeLabel = Platform.OS === 'ios' ? 'App Store' : 'Play Store';
 
   const monthlyProduct =
@@ -220,7 +220,7 @@ export const SubscriptionScreen: React.FC = () => {
 
           {/* Logo row */}
           <View style={styles.logoRow}>
-            <LogoWordmark width={118} height={57} />
+            <LogoWordmark width={118} height={56} />
             <View style={styles.plusBadge}>
               <MaskedView
                 maskElement={<Text style={styles.plusText}>plus</Text>}

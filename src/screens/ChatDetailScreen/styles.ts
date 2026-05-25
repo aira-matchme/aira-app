@@ -3148,4 +3148,23 @@ borderRadius: 16,
     letterSpacing: 0.28,
     color: colors.neutral[700],
   },
+  subscriptionGateBanner: {
+    paddingHorizontal: H_PADDING,
+    paddingTop: 12,
+  },
+  subscriptionGateGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 999,
+    gap: 8,
+  },
+  subscriptionGateText: {
+    ...typography.bodyMedium,
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.white,
+  },
 });

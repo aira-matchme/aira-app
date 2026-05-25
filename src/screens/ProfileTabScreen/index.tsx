@@ -20,6 +20,7 @@ import type { ProfileStackParamList } from '../../navigation/types';
 import { ProfileScreenGradient } from '../../components/ProfileScreenGradient';
 import { ProfileProgressRing } from '../../components/ProfileProgressRing';
 import { useAuthStore } from '../../store/auth.store';
+import { useSubscriptionStore } from '../../store/subscription.store';
 import { colors, spacing } from '../../theme';
 import {
   ProfileReferralIcon,
@@ -116,6 +117,7 @@ export const ProfileTabScreen = () => {
   const navigation = useNavigation<ProfileMainNav>();
   const insets = useSafeAreaInsets();
   const { user, logout, setUser } = useAuthStore();
+  const syncFromProfile = useSubscriptionStore((s) => s.syncFromProfile);
   const [profileImage, setProfileImage] = useState<ImageSourcePropType | null>(null);
   const [galleryCount, setGalleryCount] = useState(0);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
@@ -130,8 +132,8 @@ export const ProfileTabScreen = () => {
         try {
           const profile = await getProfileApi();
           if (profile?.data) {
-            // Keep auth store in sync with latest profile
             setUser(profile.data as any);
+            syncFromProfile(profile.data as Record<string, unknown>);
 
             const galleryImages = (profile.data as any)?.galleryImages;
             const filledCount = Array.isArray(galleryImages)

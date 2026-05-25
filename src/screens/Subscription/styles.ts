@@ -1,5 +1,12 @@
-import { StyleSheet } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
+
+// Scale vertical spacing proportionally to screen height.
+// Design baseline is 812 px (iPhone X / 11). Clamped to ±25 % of the
+// design value so nothing looks extreme on very tall or very short screens.
+const { height: SCREEN_H } = Dimensions.get('window');
+const vs = (size: number) =>
+  Math.round(Math.max(size * 0.75, Math.min(size * 1.25, (SCREEN_H / 812) * size)));
 
 export const styles = StyleSheet.create({
   // ── Root ───────────────────────────────────────────────────────────────────
@@ -83,7 +90,6 @@ export const styles = StyleSheet.create({
     paddingRight: 2,
     paddingVertical: 2,
     borderRadius: 100,
-    marginBottom: 6,
   },
   plusText: {
     fontSize: 16,
@@ -107,7 +113,7 @@ export const styles = StyleSheet.create({
   // ── Feature card ───────────────────────────────────────────────────────────
   featureCardWrapper: {
     flex: 1,
-    marginTop: 20,
+    marginTop: vs(20),
     borderRadius: 40,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
@@ -115,9 +121,9 @@ export const styles = StyleSheet.create({
   },
   featureCard: {
     flex: 1,
-    paddingVertical: 32,
+    paddingVertical: vs(32),
     paddingHorizontal: 24,
-    gap: 20,
+    gap: vs(20),
     justifyContent: 'center',
   },
   featureRow: {

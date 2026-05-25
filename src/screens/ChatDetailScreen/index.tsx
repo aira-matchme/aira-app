@@ -81,6 +81,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { setChatRequestActionApi, blockUserApi, reportUserApi, getChatMessagesApi, mapApiMessageToChatMessage, markChatSeenApi, sendMessageApi, uploadChatFileApi, postAIMessagesApi, getAiSuggestionsApi, deleteMessageApi, extractChatMessageFromSendResponse, type ChatMessageApiItem } from '../../modules/chat/api';
 import { useAuthStore } from '../../store/auth.store';
+import { useSubscriptionStore } from '../../store/subscription.store';
 import socketService, {
   type MessageReceivePayload,
   type MessageDeletePayload,
@@ -180,6 +181,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const bottomSafeInset = insets.bottom;
   const imageBubbleSize = Math.max(160, Math.min(Math.round(windowWidth * 0.75), 320));
   const currentUserId = useAuthStore((s) => s.user?.id);
+  const isSubscribed = useSubscriptionStore((s) => s.isSubscribed);
   const [chatId, setChatId] = useState<string | null>(initialChatId ?? null);
   const [name, setName] = useState<string>(initialName ?? 'Chat');
   const [avatar, setAvatar] = useState<typeof initialAvatar | undefined>(initialAvatar);
@@ -1559,7 +1561,18 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
   };
 
+  const navigateToSubscription = useCallback(() => {
+    const rootNav = navigation.getParent?.()?.getParent?.() ?? navigation.getParent?.();
+    if (rootNav && typeof (rootNav as any).navigate === 'function') {
+      (rootNav as any).navigate('Profile', { screen: 'Subscription' });
+    }
+  }, [navigation]);
+
   const handleSend = async () => {
+    if (!isSubscribed) {
+      navigateToSubscription();
+      return;
+    }
     
     const trimmed = inputText.trim();
     const hasAttachments = pendingAttachments.length > 0;
@@ -4408,7 +4421,25 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         style={[styles.bottomComposerContainer, { bottom: composerBottomOffset }]}
         onLayout={handleComposerLayout}
       >
-      {voice.voiceBarVisible ? (
+      {!isSubscribed ? (
+        <TouchableOpacity
+          style={[styles.subscriptionGateBanner, { paddingBottom: 12 + bottomSafeInset }]}
+          activeOpacity={0.8}
+          onPress={navigateToSubscription}
+        >
+          <LinearGradient
+            colors={['#7B2FF2', '#C94CF8']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.subscriptionGateGradient}
+          >
+            <Text style={styles.subscriptionGateText}>
+              Subscribe to Aira+ to send messages
+            </Text>
+            <ForwardArrowIcon size={18} color={colors.white} />
+          </LinearGradient>
+        </TouchableOpacity>
+      ) : voice.voiceBarVisible ? (
         <View style={[styles.voiceBar, { paddingBottom: 12 + bottomSafeInset }]}>
           <TouchableOpacity
             style={styles.voiceBarTrash}
