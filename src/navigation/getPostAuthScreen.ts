@@ -59,8 +59,8 @@ export function getPostAuthScreen(
 
 // return 'EnableNotifications'
   // Show main app with bottom tabs; RootNavigator shows TabNavigator and initial tab is Home (Dashboard)
-  // return 'Likes';
-return 'ProfileIntro'
+  return 'Likes';
+// return 'ProfileIntro'
 // return 'ProfilePhotos';
   // return 'ReferenceImageIntro';
   // return 'FaceVerification';

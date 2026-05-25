@@ -292,7 +292,7 @@ export const ProfileTabScreen = () => {
           </View>
 
           {/* Aira Plus card — Figma 2101-28021 */}
-          {/* <TouchableOpacity style={styles.airaPlusCard} activeOpacity={0.95}>
+          <TouchableOpacity style={styles.airaPlusCard} activeOpacity={0.95}>
             <Image
               source={AIRA_PLUS_CARD_IMAGE}
               style={styles.airaPlusBackgroundImage}
@@ -313,7 +313,7 @@ export const ProfileTabScreen = () => {
                 <Text style={styles.airaPlusText}>
                   See more. Understand better.{'\n'}Connect smarter.
                 </Text>
-                <Pressable style={styles.airaPlusButton} onPress={() => {}}>
+                <Pressable style={styles.airaPlusButton} onPress={() => navigation.navigate('Subscription')}>
                   <LinearGradient
                     colors={[colors.secondary.lavender, colors.primary.purple] as [string, string]}
                     start={{ x: 0.15, y: 0 }}
@@ -324,7 +324,7 @@ export const ProfileTabScreen = () => {
                 </Pressable>
               </View>
             </View>
-          </TouchableOpacity> */}
+          </TouchableOpacity>
 
           {/* Menu list */}
           <View style={styles.menuList}>

@@ -811,14 +811,11 @@ export const DashboardScreen = () => {
                         </Text>
                       </View>
                       <View style={styles.progressTrack}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            {
-                              width: `${match.overallPercent}%`,
-                              backgroundColor: colors.primary.purple,
-                            },
-                          ]}
+                        <LinearGradient
+                          colors={[colors.primary.purple, colors.secondary.lavender]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={[styles.progressFill, { width: `${match.overallPercent}%` }]}
                         />
                       </View>
                       <View style={styles.chipsRow}>
@@ -896,7 +893,7 @@ export const DashboardScreen = () => {
                               backgroundColor: match.isLiked
                                 ? 'rgba(0,0,0,0.2)'
                                 : 'white',
-                              borderRadius: 24,
+                              borderRadius: 32,
                             },
                           ]}
                         />
