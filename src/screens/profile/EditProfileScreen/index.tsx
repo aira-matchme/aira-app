@@ -666,7 +666,7 @@ export const EditProfileScreen: React.FC = () => {
           if (isRequestingPermission) return;
           handleAllowCameraPermission().catch(() => {});
         }}
-        snapPoints={[336]}
+        snapPoints={[330]}
         showDragHandle={true}
         showCloseButton={false}
         enablePanDownToClose={false}
@@ -715,7 +715,7 @@ export const EditProfileScreen: React.FC = () => {
           if (isRequestingPermission) return;
           handleAllowGalleryPermission().catch(() => {});
         }}
-        snapPoints={[336]}
+        snapPoints={[330]}
         showDragHandle={true}
         showCloseButton={false}
         enablePanDownToClose={false}

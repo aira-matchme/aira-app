@@ -4804,7 +4804,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           if (isRequestingPermission) return;
           handleAllowCameraPermission().catch(() => {});
         }}
-        snapPoints={[336]}
+        snapPoints={[330]}
         showDragHandle
         showCloseButton={false}
         enablePanDownToClose={false}
@@ -4853,7 +4853,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           if (isRequestingPermission) return;
           handleAllowGalleryPermission().catch(() => {});
         }}
-        snapPoints={[336]}
+        snapPoints={[330]}
         showDragHandle
         showCloseButton={false}
         enablePanDownToClose={false}
@@ -4902,7 +4902,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           if (isRequestingPermission) return;
           handleAllowMicrophonePermission().catch(() => {});
         }}
-        snapPoints={[336]}
+        snapPoints={[330]}
         showDragHandle
         showCloseButton={false}
         enablePanDownToClose={false}

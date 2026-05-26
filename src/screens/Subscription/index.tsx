@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   ImageBackground,
   StyleSheet,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -139,6 +139,8 @@ export const SubscriptionScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const insets = useSafeAreaInsets();
+  const [stickyHeight, setStickyHeight] = useState(0);
 
   const {
     subscriptions,
@@ -147,7 +149,6 @@ export const SubscriptionScreen: React.FC = () => {
     isPremium,
     error,
     buySubscription,
-    restorePurchases,
     reloadProducts,
   } = useIAP({ enabled: isAuthenticated });
 
@@ -203,9 +204,8 @@ export const SubscriptionScreen: React.FC = () => {
         resizeMode="cover"
       />
 
-
-
-      <SafeAreaView style={styles.safeArea}>
+      {/* SafeAreaView handles top only; bottom is handled by sticky section */}
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         {/* ── Header ── */}
         <View style={styles.header}>
           <Text style={styles.upgradeToText}>Upgrade to</Text>
@@ -242,41 +242,36 @@ export const SubscriptionScreen: React.FC = () => {
           </Text>
         </View>
 
-        {/* ── Feature card ── */}
-        <View style={styles.featureCardWrapper}>
-          <LinearGradient
-            colors={['rgba(17,4,47,0.45)', 'rgba(54,13,149,0.35)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={styles.featureCard}
-          >
-            {FEATURES.map((feature) => (
-              <View key={feature.key} style={styles.featureRow}>
-                <View style={styles.featureIconContainer}>
-                  {feature.icon}
-                </View>
-                <View style={styles.featureTextContainer}>
-                  <Text style={styles.featureTitle}>{feature.title}</Text>
-                  <Text style={styles.featureDescription}>{feature.description}</Text>
-                </View>
+        {/* ── Feature list — no card, directly on background ── */}
+        <View style={[styles.featuresList, { marginBottom: stickyHeight }]}>
+          {FEATURES.map((feature) => (
+            <View key={feature.key} style={styles.featureRow}>
+              <View style={styles.featureIconContainer}>
+                {feature.icon}
               </View>
-            ))}
-          </LinearGradient>
+              <View style={styles.featureTextContainer}>
+                <Text style={styles.featureTitle}>{feature.title}</Text>
+                <Text style={styles.featureDescription}>{feature.description}</Text>
+              </View>
+            </View>
+          ))}
         </View>
+      </SafeAreaView>
 
-        {/* ── Bottom section ── */}
-        <View style={styles.bottomSection}>
+      {/* ── Sticky bottom section — absolute at screen bottom ── */}
+      <View
+        style={styles.stickyBottomOuter}
+        onLayout={(e) => setStickyHeight(e.nativeEvent.layout.height)}
+      >
+        {/* Gradient card with rounded top corners */}
+        <LinearGradient
+          colors={['rgba(17,4,47,0.5)', 'rgba(54,13,149,0.5)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={[styles.bottomCard, { paddingBottom: 32 + insets.bottom }]}
+        >
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-          {/* Price */}
-          <View style={styles.priceRow}>
-            <Text style={styles.priceAmount}>
-              {monthlyProduct?.displayPrice ?? '₹199'}
-            </Text>
-            <Text style={styles.pricePeriod}>{' /month'}</Text>
-          </View>
-
-          {/* CTA */}
           <TouchableOpacity
             style={[styles.ctaButton, (isLoading || !monthlyProduct) && styles.ctaButtonDisabled]}
             onPress={() => monthlyProduct && handleBuy(monthlyProduct.id)}
@@ -284,7 +279,7 @@ export const SubscriptionScreen: React.FC = () => {
             activeOpacity={0.9}
           >
             {isLoading ? (
-              <ActivityIndicator size="small" color={colors.black} />
+              <ActivityIndicator size="small" color={colors.primary.purple} />
             ) : (
               <Text style={styles.ctaButtonText}>Unlock Aira Plus</Text>
             )}
@@ -304,8 +299,18 @@ export const SubscriptionScreen: React.FC = () => {
             Subscription auto-renews monthly. Cancel anytime from your{' '}
             {storeLabel} or App Store settings.
           </Text>
+        </LinearGradient>
+
+        {/* Price pill — floats 32px above the card */}
+        <View style={styles.pricePillAnchor}>
+          <View style={styles.pricePill}>
+            <Text style={[styles.priceAmount, { marginRight: 6 }]}>
+              {monthlyProduct?.displayPrice ?? '₹199'}
+            </Text>
+            <Text style={styles.pricePeriod}>{'/month'}</Text>
+          </View>
         </View>
-      </SafeAreaView>
+      </View>
     </View>
   );
 };

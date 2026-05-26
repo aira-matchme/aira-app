@@ -115,7 +115,7 @@ export const styles = StyleSheet.create({
   },
   airaPlusOverlayTint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   airaPlusOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -128,9 +128,29 @@ export const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     gap: 8,
   },
-  airaPlusLogo: {
-    width: 66,
-    height: 48,
+  airaPlusLogoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
+  },
+  airaPlusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.white,
+    paddingLeft: 10,
+    paddingRight: 2,
+    paddingVertical: 2,
+    borderRadius: 100,
+  },
+  airaPlusPlusText: {
+    fontSize: 16,
+    fontFamily: typography.fontFamily.semibold,
+    lineHeight: 22,
+    letterSpacing: -0.32,
+  },
+  airaPlusPlusTextHidden: {
+    opacity: 0,
   },
   airaPlusTextBlock: {
     flexDirection: 'column',
@@ -148,12 +168,11 @@ export const styles = StyleSheet.create({
     lineHeight: 20,
   },
   airaPlusButton: {
-    height: 48,
-    paddingHorizontal: 32,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
     borderRadius: 100,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
@@ -165,7 +184,7 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: colors.white,
-    letterSpacing: 0.32,
+    letterSpacing: 0.28,
   },
   menuList: {
     gap: 8,

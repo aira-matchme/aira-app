@@ -1,21 +1,13 @@
-import { Dimensions, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
-
-// Scale vertical spacing proportionally to screen height.
-// Design baseline is 812 px (iPhone X / 11). Clamped to ±25 % of the
-// design value so nothing looks extreme on very tall or very short screens.
-const { height: SCREEN_H } = Dimensions.get('window');
-const vs = (size: number) =>
-  Math.round(Math.max(size * 0.75, Math.min(size * 1.25, (SCREEN_H / 812) * size)));
 
 export const styles = StyleSheet.create({
   // ── Root ───────────────────────────────────────────────────────────────────
   wrapper: {
     flex: 1,
-    backgroundColor: '#22075F', // Violet/800 — exact Figma bg
+    backgroundColor: '#22075F',
   },
 
-  // Exact Figma gradient background SVG (Gradient BG.svg)
   bgSvg: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -60,8 +52,8 @@ export const styles = StyleSheet.create({
 
   // ── Header ─────────────────────────────────────────────────────────────────
   header: {
-    paddingHorizontal: 16,
-    paddingTop: spacing.md,
+    paddingHorizontal: 24,
+    paddingTop: 24,
   },
   upgradeToText: {
     fontSize: 16,
@@ -71,8 +63,8 @@ export const styles = StyleSheet.create({
   },
   closeButton: {
     position: 'absolute',
-    top: spacing.md,
-    right: 16,
+    top: 24,
+    right: 24,
     zIndex: 10,
   },
   logoRow: {
@@ -104,40 +96,30 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: typography.fontFamily.medium,
     color: colors.white,
-    lineHeight: 22,
+    lineHeight: 16,
     letterSpacing: 0.32,
-    marginTop: 20,
-    maxWidth: 210,
+    marginTop: 16,
+    maxWidth: 176,
   },
 
-  // ── Feature card ───────────────────────────────────────────────────────────
-  featureCardWrapper: {
+  // ── Feature list ───────────────────────────────────────────────────────────
+  featuresList: {
     flex: 1,
-    marginTop: vs(20),
-    borderRadius: 40,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    overflow: 'hidden',
-  },
-  featureCard: {
-    flex: 1,
-    paddingVertical: vs(32),
+    marginTop: 24,
     paddingHorizontal: 24,
-    gap: vs(20),
-    justifyContent: 'center',
+    gap: 20,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: 12,
   },
   featureIconContainer: {
-    width: 32,
-    height: 32,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
@@ -155,24 +137,53 @@ export const styles = StyleSheet.create({
   },
   featureDescription: {
     fontSize: 14,
-    fontFamily: typography.fontFamily.medium,
-    color: colors.neutral[200],
-    lineHeight: 20,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.neutral[300],
+    lineHeight: 14,
     letterSpacing: 0.28,
   },
 
-  // ── Bottom section ─────────────────────────────────────────────────────────
-  bottomSection: {
-    paddingHorizontal: 16,
-    paddingBottom: spacing.md,
+  // ── Sticky bottom section ──────────────────────────────────────────────────
+  stickyBottomOuter: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    overflow: 'visible',
+  },
+  bottomCard: {
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    overflow: 'hidden',
+    paddingTop: 56,
+    paddingLeft: 24,
+    paddingRight: 24,
+    alignItems: 'center',
+    gap: 20,
+  },
+  // Price pill floats 32px above the card
+  pricePillAnchor: {
+    position: 'absolute',
+    top: -32,
+    left: 0,
+    right: 0,
     alignItems: 'center',
   },
-  priceRow: {
+  pricePill: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 5,
-    marginTop: 12,
-    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 24,
+    paddingRight: 24,
+    paddingTop: 12,
+    paddingBottom: 12,
+    borderRadius: 100,
+    backgroundColor: 'rgba(17,4,47,0.35)',
+    shadowColor: '#ffffff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 35,
+    shadowOpacity: 0.15,
+    elevation: 8,
   },
   priceAmount: {
     fontSize: 36,
@@ -181,12 +192,11 @@ export const styles = StyleSheet.create({
     lineHeight: 44,
   },
   pricePeriod: {
-    fontSize: 24,
-    fontFamily: typography.fontFamily.medium,
+    fontSize: 20,
+    fontFamily: typography.fontFamily.regular,
     color: colors.neutral[200],
-    lineHeight: 32,
-    letterSpacing: -0.24,
-    marginBottom: 4,
+    lineHeight: 28,
+    letterSpacing: -0.2,
   },
   ctaButton: {
     width: '100%',
@@ -195,6 +205,7 @@ export const styles = StyleSheet.create({
     borderRadius: 100,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   ctaButtonDisabled: {
     opacity: 0.5,
@@ -202,7 +213,7 @@ export const styles = StyleSheet.create({
   ctaButtonText: {
     fontSize: 16,
     fontFamily: typography.fontFamily.medium,
-    color: colors.black,
+    color: colors.primary.purple,
     letterSpacing: 0.32,
     lineHeight: 22,
   },
@@ -215,12 +226,6 @@ export const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.medium,
     color: 'rgba(255,255,255,0.5)',
   },
-  restoreText: {
-    fontSize: 14,
-    fontFamily: typography.fontFamily.medium,
-    color: 'rgba(255,255,255,0.5)',
-    marginTop: 10,
-  },
   legalText: {
     fontSize: 12,
     fontFamily: typography.fontFamily.regular,
@@ -228,7 +233,6 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     letterSpacing: 0.48,
-    marginTop: 10,
     maxWidth: 324,
   },
   errorText: {
@@ -236,7 +240,6 @@ export const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.regular,
     color: 'rgba(255,120,120,0.9)',
     textAlign: 'center',
-    marginTop: 8,
     lineHeight: 18,
   },
 });
