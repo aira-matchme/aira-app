@@ -36,5 +36,14 @@ target 'Aira' do
       config[:reactNativePath],
       :mac_catalyst_enabled => false
     )
+
+    # Xcode 26+ ships a stricter Clang that breaks fmt 11.0.2 (bundled with RN 0.83).
+    installer.pods_project.targets.each do |target|
+      if target.name == 'fmt'
+        target.build_configurations.each do |build_config|
+          build_config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+        end
+      end
+    end
   end
 end

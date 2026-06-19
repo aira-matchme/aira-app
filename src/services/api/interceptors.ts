@@ -3,6 +3,7 @@ import { useAuthStore } from '../../store/auth.store';
 import { useApiErrorStore } from '../../store/apiError.store';
 import { useApiTimeoutStore } from '../../store/apiTimeout.store';
 import { env } from '../../config/env';
+import { isPremiumRequiredError } from './premiumRequired';
 
 const isTimeoutError = (error: { code?: string; message?: string }) =>
   error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout');
@@ -110,6 +111,11 @@ export const setupInterceptors = () => {
       // Offline / transport failure: Figma "no internet" sheet (not server error body)
       if (isNetworkError(error)) {
         useApiErrorStore.getState().showError(undefined, { variant: 'network' });
+        return Promise.reject(error);
+      }
+
+      // Premium gate — screen handles redirect to Subscription
+      if (isPremiumRequiredError(error)) {
         return Promise.reject(error);
       }
 

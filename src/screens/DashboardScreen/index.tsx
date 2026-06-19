@@ -45,6 +45,7 @@ import { endpoints } from '../../services/api/endpoints';
 import { STRINGS } from '../../constants/strings';
 import { useAuthStore } from '../../store/auth.store';
 import { useSubscriptionStore } from '../../store/subscription.store';
+import { navigateToSubscription } from '../../navigation/navigateToSubscription';
 import { markAppTourCompleted } from '../../services/appTour/markAppTourCompleted';
 import { showErrorToast, showSuccessToast } from '../../services/toast.srvice';
 
@@ -556,6 +557,10 @@ export const DashboardScreen = () => {
   const emptyState = matches.length === 0;
 
   const handleKnowMore = (match: MatchItem) => {
+    if (!isSubscribed) {
+      navigateToSubscription(navigation);
+      return;
+    }
     navigation.navigate('MatchDetails', { userId: match.id });
   };
 

@@ -1,18 +1,60 @@
 import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
+import {
+  SUBSCRIPTION_BOTTOM_PANEL_GAP,
+  SUBSCRIPTION_BOTTOM_PANEL_HEIGHT,
+  SUBSCRIPTION_BOTTOM_PANEL_PAD_BOTTOM,
+  SUBSCRIPTION_BOTTOM_PANEL_PAD_H,
+  SUBSCRIPTION_BOTTOM_PANEL_PAD_TOP,
+  SUBSCRIPTION_CLOSE_RIGHT,
+  SUBSCRIPTION_CLOSE_SIZE,
+  SUBSCRIPTION_CTA_HEIGHT,
+  SUBSCRIPTION_FEATURE_ICON_BORDER,
+  SUBSCRIPTION_FEATURE_ICON_RADIUS,
+  SUBSCRIPTION_FEATURE_ICON_SIZE,
+  SUBSCRIPTION_FEATURE_ROW_GAP,
+  SUBSCRIPTION_FEATURE_TEXT_GAP,
+  SUBSCRIPTION_FEATURES_GAP,
+  SUBSCRIPTION_FEATURES_PADDING_H,
+  SUBSCRIPTION_FEATURES_TOP_GAP,
+  SUBSCRIPTION_GRADIENT_END,
+  SUBSCRIPTION_GRADIENT_START,
+  SUBSCRIPTION_HEADER_GAP,
+  SUBSCRIPTION_HEADER_LEFT,
+  SUBSCRIPTION_HEADER_TOP,
+  SUBSCRIPTION_LEGAL_MAX_WIDTH,
+  SUBSCRIPTION_LOGO_BLOCK_GAP,
+  SUBSCRIPTION_LOGO_ROW_GAP,
+  SUBSCRIPTION_PLUS_INNER_GAP,
+  SUBSCRIPTION_PLUS_PAD_LEFT,
+  SUBSCRIPTION_PLUS_PAD_RIGHT,
+  SUBSCRIPTION_PLUS_PAD_V,
+  SUBSCRIPTION_PRICE_PILL_GAP,
+  SUBSCRIPTION_PRICE_PILL_HEIGHT,
+  SUBSCRIPTION_PRICE_PILL_OVERLAP,
+  SUBSCRIPTION_PRICE_PILL_PAD_H,
+  SUBSCRIPTION_PRICE_PILL_PAD_V,
+  SUBSCRIPTION_PRICE_PILL_WIDTH,
+  SUBSCRIPTION_SUBTITLE_MAX_WIDTH,
+} from './layout';
 
 export const styles = StyleSheet.create({
-  // ── Root ───────────────────────────────────────────────────────────────────
   wrapper: {
     flex: 1,
-    backgroundColor: '#22075F',
+    backgroundColor: colors.primary[800],
+  },
+  safeArea: {
+    flex: 1,
+  },
+  canvas: {
+    flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  main: {
+    flex: 1,
   },
 
-  bgSvg: {
-    ...StyleSheet.absoluteFillObject,
-  },
-
-  // ── Shared states ──────────────────────────────────────────────────────────
   center: {
     flex: 1,
     justifyContent: 'center',
@@ -45,15 +87,10 @@ export const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // ── Layout ─────────────────────────────────────────────────────────────────
-  safeArea: {
-    flex: 1,
-  },
-
-  // ── Header ─────────────────────────────────────────────────────────────────
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingHorizontal: SUBSCRIPTION_HEADER_LEFT,
+    paddingTop: SUBSCRIPTION_HEADER_TOP,
+    gap: SUBSCRIPTION_HEADER_GAP,
   },
   upgradeToText: {
     fontSize: 16,
@@ -63,24 +100,30 @@ export const styles = StyleSheet.create({
   },
   closeButton: {
     position: 'absolute',
-    top: 24,
-    right: 24,
+    top: SUBSCRIPTION_HEADER_TOP,
+    right: SUBSCRIPTION_CLOSE_RIGHT,
     zIndex: 10,
+    width: SUBSCRIPTION_CLOSE_SIZE,
+    height: SUBSCRIPTION_CLOSE_SIZE,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoBlock: {
+    gap: SUBSCRIPTION_LOGO_BLOCK_GAP,
   },
   logoRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 10,
-    marginTop: 8,
+    gap: SUBSCRIPTION_LOGO_ROW_GAP,
   },
   plusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: SUBSCRIPTION_PLUS_INNER_GAP,
     backgroundColor: colors.white,
-    paddingLeft: 10,
-    paddingRight: 2,
-    paddingVertical: 2,
+    paddingLeft: SUBSCRIPTION_PLUS_PAD_LEFT,
+    paddingRight: SUBSCRIPTION_PLUS_PAD_RIGHT,
+    paddingVertical: SUBSCRIPTION_PLUS_PAD_V,
     borderRadius: 100,
   },
   plusText: {
@@ -98,35 +141,32 @@ export const styles = StyleSheet.create({
     color: colors.white,
     lineHeight: 16,
     letterSpacing: 0.32,
-    marginTop: 16,
-    maxWidth: 176,
+    maxWidth: SUBSCRIPTION_SUBTITLE_MAX_WIDTH,
   },
 
-  // ── Feature list ───────────────────────────────────────────────────────────
   featuresList: {
-    flex: 1,
-    marginTop: 24,
-    paddingHorizontal: 24,
-    gap: 20,
+    paddingHorizontal: SUBSCRIPTION_FEATURES_PADDING_H,
+    marginTop: SUBSCRIPTION_FEATURES_TOP_GAP,
+    gap: SUBSCRIPTION_FEATURES_GAP,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: SUBSCRIPTION_FEATURE_ROW_GAP,
   },
   featureIconContainer: {
-    width: 38,
-    height: 38,
-    borderWidth: 1.2,
+    width: SUBSCRIPTION_FEATURE_ICON_SIZE,
+    height: SUBSCRIPTION_FEATURE_ICON_SIZE,
+    borderWidth: SUBSCRIPTION_FEATURE_ICON_BORDER,
     borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 14,
+    borderRadius: SUBSCRIPTION_FEATURE_ICON_RADIUS,
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
   },
   featureTextContainer: {
     flex: 1,
-    gap: 6,
+    gap: SUBSCRIPTION_FEATURE_TEXT_GAP,
   },
   featureTitle: {
     fontSize: 16,
@@ -143,53 +183,66 @@ export const styles = StyleSheet.create({
     letterSpacing: 0.28,
   },
 
-  // ── Sticky bottom section ──────────────────────────────────────────────────
-  stickyBottomOuter: {
+  purchaseWrap: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
+    bottom: 0,
     overflow: 'visible',
   },
-  bottomCard: {
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    overflow: 'hidden',
-    paddingTop: 56,
-    paddingLeft: 24,
-    paddingRight: 24,
-    alignItems: 'center',
-    gap: 20,
+  bottomPanelWrap: {
+    position: 'relative',
+    overflow: 'visible',
   },
-  // Price pill floats 32px above the card
-  pricePillAnchor: {
+  bottomPanel: {
+    backgroundColor: 'transparent',
+    minHeight: SUBSCRIPTION_BOTTOM_PANEL_HEIGHT,
+    paddingTop: SUBSCRIPTION_BOTTOM_PANEL_PAD_TOP,
+    paddingHorizontal: SUBSCRIPTION_BOTTOM_PANEL_PAD_H,
+    paddingBottom: SUBSCRIPTION_BOTTOM_PANEL_PAD_BOTTOM,
+    gap: SUBSCRIPTION_BOTTOM_PANEL_GAP,
+    alignItems: 'center',
+  },
+  pricePillOuter: {
     position: 'absolute',
-    top: -32,
+    top: -SUBSCRIPTION_PRICE_PILL_OVERLAP,
     left: 0,
     right: 0,
     alignItems: 'center',
+    zIndex: 2,
+    paddingHorizontal: SUBSCRIPTION_BOTTOM_PANEL_PAD_H,
   },
-  pricePill: {
+  pricePillShell: {
+    position: 'relative',
+    borderRadius: 100,
+    overflow: 'hidden',
+    minWidth: SUBSCRIPTION_PRICE_PILL_WIDTH,
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 17.5,
+    elevation: 8,
+  },
+  pricePillUnderlay: {
+    backgroundColor: colors.primary[900],
+  },
+  pricePillContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingLeft: 24,
-    paddingRight: 24,
-    paddingTop: 12,
-    paddingBottom: 12,
-    borderRadius: 100,
-    backgroundColor: 'rgba(17,4,47,0.35)',
-    shadowColor: '#ffffff',
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 35,
-    shadowOpacity: 0.15,
-    elevation: 8,
+    gap: SUBSCRIPTION_PRICE_PILL_GAP,
+    minHeight: SUBSCRIPTION_PRICE_PILL_HEIGHT,
+    paddingHorizontal: SUBSCRIPTION_PRICE_PILL_PAD_H,
+    paddingVertical: SUBSCRIPTION_PRICE_PILL_PAD_V,
   },
   priceAmount: {
-    fontSize: 36,
     fontFamily: typography.fontFamily.semibold,
     color: colors.white,
-    lineHeight: 44,
+    includeFontPadding: false,
+    flexShrink: 0,
   },
   pricePeriod: {
     fontSize: 20,
@@ -197,15 +250,23 @@ export const styles = StyleSheet.create({
     color: colors.neutral[200],
     lineHeight: 28,
     letterSpacing: -0.2,
+    includeFontPadding: false,
+    flexShrink: 0,
+    paddingTop: 6,
   },
   ctaButton: {
+    alignSelf: 'stretch',
     width: '100%',
-    height: 54,
+    height: SUBSCRIPTION_CTA_HEIGHT,
     backgroundColor: colors.white,
     borderRadius: 100,
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   ctaButtonDisabled: {
     opacity: 0.5,
@@ -213,12 +274,11 @@ export const styles = StyleSheet.create({
   ctaButtonText: {
     fontSize: 16,
     fontFamily: typography.fontFamily.medium,
-    color: colors.primary.purple,
+    color: SUBSCRIPTION_GRADIENT_START,
     letterSpacing: 0.32,
     lineHeight: 22,
   },
   retryButton: {
-    marginTop: 8,
     paddingVertical: 4,
   },
   retryText: {
@@ -233,7 +293,8 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     letterSpacing: 0.48,
-    maxWidth: 324,
+    maxWidth: SUBSCRIPTION_LEGAL_MAX_WIDTH,
+    alignSelf: 'center',
   },
   errorText: {
     fontSize: 13,
@@ -241,5 +302,6 @@ export const styles = StyleSheet.create({
     color: 'rgba(255,120,120,0.9)',
     textAlign: 'center',
     lineHeight: 18,
+    alignSelf: 'stretch',
   },
 });

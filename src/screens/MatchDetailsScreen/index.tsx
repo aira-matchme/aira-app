@@ -48,6 +48,8 @@ import { EducationEssentialIcon } from '../../assets/icons/match/EducationEssent
 import { InsightsTabIcon } from '../../assets/icons/match/InsightsTabIcon';
 import { InterestChipCheckIcon } from '../../assets/icons/common/InterestChipCheckIcon';
 import { showErrorToast, showSuccessToast } from '../../services/toast.srvice';
+import { isPremiumRequiredError } from '../../services/api/premiumRequired';
+import { navigateToSubscription } from '../../navigation/navigateToSubscription';
 
 type MatchDetailsRoute = RouteProp<RootStackParamList, 'MatchDetails'>;
 
@@ -455,7 +457,12 @@ export const MatchDetailsScreen: React.FC = () => {
       const likedValue =
         nextDetails?.isLiked ?? nextDetails?.liked ?? nextDetails?.match?.isLiked ?? false;
       setIsLiked(Boolean(likedValue));
-    } catch {
+    } catch (error) {
+      if (isPremiumRequiredError(error)) {
+        navigation.goBack();
+        navigateToSubscription(navigation);
+        return;
+      }
       setDetails(null);
       setIsLiked(false);
     } finally {
