@@ -54,13 +54,13 @@ function getInitials(name: string): string {
   return trimmed.charAt(0).toUpperCase();
 }
 
-const TAB_BAR_VISIBLE_HEIGHT = 56 + 24;
+import { useTabBarOccupiedHeight } from '../../navigation/tabBarLayout';
 const PAGE_SIZE = 20;
 
 export const ChatScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<ChatStackParamList, 'ChatList'>>();
-  const listBottomPadding = TAB_BAR_VISIBLE_HEIGHT + insets.bottom;
+  const listBottomPadding = useTabBarOccupiedHeight();
 
   type ActiveTab = 'chats' | 'requests';
   const [activeTab, setActiveTab] = useState<ActiveTab>('chats');

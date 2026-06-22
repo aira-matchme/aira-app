@@ -111,7 +111,7 @@ function navigateToMatchDetails(
 
 const PAGE_SIZE = 15;
 /** Same bottom inset as ChatScreen list (tab bar + safe area). */
-const TAB_BAR_VISIBLE_HEIGHT = 56 + 24;
+import { useTabBarOccupiedHeight } from '../../navigation/tabBarLayout';
 
 function firstNonEmptyString(...values: Array<unknown>): string | undefined {
   for (const value of values) {
@@ -301,7 +301,7 @@ function formatNotificationTime(iso: string | null): string {
 export const NotificationsScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NotificationsNav>();
-  const listBottomPadding = TAB_BAR_VISIBLE_HEIGHT + insets.bottom;
+  const listBottomPadding = useTabBarOccupiedHeight();
   const [filter, setFilter] = useState<FilterTab>('all');
   const [rows, setRows] = useState<NotificationRow[]>([]);
   const [meta, setMeta] = useState<NotificationsListMeta | null>(null);

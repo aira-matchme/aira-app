@@ -40,6 +40,7 @@ import { styles } from './styles';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { postAIMessagesApi, blockUserApi, reportUserApi } from '../../modules/chat/api';
 import { useTabWalkthrough } from '../../navigation/TabWalkthroughContext';
+import { useTabBarOccupiedHeight } from '../../navigation/tabBarLayout';
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
 import { STRINGS } from '../../constants/strings';
@@ -125,6 +126,7 @@ type CursorPageResult = {
 
 export const DashboardScreen = () => {
   const insets = useSafeAreaInsets();
+  const tabBarOccupiedHeight = useTabBarOccupiedHeight();
   const navigation = useNavigation<any>();
   const isAppTourDone = useAuthStore((s) => s.user?.isAppTourDone);
   const isSubscribed = useSubscriptionStore((s) => s.isSubscribed);
@@ -608,7 +610,7 @@ export const DashboardScreen = () => {
         animationType="fade"
         onRequestClose={handleWalkthroughSkip}
       >
-        <View style={styles.walkthroughWelcomeBackdrop}>
+        <View style={[styles.walkthroughWelcomeBackdrop, { paddingBottom: tabBarOccupiedHeight }]}>
           <View style={styles.walkthroughWelcomeCard}>
             <Text style={styles.walkthroughWelcomeTitle}>
               {STRINGS.DASHBOARD_WALKTHROUGH.WELCOME_TITLE}

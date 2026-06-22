@@ -36,6 +36,13 @@ import { TabLikesIcon } from '../assets/icons/tabs/TabLikesIcon';
 import { TabProfileIcon } from '../assets/icons/tabs/TabProfileIcon';
 import { TabAICenterIcon } from '../assets/icons/tabs/TabAICenterIcon';
 import { TAB_BAR_ACTIVE_ICONS } from '../assets/icons/tabs/tabBarActiveIcons';
+import {
+  TAB_BAR_BORDER_RADIUS,
+  TAB_BAR_PADDING_TOP,
+  TAB_BAR_ICON_LABEL_GAP,
+  getTabBarBottomPadding,
+  getTabBarOccupiedHeight,
+} from './tabBarLayout';
 
 const Tab = createBottomTabNavigator<TabStackParamList>();
 
@@ -63,12 +70,8 @@ function renderTabBarPressable(props: BottomTabBarButtonProps) {
   );
 }
 
-// Figma 1758-4797: exact specs
+// Figma 2778-10903: bottom nav — 87px total height, flush to screen bottom
 const TAB_ICON_SIZE = 24;
-const TAB_BAR_HORIZONTAL_MARGIN = 4;
-const TAB_BAR_BORDER_RADIUS = 24;
-const TAB_BAR_CONTENT_HEIGHT = 56;
-const TAB_BAR_PADDING_BOTTOM = 24;
 const CENTER_BUTTON_DIAMETER = 56;
 const CENTER_BUTTON_TOP_OFFSET = -36;
 
@@ -110,15 +113,16 @@ function TabNavigatorInner() {
   const insets = useSafeAreaInsets();
   const currentUserId = useAuthStore((s) => s.user?.id);
   const tabState = useNavigationState((state) => state);
-  const bottomPadding = TAB_BAR_PADDING_BOTTOM + insets.bottom;
+  const bottomPadding = getTabBarBottomPadding(insets.bottom);
+  const tabBarOccupiedHeight = getTabBarOccupiedHeight(insets.bottom);
   const tabBarStyle: StyleProp<ViewStyle> = [
     styles.tabBar,
     {
-      height: TAB_BAR_CONTENT_HEIGHT + bottomPadding,
+      height: tabBarOccupiedHeight,
+      paddingTop: TAB_BAR_PADDING_TOP,
       paddingBottom: bottomPadding,
-      marginHorizontal: TAB_BAR_HORIZONTAL_MARGIN,
-      left: TAB_BAR_HORIZONTAL_MARGIN,
-      right: TAB_BAR_HORIZONTAL_MARGIN,
+      left: 0,
+      right: 0,
       bottom: 0,
     },
   ];
@@ -173,10 +177,13 @@ function TabNavigatorInner() {
       screenOptions={{
         headerShown: false,
         lazy: false,
+        safeAreaInsets: { bottom: 0 },
         tabBarActiveTintColor: colors.primary.purple,
         tabBarInactiveTintColor: '#949494',
         tabBarStyle,
         tabBarShowLabel: true,
+        tabBarItemStyle: styles.tabBarItem,
+        tabBarIconStyle: styles.tabBarIcon,
         tabBarLabelStyle: styles.tabBarLabel,
       }}
     >
@@ -305,29 +312,45 @@ function TabNavigatorInner() {
 
 export const TabNavigator = () => (
   <TabWalkthroughProvider>
-    <TabNavigatorInner />
+    <View style={styles.navigatorRoot}>
+      <TabNavigatorInner />
+    </View>
   </TabWalkthroughProvider>
 );
 
 const styles = StyleSheet.create({
+  navigatorRoot: {
+    flex: 1,
+    overflow: 'visible',
+  },
   tabBar: {
     backgroundColor: colors.white,
     borderTopWidth: 0,
-    paddingTop: 8,
     borderTopLeftRadius: TAB_BAR_BORDER_RADIUS,
     borderTopRightRadius: TAB_BAR_BORDER_RADIUS,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     position: 'absolute',
-    elevation: 8,
+    overflow: 'visible',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
   },
+  tabBarItem: {
+    paddingTop: 0,
+    marginTop: 0,
+    justifyContent: 'flex-start',
+  },
+  tabBarIcon: {
+    marginBottom: TAB_BAR_ICON_LABEL_GAP,
+  },
   tabBarLabel: {
     fontSize: 11,
     fontWeight: '600',
+    lineHeight: 13,
+    marginTop: 0,
+    marginBottom: 0,
   },
   centerButtonWrapper: {
     flex: 1,

@@ -23,12 +23,12 @@ type LikedProfile = {
 };
 
 // Tab bar content height + padding (match TabNavigator) so last row can scroll into view
-const TAB_BAR_VISIBLE_HEIGHT = 56 + 24;
+import { useTabBarOccupiedHeight } from '../../navigation/tabBarLayout';
 
 export const LikesScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
-  const listBottomPadding = TAB_BAR_VISIBLE_HEIGHT + insets.bottom;
+  const listBottomPadding = useTabBarOccupiedHeight();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<LikedProfile[]>([]);
 

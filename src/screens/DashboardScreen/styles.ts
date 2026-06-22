@@ -45,7 +45,6 @@ export const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
-    paddingBottom: 86,
   },
   walkthroughWelcomeCard: {
     backgroundColor: colors.white,
