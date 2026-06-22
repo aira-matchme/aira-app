@@ -4,6 +4,7 @@ import { useApiErrorStore } from '../../store/apiError.store';
 import { useApiTimeoutStore } from '../../store/apiTimeout.store';
 import { env } from '../../config/env';
 import { isPremiumRequiredError } from './premiumRequired';
+import { resolveUserFacingError } from '../../utils/resolveUserFacingError';
 
 const isTimeoutError = (error: { code?: string; message?: string }) =>
   error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout');
@@ -120,10 +121,8 @@ export const setupInterceptors = () => {
       }
 
       // Show global API error modal for other errors (not 401)
-      const message =
-        error.response?.data?.message ??
-        error.response?.data?.error ??
-        'Something went wrong. Please try again.';
+      const context = requestUrl.includes('/iap/') ? 'subscription' : 'generic';
+      const message = resolveUserFacingError(error, context);
       useApiErrorStore.getState().showError(message, { variant: 'generic' });
 
       return Promise.reject(error);

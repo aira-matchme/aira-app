@@ -7,6 +7,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { colors } from '../theme';
 import { LogoIcon } from '../assets/icons/branding/LogoIcon';
 import { useAuthStore } from '../store/auth.store';
+import { useSubscriptionStore } from '../store/subscription.store';
 import { useMe } from '../modules/auth/hooks';
 import { checkNotificationPermission } from '../config/permissions';
 import type { RootStackParamList } from '../navigation/types';
@@ -18,6 +19,7 @@ type SplashScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 export const SplashScreen: React.FC = () => {
   const navigation = useNavigation<SplashScreenNavigationProp>();
   const { accessToken, setUser, setLoading, logout, initialize, setShouldShowEnableNotifications } = useAuthStore();
+  const syncFromProfile = useSubscriptionStore((s) => s.syncFromProfile);
   const [isInitialized, setIsInitialized] = useState(false);
   const hasNavigatedRef = useRef(false); // Prevent multiple navigations using ref
   const hasToken = !!accessToken;
@@ -60,6 +62,7 @@ export const SplashScreen: React.FC = () => {
       if (hasNavigatedRef.current) return;
       hasNavigatedRef.current = true;
       setUser(data.data);
+      syncFromProfile(data.data as Record<string, unknown>);
 
       // Check notification permission - redirect to EnableNotifications if not granted
       (async () => {
@@ -80,7 +83,7 @@ export const SplashScreen: React.FC = () => {
       logout();
       setLoading(false);
     }
-  }, [isInitialized, hasToken, data, error, isFetchingProfile, setUser, setLoading, logout, setShouldShowEnableNotifications, navigation]);
+  }, [isInitialized, hasToken, data, error, isFetchingProfile, setUser, setLoading, logout, setShouldShowEnableNotifications, syncFromProfile, navigation]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>

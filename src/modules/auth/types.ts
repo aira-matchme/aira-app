@@ -86,6 +86,10 @@ export interface UserProfileResponse {
     questionnaireCompleted?: boolean;
     /** When `false`, show dashboard tab walkthrough until completed. */
     isAppTourDone?: boolean;
+    /** Source of truth for premium feature access. */
+    hasActiveSubscription?: boolean;
+    /** Premium access valid until (ISO). User may be cancelled but still active until this date. */
+    premiumUntil?: string | null;
   };
 }
 

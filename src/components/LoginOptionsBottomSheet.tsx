@@ -16,6 +16,7 @@ import type { RootStackParamList } from '../navigation/types';
 import { env } from '../config/env';
 import { useSocialLogin } from '../modules/auth/hooks';
 import { useAuthStore } from '../store/auth.store';
+import { useSubscriptionStore } from '../store/subscription.store';
 import {
   checkNotificationPermission,
 } from '../config/permissions';
@@ -44,6 +45,7 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
   const navigation = useNavigation<LoginOptionsNavigationProp>();
   const socialLoginMutation = useSocialLogin();
   const { setTokens, setUser, setShouldShowEnableNotifications } = useAuthStore();
+  const syncFromProfile = useSubscriptionStore((s) => s.syncFromProfile);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -127,6 +129,7 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
       const latestUser = (await fetchLatestProfile()) ?? authData?.user ?? null;
       if (latestUser) {
         setUser(latestUser);
+        syncFromProfile(latestUser as Record<string, unknown>);
       }
       const screen = await resolvePostLoginScreen(latestUser);
       navigation.navigate('AuthStack', { screen } as any);
@@ -182,6 +185,7 @@ export const LoginOptionsBottomSheet: React.FC<LoginOptionsBottomSheetProps> = (
         const latestUser = (await fetchLatestProfile()) ?? authData?.user ?? null;
         if (latestUser) {
           setUser(latestUser);
+          syncFromProfile(latestUser as Record<string, unknown>);
         }
         const screen = await resolvePostLoginScreen(latestUser);
         navigation.navigate('AuthStack', { screen } as any);

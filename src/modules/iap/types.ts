@@ -21,17 +21,44 @@ export interface IapSubscriptionStatus {
   status?: string;
 }
 
+export interface IapEntitlement {
+  _id: string;
+  userId: string;
+  platform: 'apple' | 'google' | string;
+  originalTransactionId?: string;
+  productId: string;
+  basePlanId?: string | null;
+  offerId?: string | null;
+  subscriptionGroupIdentifier?: string | null;
+  packageName?: string | null;
+  status: string;
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  gracePeriodEnd?: string | null;
+  autoRenewEnabled?: boolean;
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
+  userCancelRequestedAt?: string | null;
+  userCancelReason?: string | null;
+  environment?: string;
+  appAccountToken?: string | null;
+  lastStoreUpdateAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** GET /iap/entitlements — array of store entitlements for manage-subscription UI. */
+export type IapEntitlementsResponse = IapApiResponse<IapEntitlement[]>;
+
+/** @deprecated Legacy wrapped shape — use IapEntitlement[] via normalizeEntitlements. */
 export interface IapEntitlementsData {
   isPremium?: boolean;
   tier?: 'free' | 'premium';
   expiresAt?: string;
   productId?: string;
   platform?: 'ios' | 'android';
-  /** Legacy/alternate backend shape */
   subscriptions?: IapSubscriptionStatus[];
 }
-
-export type IapEntitlementsResponse = IapApiResponse<IapEntitlementsData>;
 
 export interface IapTransactionItem {
   id?: string;

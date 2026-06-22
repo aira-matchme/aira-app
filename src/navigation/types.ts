@@ -169,4 +169,6 @@ export type ProfileStackParamList = {
   ReferenceImageIntro: { returnToProfileMain?: boolean } | undefined;
   ReferenceImagePreference: { returnToProfileMain?: boolean } | undefined;
   Subscription: undefined;
+  CancelSubscriptionReason: undefined;
+  CancelSubscriptionConfirm: { reason: string; otherReason?: string };
 };

@@ -23,6 +23,8 @@ interface ButtonProps {
   rightIcon?: React.ReactNode;
   style?: ViewStyle;
   textStyle?: TextStyle;
+  /** When true, title is centered without left/right icon slots (longer labels). */
+  centerTitleOnly?: boolean;
 }
 
 const HEIGHT = 54;
@@ -43,6 +45,7 @@ export const Button: React.FC<ButtonProps> = ({
   rightIcon,
   style,
   textStyle,
+  centerTitleOnly = false,
 }) => {
   const isDisabled = disabled || loading || success;
 
@@ -112,14 +115,26 @@ export const Button: React.FC<ButtonProps> = ({
             style={styles.sheen}
             pointerEvents="none"
           />
-          <View style={styles.contentRow}>
-            <View style={styles.sideSlot} pointerEvents="none">
-              {leftIcon ?? null}
-            </View>
-            <Text style={[styles.text, textStyle]}>{title}</Text>
-            <View style={styles.sideSlot} pointerEvents="none">
-              {rightIcon ?? null}
-            </View>
+          <View style={[styles.contentRow, centerTitleOnly && styles.contentRowTitleOnly]}>
+            {!centerTitleOnly ? (
+              <View style={styles.sideSlot} pointerEvents="none">
+                {leftIcon ?? null}
+              </View>
+            ) : null}
+            <Text
+              style={[
+                styles.text,
+                centerTitleOnly && styles.centerTitleOnlyText,
+                textStyle,
+              ]}
+            >
+              {title}
+            </Text>
+            {!centerTitleOnly ? (
+              <View style={styles.sideSlot} pointerEvents="none">
+                {rightIcon ?? null}
+              </View>
+            ) : null}
           </View>
         </LinearGradient>
       </Pressable>
@@ -185,6 +200,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
     gap: spacing.sm,
+  },
+
+  contentRowTitleOnly: {
+    paddingHorizontal: 32,
+  },
+
+  centerTitleOnlyText: {
+    flexShrink: 1,
+    textAlign: 'center',
   },
 
   sideSlot: {

@@ -6,6 +6,7 @@ import { useProfileStore } from './profile.store';
 import { usePreferencesStore } from './preferences.store';
 import { useOnboardingStore } from './onboarding.store';
 import { useUserStore } from './user.store';
+import { useSubscriptionStore } from './subscription.store';
 
 export interface User {
   id: string;
@@ -21,6 +22,8 @@ export interface User {
   galleryPhotosUploaded?: boolean;
   questionnaireCompleted?: boolean;
   isAppTourDone?: boolean;
+  hasActiveSubscription?: boolean;
+  premiumUntil?: string | null;
 }
 
 const TOKEN_STORAGE_KEY = '@auth_tokens';
@@ -87,6 +90,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       normalized.isAppTourDone = (user as any).is_app_tour_done;
     }
     syncSentryUser(normalized);
+    useSubscriptionStore.getState().syncFromProfile(normalized as Record<string, unknown>);
     set({ user: normalized, isAuthenticated: true });
   },
 
@@ -115,6 +119,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     usePreferencesStore.getState().reset();
     useOnboardingStore.getState().clearOnboarding();
     useUserStore.getState().clearUser();
+    useSubscriptionStore.getState().clearSubscription();
     syncSentryUser(null);
     set({
       accessToken: null,

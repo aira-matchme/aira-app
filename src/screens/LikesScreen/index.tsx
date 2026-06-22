@@ -12,8 +12,8 @@ import { styles } from './styles';
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../../navigation/types';
+import type { NavigationProp, ParamListBase } from '@react-navigation/native';
+import { navigateToNotifications } from '../../navigation/navigateToNotifications';
 
 type LikedProfile = {
   id: string;
@@ -26,7 +26,7 @@ type LikedProfile = {
 import { useTabBarOccupiedHeight } from '../../navigation/tabBarLayout';
 
 export const LikesScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const insets = useSafeAreaInsets();
   const listBottomPadding = useTabBarOccupiedHeight();
   const [loading, setLoading] = useState(true);
@@ -120,12 +120,7 @@ export const LikesScreen = () => {
           <TouchableOpacity
             style={styles.notifButton}
             activeOpacity={0.7}
-            onPress={() => {
-              const tabNav = navigation.getParent?.() as
-                | { navigate?: (name: string, params?: Record<string, unknown>) => void }
-                | undefined;
-              tabNav?.navigate?.('Home', { screen: 'Notifications' });
-            }}
+            onPress={() => navigateToNotifications(navigation)}
             accessibilityRole="button"
             accessibilityLabel="Notifications"
           >

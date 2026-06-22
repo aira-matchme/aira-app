@@ -138,6 +138,7 @@ export const ProfileTabScreen = () => {
   const insets = useSafeAreaInsets();
   const { user, logout, setUser } = useAuthStore();
   const syncFromProfile = useSubscriptionStore((s) => s.syncFromProfile);
+  const isSubscribed = useSubscriptionStore((s) => s.isSubscribed);
   const [profileImage, setProfileImage] = useState<ImageSourcePropType | null>(null);
   const [galleryCount, setGalleryCount] = useState(0);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
@@ -356,7 +357,9 @@ export const ProfileTabScreen = () => {
                     end={{ x: 0.85, y: 1 }}
                     style={styles.airaPlusButtonGradient}
                   />
-                  <Text style={styles.airaPlusButtonText}>Upgrade Plan</Text>
+                  <Text style={styles.airaPlusButtonText}>
+                    {isSubscribed ? 'Manage Plan' : 'Upgrade Plan'}
+                  </Text>
                 </Pressable>
               </View>
             </View>

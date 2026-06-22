@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
+import axios from 'axios';
 import type {
   EventSubscription,
   ProductSubscription,
@@ -22,8 +23,11 @@ import {
   SUBSCRIPTION_SKUS,
   syncPurchaseWithBackend,
 } from '../services/Purchase/IAPService';
-import type { IapEntitlementsResponse } from '../modules/iap/types';
+import type { IapEntitlement, IapEntitlementsResponse } from '../modules/iap/types';
+import { refreshSubscriptionFromProfile } from '../modules/subscription/refreshSubscriptionFromProfile';
 import { useSubscriptionStore } from '../store/subscription.store';
+import { useApiErrorStore } from '../store/apiError.store';
+import { resolveUserFacingError } from '../utils/resolveUserFacingError';
 
 function isUserCancelled(error: unknown): boolean {
   const code = String((error as PurchaseError)?.code ?? '');
@@ -31,9 +35,12 @@ function isUserCancelled(error: unknown): boolean {
 }
 
 function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'string') return error;
-  return 'Something went wrong. Please try again.';
+  return resolveUserFacingError(error, 'purchase');
+}
+
+function reportNonApiError(error: unknown): void {
+  if (axios.isAxiosError(error)) return;
+  useApiErrorStore.getState().showError(getErrorMessage(error), { variant: 'generic' });
 }
 
 function getEmptyProductsHint(): string {
@@ -56,11 +63,21 @@ function resolvePremiumFromEntitlements(
   response: IapEntitlementsResponse,
 ): boolean {
   const data = response.data;
-  if (data?.isPremium === true || data?.tier === 'premium') {
+  if (Array.isArray(data)) {
+    return data.some(
+      (item) => item.status === 'active' || item.status === 'grace_period',
+    );
+  }
+  const legacy = data as {
+    isPremium?: boolean;
+    tier?: string;
+    subscriptions?: { status?: string }[];
+  } | null | undefined;
+  if (legacy?.isPremium === true || legacy?.tier === 'premium') {
     return true;
   }
   return (
-    data?.subscriptions?.some(
+    legacy?.subscriptions?.some(
       (s) => s.status === 'active' || s.status === 'grace_period',
     ) ?? false
   );
@@ -81,58 +98,55 @@ function getAndroidOfferToken(
 export interface UseIapOptions {
   /** When false, skips store connection (e.g. logged-out). Default true. */
   enabled?: boolean;
+  /** When true, checks entitlements on mount (legacy UI only — access uses profile). Default false. */
+  checkEntitlementsOnMount?: boolean;
 }
 
 export function useIAP(options: UseIapOptions = {}) {
-  const { enabled = true } = options;
+  const { enabled = true, checkEntitlementsOnMount = false } = options;
 
   const [subscriptions, setSubscriptions] = useState<ProductSubscription[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isPremium, setIsPremium] = useState(
+    () => useSubscriptionStore.getState().isSubscribed,
+  );
   const [productsHint, setProductsHint] = useState<string | null>(null);
 
-  const setSubscription = useSubscriptionStore((s) => s.setSubscription);
-  const clearSubscription = useSubscriptionStore((s) => s.clearSubscription);
-
   const subscriptionsRef = useRef<ProductSubscription[]>([]);
-
-  const applyPremiumState = useCallback(
-    (premium: boolean) => {
-      setIsPremium(premium);
-      if (premium) {
-        setSubscription('premium');
-      } else {
-        clearSubscription();
-      }
-    },
-    [clearSubscription, setSubscription],
-  );
 
   const checkPremiumStatus = useCallback(async () => {
     try {
       const response = await fetchEntitlements();
-      applyPremiumState(resolvePremiumFromEntitlements(response));
+      setIsPremium(resolvePremiumFromEntitlements(response));
     } catch (err) {
       console.error('Entitlements check failed:', err);
     }
-  }, [applyPremiumState]);
+  }, []);
+
+  const refreshProfileSubscription = useCallback(async () => {
+    try {
+      await refreshSubscriptionFromProfile();
+      setIsPremium(useSubscriptionStore.getState().isSubscribed);
+    } catch (err) {
+      console.error('Profile subscription refresh failed:', err);
+    }
+  }, []);
 
   const handlePurchase = useCallback(
     async (purchase: Purchase) => {
       try {
         await syncPurchaseWithBackend(purchase);
         await finalizePurchase(purchase);
-        await checkPremiumStatus();
+        await refreshProfileSubscription();
         setIsLoading(false);
       } catch (err) {
         console.error('Purchase handling failed:', err);
-        setError(getErrorMessage(err));
+        reportNonApiError(err);
         setIsLoading(false);
       }
     },
-    [checkPremiumStatus],
+    [refreshProfileSubscription],
   );
 
   const handlePurchaseRef = useRef(handlePurchase);
@@ -161,7 +175,11 @@ export function useIAP(options: UseIapOptions = {}) {
         if (__DEV__ && diagnostics.length > 0) {
           console.warn('[IAP] product diagnostics:', diagnostics);
         }
-        await checkPremiumStatus();
+        if (checkEntitlementsOnMount) {
+          await checkPremiumStatus();
+        } else {
+          setIsPremium(useSubscriptionStore.getState().isSubscribed);
+        }
 
         purchaseListener = onPurchaseUpdated((purchase) => {
           void handlePurchaseRef.current(purchase);
@@ -169,13 +187,13 @@ export function useIAP(options: UseIapOptions = {}) {
 
         errorListener = onPurchaseError((err) => {
           if (!isUserCancelled(err)) {
-            setError(err.message);
+            reportNonApiError(err);
           }
           setIsLoading(false);
         });
       } catch (err) {
         console.error('IAP setup error:', err);
-        setError(getErrorMessage(err));
+        reportNonApiError(err);
       } finally {
         setIsInitializing(false);
       }
@@ -188,13 +206,12 @@ export function useIAP(options: UseIapOptions = {}) {
       errorListener?.remove();
       void disconnectIap();
     };
-  }, [enabled, checkPremiumStatus]);
+  }, [enabled, checkEntitlementsOnMount, checkPremiumStatus]);
 
   const buySubscription = useCallback(
     async (productId: string, userId?: string) => {
       try {
         setIsLoading(true);
-        setError(null);
 
         if (Platform.OS === 'ios') {
           const appAccountToken = await prepareIosAppAccountToken();
@@ -213,7 +230,7 @@ export function useIAP(options: UseIapOptions = {}) {
         });
       } catch (err) {
         if (!isUserCancelled(err)) {
-          setError(getErrorMessage(err));
+          reportNonApiError(err);
         }
         setIsLoading(false);
       }
@@ -224,7 +241,6 @@ export function useIAP(options: UseIapOptions = {}) {
   const restorePurchases = useCallback(async () => {
     try {
       setIsLoading(true);
-      setError(null);
 
       const purchases = await restoreAndSyncPurchases();
       const active = purchases.find((p) =>
@@ -232,8 +248,16 @@ export function useIAP(options: UseIapOptions = {}) {
       );
 
       if (active) {
-        await checkPremiumStatus();
-        Alert.alert('Restored', 'Your subscription has been restored.');
+        await refreshProfileSubscription();
+        const subscribed = useSubscriptionStore.getState().isSubscribed;
+        if (subscribed) {
+          Alert.alert('Restored', 'Your subscription has been restored.');
+        } else {
+          Alert.alert(
+            'No active subscription',
+            'We found a purchase but your subscription is not active yet. Try again in a moment.',
+          );
+        }
       } else {
         Alert.alert(
           'No subscription found',
@@ -241,16 +265,15 @@ export function useIAP(options: UseIapOptions = {}) {
         );
       }
     } catch (err) {
-      setError(getErrorMessage(err));
+      reportNonApiError(err);
     } finally {
       setIsLoading(false);
     }
-  }, [checkPremiumStatus]);
+  }, [refreshProfileSubscription]);
 
   const reloadProducts = useCallback(async () => {
     try {
       setIsInitializing(true);
-      setError(null);
       const { products, diagnostics } = await loadSubscriptionProducts();
       setSubscriptions(products);
       subscriptionsRef.current = products;
@@ -261,7 +284,7 @@ export function useIAP(options: UseIapOptions = {}) {
         console.warn('[IAP] product diagnostics:', diagnostics);
       }
     } catch (err) {
-      setError(getErrorMessage(err));
+      reportNonApiError(err);
     } finally {
       setIsInitializing(false);
     }
@@ -272,11 +295,11 @@ export function useIAP(options: UseIapOptions = {}) {
     isInitializing,
     isLoading,
     isPremium,
-    error,
     productsHint,
     buySubscription,
     restorePurchases,
     checkPremiumStatus,
+    refreshProfileSubscription,
     reloadProducts,
   };
 }

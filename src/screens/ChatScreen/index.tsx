@@ -16,6 +16,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { ChatStackParamList } from '../../navigation/types';
+import { navigateToNotifications } from '../../navigation/navigateToNotifications';
 
 import { BellIcon } from '../../assets/icons/common/BellIcon';
 import { ChatEmptyIcon } from '../../assets/icons/home_figma/ChatEmptyIcon';
@@ -348,12 +349,7 @@ export const ChatScreen = () => {
             <TouchableOpacity
               style={styles.notifButton}
               activeOpacity={0.7}
-              onPress={() => {
-                const tabNav = navigation.getParent?.() as
-                  | { navigate?: (name: string, params?: Record<string, unknown>) => void }
-                  | undefined;
-                tabNav?.navigate?.('Home', { screen: 'Notifications' });
-              }}
+              onPress={() => navigateToNotifications(navigation)}
               accessibilityRole="button"
               accessibilityLabel="Notifications"
             >

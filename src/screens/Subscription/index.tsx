@@ -13,21 +13,20 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import MaskedView from '@react-native-masked-view/masked-view';
 import Svg, {
-  Circle,
   ClipPath,
   Defs,
   G,
-  LinearGradient as SvgLinearGradient,
   Path,
   Rect,
-  Stop,
 } from 'react-native-svg';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { LogoWordmark } from '../../assets/icons/branding/LogoWordmark';
 import { CloseIcon } from '../../assets/icons/common/CloseIcon';
 import { useIAP } from '../../hooks/useIAP';
+import { useSubscriptionEntitlements } from '../../hooks/useSubscriptionEntitlements';
 import { useAuthStore } from '../../store/auth.store';
+import { useSubscriptionStore } from '../../store/subscription.store';
 import type { ProfileStackParamList } from '../../navigation/types';
 import { colors } from '../../theme';
 import {
@@ -45,6 +44,9 @@ import {
 } from './layout';
 import { styles } from './styles';
 import { SubscriptionBackground } from './SubscriptionBackground';
+import { PlusGemIcon } from './components/PlusGemIcon';
+import { ManageSubscriptionView } from './ManageSubscriptionView';
+import { formatSubscriptionAmountGBP } from '../../modules/iap/entitlements';
 
 const IntroductionsIcon: React.FC = () => (
   <Svg
@@ -114,24 +116,6 @@ const InsightsIcon: React.FC = () => (
   </Svg>
 );
 
-const PlusGemIcon: React.FC = () => (
-  <Svg width={26} height={26} viewBox="0 0 26 26" fill="none">
-    <Defs>
-      <SvgLinearGradient id="subscriptionPgGrad" x1="13" y1="0" x2="13" y2="26" gradientUnits="userSpaceOnUse">
-        <Stop stopColor={SUBSCRIPTION_GRADIENT_START} />
-        <Stop offset={1} stopColor={SUBSCRIPTION_GRADIENT_END} />
-      </SvgLinearGradient>
-    </Defs>
-    <Circle cx={13} cy={13} r={13} fill="url(#subscriptionPgGrad)" />
-    <G transform="translate(6, 6)">
-      <Path
-        d="M7 0L7.5387 2.39157C7.9957 4.42015 9.5798 6.00431 11.6084 6.46127L14 7L11.6084 7.53873C9.5798 7.99569 7.9957 9.5798 7.5387 11.6084L7 14L6.4613 11.6084C6.0043 9.5798 4.4202 7.99569 2.3916 7.53873L0 7L2.3916 6.46127C4.4201 6.00431 6.0043 4.42015 6.4613 2.39158L7 0Z"
-        fill="white"
-      />
-    </G>
-  </Svg>
-);
-
 const FEATURES = [
   {
     key: 'introductions',
@@ -159,9 +143,9 @@ const FEATURES = [
   },
 ] as const;
 
-/** Strip store period suffix; Figma uses separate "/month" label (4285:14457). */
+/** GBP amount for the price pill; Figma uses separate "/month" label (4285:14457). */
 function splitDisplayPrice(displayPrice: string): string {
-  return displayPrice.replace(/\s*\/\s*mo(?:nth)?$/i, '').trim();
+  return formatSubscriptionAmountGBP(displayPrice);
 }
 
 function priceAmountTypography(amount: string): { fontSize: number; lineHeight: number } {
@@ -208,24 +192,26 @@ const PricePill: React.FC<PricePillProps> = ({ displayPrice }) => {
 
 type PurchaseFooterProps = {
   displayPrice: string;
-  error: string | null;
   isLoading: boolean;
   hasProduct: boolean;
   showRetry: boolean;
+  showRestore?: boolean;
   bottomInset: number;
   onBuy: () => void;
   onRetry: () => void;
+  onRestore?: () => void;
 };
 
 const PurchaseFooter: React.FC<PurchaseFooterProps> = ({
   displayPrice,
-  error,
   isLoading,
   hasProduct,
   showRetry,
+  showRestore = false,
   bottomInset,
   onBuy,
   onRetry,
+  onRestore,
 }) => (
   <View style={styles.purchaseWrap}>
     <View style={styles.bottomPanelWrap}>
@@ -239,8 +225,6 @@ const PurchaseFooter: React.FC<PurchaseFooterProps> = ({
           { paddingBottom: SUBSCRIPTION_BOTTOM_PANEL_PAD_BOTTOM + bottomInset },
         ]}
       >
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
         <TouchableOpacity
           style={[styles.ctaButton, (isLoading || !hasProduct) && styles.ctaButtonDisabled]}
           onPress={onBuy}
@@ -260,6 +244,17 @@ const PurchaseFooter: React.FC<PurchaseFooterProps> = ({
           </TouchableOpacity>
         ) : null}
 
+        {showRestore ? (
+          <TouchableOpacity
+            style={styles.restoreLink}
+            onPress={onRestore}
+            activeOpacity={0.7}
+            disabled={isLoading}
+          >
+            <Text style={styles.restoreLinkText}>Restore purchases</Text>
+          </TouchableOpacity>
+        ) : null}
+
         <Text style={styles.legalText}>
           Subscription auto-renews monthly. Cancel anytime from your Play Store or App Store
           settings.
@@ -273,20 +268,28 @@ export const SubscriptionScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isSubscribed = useSubscriptionStore((s) => s.isSubscribed);
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const scale = useCallback((value: number) => scaleSubscription(value, windowWidth), [windowWidth]);
   const bottomInset = Math.max(insets.bottom, 0);
 
+  const showManage = isSubscribed;
+  const showPurchase = !isSubscribed;
+
   const {
     subscriptions,
     isInitializing,
     isLoading,
-    isPremium,
-    error,
     buySubscription,
+    restorePurchases,
     reloadProducts,
   } = useIAP({ enabled: isAuthenticated });
+
+  const {
+    isLoading: entitlementsLoading,
+    primaryEntitlement,
+  } = useSubscriptionEntitlements(showManage);
 
   const handleBuy = useCallback(
     (productId: string) => {
@@ -298,9 +301,21 @@ export const SubscriptionScreen: React.FC = () => {
   const monthlyProduct =
     subscriptions.find((item) => item.id.toLowerCase().includes('month')) ?? subscriptions[0];
 
-  const displayPrice = '£8.99';
+  const storeDisplayPrice = monthlyProduct?.displayPrice;
+  const displayPrice = formatSubscriptionAmountGBP(storeDisplayPrice);
   const bottomPanelReserve =
     scale(SUBSCRIPTION_BOTTOM_PANEL_HEIGHT - SUBSCRIPTION_PRICE_PILL_OVERLAP) + bottomInset;
+
+  if (showManage) {
+    return (
+      <ManageSubscriptionView
+        entitlement={primaryEntitlement}
+        hasActiveSubscription={isSubscribed}
+        isLoading={entitlementsLoading}
+        displayPrice={storeDisplayPrice}
+      />
+    );
+  }
 
   if (isInitializing) {
     return (
@@ -310,22 +325,6 @@ export const SubscriptionScreen: React.FC = () => {
         <SafeAreaView style={styles.center}>
           <ActivityIndicator size="large" color={colors.white} />
           <Text style={styles.loadingText}>Loading plans...</Text>
-        </SafeAreaView>
-      </View>
-    );
-  }
-
-  if (isPremium) {
-    return (
-      <View style={styles.wrapper}>
-        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        <SubscriptionBackground />
-        <SafeAreaView style={styles.center}>
-          <Text style={styles.premiumEmoji}>👑</Text>
-          <Text style={styles.premiumTitle}>You're Premium</Text>
-          <Text style={styles.premiumSubtitle}>
-            Enjoy all premium features on Aira Match
-          </Text>
         </SafeAreaView>
       </View>
     );
@@ -393,13 +392,14 @@ export const SubscriptionScreen: React.FC = () => {
 
           <PurchaseFooter
             displayPrice={displayPrice}
-            error={error}
             isLoading={isLoading}
             hasProduct={Boolean(monthlyProduct)}
             showRetry={subscriptions.length === 0 && !isLoading}
+            showRestore
             bottomInset={bottomInset}
             onBuy={() => monthlyProduct && handleBuy(monthlyProduct.id)}
             onRetry={() => void reloadProducts()}
+            onRestore={() => void restorePurchases()}
           />
         </View>
       </SafeAreaView>

@@ -32,6 +32,8 @@ import { PreferencesRelationshipIntentScreen } from '../screens/preferences/Pref
 import { ReferenceImageIntroScreen } from '../screens/preferences/ReferenceImageIntroScreen';
 import { ReferenceImagePreferenceScreen } from '../screens/preferences/ReferenceImagePreferenceScreen';
 import { SubscriptionScreen } from '../screens/Subscription';
+import { CancelSubscriptionReasonScreen } from '../screens/Subscription/CancelSubscriptionReasonScreen';
+import { CancelSubscriptionConfirmScreen } from '../screens/Subscription/CancelSubscriptionConfirmScreen';
 import type { ProfileStackParamList } from './types';
 
 const PreferencesBodyTypeScreenLazy = React.lazy(() =>
@@ -217,6 +219,16 @@ export const ProfileStackNavigator = () => (
     <Stack.Screen
       name="Subscription"
       component={SubscriptionScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="CancelSubscriptionReason"
+      component={CancelSubscriptionReasonScreen}
+      options={profileScreenOptions}
+    />
+    <Stack.Screen
+      name="CancelSubscriptionConfirm"
+      component={CancelSubscriptionConfirmScreen}
       options={profileScreenOptions}
     />
   </Stack.Navigator>
