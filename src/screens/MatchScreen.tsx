@@ -165,6 +165,9 @@ export const MatchScreen = () => {
   const bottomSafeInset = insets.bottom;
 
   const hasText = message.trim().length > 0;
+  const isInputEmpty = message.length === 0;
+  const isMultilineComposer = message.includes('\n');
+  const isCompactComposer = isInputEmpty && !isMultilineComposer;
   const hasChat = chatItems.length > 0;
   const lastUserText = React.useMemo(() => {
     // When the user picks a `missing_info` card, we need "the last user message".
@@ -994,18 +997,47 @@ export const MatchScreen = () => {
                 },
               ]}
             >
-              <View style={[styles.composerRow, { paddingBottom: 12 }]}>
-                <View style={[styles.inputPill, !hasText && styles.inputPillEmpty]}>
-                  <TextInput
-                    key={inputResetKey}
-                    value={message}
-                    onChangeText={setMessage}
-                    placeholder="Ask me anything..."
-                    placeholderTextColor={colors.neutral[600]}
-                    style={[styles.input, !hasText && styles.inputEmpty]}
-                    multiline={hasText}
-                    textAlignVertical={hasText ? 'top' : 'center'}
-                  />
+              <View
+                style={[
+                  styles.composerRow,
+                  { paddingBottom: 12 },
+                  isMultilineComposer && styles.composerRowExpanded,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.inputPill,
+                    isCompactComposer && styles.inputPillEmpty,
+                    isMultilineComposer && styles.inputPillMultiline,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.inputFieldOuter,
+                      isCompactComposer && styles.inputFieldOuterCompact,
+                      !isCompactComposer && styles.inputFieldOuterExpanded,
+                    ]}
+                  >
+                    {isInputEmpty && (
+                      <View style={styles.inputPlaceholderWrap} pointerEvents="none">
+                        <Text style={styles.inputPlaceholderText} numberOfLines={1}>
+                          Ask me anything...
+                        </Text>
+                      </View>
+                    )}
+                    <TextInput
+                      key={inputResetKey}
+                      value={message}
+                      onChangeText={setMessage}
+                      placeholder=""
+                      placeholderTextColor={colors.neutral[600]}
+                      style={styles.input}
+                      multiline
+                      blurOnSubmit={false}
+                      scrollEnabled
+                      textAlignVertical="top"
+                    />
+                  </View>
                 </View>
 
                 <TouchableOpacity
@@ -1014,11 +1046,12 @@ export const MatchScreen = () => {
                     if (!hasText || isTyping) return;
                     handleSend(message);
                   }}
-                  style={
+                  style={[
                     hasText && !isTyping
                       ? styles.sendButton
-                      : [styles.sendButton, styles.sendButtonDisabled]
-                  }
+                      : [styles.sendButton, styles.sendButtonDisabled],
+                    isMultilineComposer && styles.sendButtonExpanded,
+                  ]}
                 >
                   <ForwardArrowIcon
                     size={22}
@@ -1033,6 +1066,11 @@ export const MatchScreen = () => {
       </View>
     );
   };
+
+const MATCH_INPUT_BAR_HEIGHT = 56;
+const MATCH_INPUT_MIN_HEIGHT = 36;
+const MATCH_INPUT_MAX_HEIGHT = 120;
+const MATCH_INPUT_WRAP_MAX = 142;
 
   const styles = StyleSheet.create({
     screen: {
@@ -1374,6 +1412,9 @@ export const MatchScreen = () => {
       paddingHorizontal: 12,
       paddingVertical: 12,
     },
+    composerRowExpanded: {
+      alignItems: 'flex-end',
+    },
     composerIconButton: {
       width: 48,
       height: 48,
@@ -1395,33 +1436,79 @@ export const MatchScreen = () => {
       borderWidth: 1,
       borderColor: colors.neutral[200],
     },
+    sendButtonExpanded: {
+      alignSelf: 'flex-end',
+      marginBottom: 2,
+    },
     inputPill: {
       flex: 1,
       borderRadius: 999,
       backgroundColor: '#F3F3F3',
       justifyContent: 'flex-start',
       paddingHorizontal: 16,
-      minHeight: 56,
-      // Allow the composer to grow but stop it from covering too much of the screen.
-      maxHeight: 200,
+      minHeight: MATCH_INPUT_BAR_HEIGHT,
+      maxHeight: MATCH_INPUT_WRAP_MAX,
+      overflow: 'hidden',
     },
     inputPillEmpty: {
       justifyContent: 'center',
+      minHeight: MATCH_INPUT_BAR_HEIGHT,
+    },
+    inputPillMultiline: {
+      borderRadius: 24,
+      paddingTop: 12,
+      paddingBottom: 10,
+      justifyContent: 'flex-start',
+    },
+    inputFieldOuter: {
+      minHeight: MATCH_INPUT_MIN_HEIGHT,
+      alignSelf: 'stretch',
+      position: 'relative',
+    },
+    inputFieldOuterCompact: {
+      justifyContent: 'center',
+      maxHeight: MATCH_INPUT_MIN_HEIGHT,
+      overflow: 'hidden',
+    },
+    inputFieldOuterExpanded: {
+      maxHeight: MATCH_INPUT_MAX_HEIGHT,
+      overflow: 'hidden',
+    },
+    inputPlaceholderWrap: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'center',
+    },
+    inputPlaceholderText: {
+      fontSize: 16,
+      lineHeight: 22,
+      letterSpacing: 0.32,
+      fontFamily: typography.body.fontFamily,
+      color: colors.neutral[600],
     },
     input: {
-      ...typography.body,
-      color: colors.black,
-      letterSpacing: 0.32,
+      width: '100%',
+      alignSelf: 'stretch',
+      minHeight: MATCH_INPUT_MIN_HEIGHT,
+      maxHeight: MATCH_INPUT_MAX_HEIGHT,
+      fontSize: 16,
       lineHeight: 22,
-      paddingVertical: 13,
-      paddingHorizontal: 0,
-      includeFontPadding: false,
-    },
-    inputEmpty: {
-      paddingVertical: 0,
+      letterSpacing: 0.32,
+      fontFamily: typography.body.fontFamily,
+      color: colors.black,
       margin: 0,
-      minHeight: 22,
-      maxHeight: 22,
+      paddingTop: Platform.OS === 'ios' ? 7 : 5,
+      paddingBottom: Platform.OS === 'ios' ? 7 : 5,
+      paddingHorizontal: 0,
+      backgroundColor: 'transparent',
+      ...Platform.select({
+        android: {
+          includeFontPadding: false,
+          textAlignVertical: 'top',
+        },
+        default: {
+          textAlignVertical: 'top',
+        },
+      }),
     },
     homeIndicatorArea: {
       height: 24,

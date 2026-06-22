@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StatusBar,
@@ -15,6 +14,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
+import { useFormKeyboardInset } from '../../hooks/useFormKeyboardInset';
 import type { ProfileStackParamList } from '../../navigation/types';
 import { colors, typography } from '../../theme';
 import {
@@ -24,19 +24,18 @@ import {
 import { SubscriptionScreenHeader } from './components/SubscriptionScreenHeader';
 import { MANAGE_FOOTER_BUTTON_HEIGHT, MANAGE_SCREEN_PAD_H } from './manageLayout';
 
-const KEYBOARD_SCROLL_DELAY_MS = Platform.OS === 'ios' ? 80 : 180;
+const KEYBOARD_SCROLL_DELAY_MS = Platform.OS === 'ios' ? 120 : 220;
 
 export const CancelSubscriptionReasonScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const insets = useSafeAreaInsets();
+  const { keyboardInset, isKeyboardVisible } = useFormKeyboardInset();
   const scrollRef = useRef<ScrollView>(null);
-  const otherInputOffsetRef = useRef(0);
   const otherInputRef = useRef<TextInput>(null);
   const [selectedReason, setSelectedReason] = useState<CancelSubscriptionReasonId | null>(
     null,
   );
   const [otherReason, setOtherReason] = useState('');
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   const canContinue = useMemo(() => {
     if (!selectedReason) return false;
@@ -48,13 +47,7 @@ export const CancelSubscriptionReasonScreen: React.FC = () => {
 
   const scrollToOtherInput = useCallback(() => {
     requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({
-        y: Math.max(0, otherInputOffsetRef.current - 24),
-        animated: true,
-      });
-      setTimeout(() => {
-        scrollRef.current?.scrollToEnd({ animated: true });
-      }, KEYBOARD_SCROLL_DELAY_MS);
+      scrollRef.current?.scrollToEnd({ animated: true });
     });
   }, []);
 
@@ -66,6 +59,8 @@ export const CancelSubscriptionReasonScreen: React.FC = () => {
           otherInputRef.current?.focus();
           scrollToOtherInput();
         }, KEYBOARD_SCROLL_DELAY_MS);
+      } else {
+        Keyboard.dismiss();
       }
     },
     [scrollToOtherInput],
@@ -81,26 +76,10 @@ export const CancelSubscriptionReasonScreen: React.FC = () => {
   }, [canContinue, navigation, otherReason, selectedReason]);
 
   useEffect(() => {
-    if (selectedReason !== 'other') return;
-
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSub = Keyboard.addListener(showEvent, () => {
-      setKeyboardVisible(true);
-      scrollToOtherInput();
-    });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setKeyboardVisible(false);
-    });
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, [scrollToOtherInput, selectedReason]);
-
-  const keyboardVerticalOffset = insets.top + 56;
+    if (selectedReason !== 'other' || !isKeyboardVisible) return;
+    const timer = setTimeout(scrollToOtherInput, KEYBOARD_SCROLL_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [isKeyboardVisible, scrollToOtherInput, selectedReason]);
 
   return (
     <View style={styles.screen}>
@@ -111,18 +90,11 @@ export const CancelSubscriptionReasonScreen: React.FC = () => {
           onBack={() => navigation.goBack()}
         />
 
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={keyboardVerticalOffset}
-        >
+        <View style={styles.flex}>
           <ScrollView
             ref={scrollRef}
             style={styles.scrollView}
-            contentContainerStyle={[
-              styles.scroll,
-              keyboardVisible && styles.scrollKeyboardOpen,
-            ]}
+            contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
@@ -163,12 +135,7 @@ export const CancelSubscriptionReasonScreen: React.FC = () => {
             </View>
 
             {selectedReason === 'other' ? (
-              <View
-                style={styles.otherInputWrap}
-                onLayout={(event) => {
-                  otherInputOffsetRef.current = event.nativeEvent.layout.y;
-                }}
-              >
+              <View style={styles.otherInputWrap}>
                 <TextInput
                   ref={otherInputRef}
                   value={otherReason}
@@ -184,7 +151,15 @@ export const CancelSubscriptionReasonScreen: React.FC = () => {
             ) : null}
           </ScrollView>
 
-          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <View
+            style={[
+              styles.footer,
+              {
+                paddingBottom: isKeyboardVisible ? 8 : Math.max(insets.bottom, 16),
+                marginBottom: keyboardInset,
+              },
+            ]}
+          >
             <TouchableOpacity
               style={[
                 styles.continueButton,
@@ -206,7 +181,7 @@ export const CancelSubscriptionReasonScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </SafeAreaView>
     </View>
   );
@@ -222,13 +197,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scroll: {
+    flexGrow: 1,
     paddingHorizontal: MANAGE_SCREEN_PAD_H,
     paddingTop: 16,
     paddingBottom: 24,
     gap: 16,
-  },
-  scrollKeyboardOpen: {
-    paddingBottom: MANAGE_FOOTER_BUTTON_HEIGHT + 32,
   },
   subtitle: {
     fontSize: 14,

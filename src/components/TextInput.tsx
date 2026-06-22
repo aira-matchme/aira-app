@@ -67,6 +67,8 @@ export const TextInput: React.FC<TextInputProps> = ({
   return (
     <View style={styles.container}>
       <RNTextInput
+        cursorColor={colors.textField.cursor}
+        selectionColor={colors.textField.selection}
         style={[
           styles.input,
           { borderColor },

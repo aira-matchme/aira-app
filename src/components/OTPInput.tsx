@@ -79,6 +79,8 @@ export const OTPInput: React.FC<OTPInputProps> = ({
   return (
     <View style={styles.container}>
       <TextInput
+        cursorColor={colors.textField.cursor}
+        selectionColor={colors.textField.selection}
         ref={inputRef}
         style={[
           styles.input,

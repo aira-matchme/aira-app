@@ -12,6 +12,9 @@ import { SENTRY_DSN } from '@env';
 import * as Sentry from '@sentry/react-native';
 import { getSentryDist, getSentryRelease } from './src/services/sentry/release';
 import { syncSentryDeviceContext } from './src/services/sentry/deviceContext';
+import { configureTextInputDefaults } from './src/theme/configureTextInputDefaults';
+
+configureTextInputDefaults();
 
 const sentryDsn = typeof SENTRY_DSN === 'string' ? SENTRY_DSN.trim() : '';
 

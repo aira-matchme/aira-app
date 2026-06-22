@@ -36,6 +36,8 @@ export const EmailInput: React.FC<EmailInputProps> = ({
   return (
     <View style={styles.container}>
       <TextInput
+        cursorColor={colors.textField.cursor}
+        selectionColor={colors.textField.selection}
         style={[
           styles.input,
           isFocused && styles.inputFocused,

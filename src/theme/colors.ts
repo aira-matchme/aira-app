@@ -118,5 +118,11 @@ export const colors = {
     warning: '#FF9800',
     info: '#2196F3',
   },
+
+  /** TextInput caret + text selection — high contrast on light fields */
+  textField: {
+    cursor: '#000000',
+    selection: 'rgba(0, 0, 0, 0.25)',
+  },
 };
 

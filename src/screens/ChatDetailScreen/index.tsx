@@ -96,18 +96,22 @@ import socketService, {
   type CallSwitchAppliedPayload,
 } from '../../services/socket/socketService';
 import { agoraCallService } from '../../services/call/agoraCallService';
-import { styles, H_PADDING, CHAT_INPUT_MIN_HEIGHT, CHAT_INPUT_MAX_HEIGHT } from './styles';
+import { styles, H_PADDING } from './styles';
 import { TabAICenterIcon } from '../../assets/icons/tabs/TabAICenterIcon';
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
 import { showErrorToast, showSuccessToast } from '../../services/toast.srvice';
 import type { ChatMessage, PendingAttachment } from './types';
+import { ComposerAttachmentPreviews } from './components/ComposerAttachmentPreviews';
+import { ChatMessagesSkeleton } from './components/ChatMessagesSkeleton';
+import { ChatBubbleImage } from './components/ChatBubbleImage';
 import {
   now,
   extractChatIdFromAddChatResponse,
   firstNonEmptyString,
   formatMessageTimestamp,
 } from './utils/helpers';
+import { CHAT_IMAGE_PICKER_OPTIONS } from './utils/chatMedia';
 import { useKeyboardOffset } from './hooks/useKeyboardOffset';
 import { useAiraSuggestions } from './hooks/useAiraSuggestions';
 import { useVoiceRecording } from './hooks/useVoiceRecording';
@@ -401,19 +405,18 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const isPickingFileRef = useRef(false);
   const [replyingTo, setReplyingTo] = useState<{ index: number; message: ChatMessage; senderName: string; messageId?: string } | null>(null);
   const [sendLoading, setSendLoading] = useState(false);
+  /** Active media uploads in chat (WhatsApp-style — loader on bubble, not composer). */
+  const [pendingMediaUploadCount, setPendingMediaUploadCount] = useState(0);
   const [otherUserTyping, setOtherUserTyping] = useState(false);
   const [otherUserOnline, setOtherUserOnline] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
   const [composerHeight, setComposerHeight] = useState(120);
-  /** Growing multiline composer: expands until CHAT_INPUT_MAX_HEIGHT, then scrolls inside. */
-  const [composerInputHeight, setComposerInputHeight] = useState(CHAT_INPUT_MIN_HEIGHT);
-  const isSingleLineComposer = useMemo(
-    () =>
-      inputText.length === 0 &&
-      composerInputHeight <= CHAT_INPUT_MIN_HEIGHT + 4,
-    [inputText.length, composerInputHeight],
+  /** Multiline layout (card + bottom-aligned +) — text-based only, never from measured height. */
+  const isMultilineComposer = useMemo(
+    () => inputText.includes('\n') || pendingAttachments.length > 0,
+    [inputText, pendingAttachments.length],
   );
-  const [composerSelection, setComposerSelection] = useState({ start: 0, end: 0 });
+  const composerSelectionRef = useRef({ start: 0, end: 0 });
   const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
   const [imagePreviewZoomed, setImagePreviewZoomed] = useState(false);
   const imagePreviewLastTapRef = useRef<number>(0);
@@ -748,13 +751,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     if (ext === 'txt') return 'text/plain';
     return 'application/octet-stream';
   };
-
-  const getFileTypeLabel = (name: string) => {
-    const ext = name.split('.').pop()?.toUpperCase() ?? 'FILE';
-    return ext.length <= 4 ? ext : 'FILE';
-  };
-
-
 
 
   useEffect(() => {
@@ -1378,10 +1374,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     return () => cancelAnimationFrame(id);
   }, [scrollAfterLocalSendNonce, messagesLoading]);
 
-  useEffect(() => {
-    if (inputText.length > 0) return;
-    setComposerInputHeight(CHAT_INPUT_MIN_HEIGHT);
-  }, [inputText]);
 
   const getMessagePreview = (msg: ChatMessage): string => {
     if (msg.type === 'text') return msg.text;
@@ -1402,7 +1394,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   };
 
   const handleMicPress = async () => {
-    if (inputText.trim() || pendingAttachments.length || sendLoading) return;
+    if (inputText.trim() || pendingAttachments.length || sendLoading || pendingMediaUploadCount > 0) return;
     const status = await checkMicrophonePermission();
     if (status !== 'granted') {
       setShowMicrophonePermissionSheet(true);
@@ -1428,7 +1420,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
   const openCamera = () => {
     launchCamera(
-      { mediaType: 'photo', quality: 0.8 },
+      CHAT_IMAGE_PICKER_OPTIONS,
       (response) => {
         if (response.didCancel || response.errorCode) return;
         const asset = response.assets?.[0];
@@ -1446,7 +1438,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const openGallery = () => {
     launchImageLibrary(
       {
-        mediaType: 'photo',
+        ...CHAT_IMAGE_PICKER_OPTIONS,
         // `0` means "no limit" in react-native-image-picker.
         selectionLimit: 0,
         assetRepresentationMode: 'current',
@@ -1573,19 +1565,130 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       navigateToSubscription();
       return;
     }
-    
+
     const trimmed = inputText.trim();
-    const hasAttachments = pendingAttachments.length > 0;
-    if (!trimmed && !hasAttachments) return;
+    const attachmentsToSend = [...pendingAttachments];
+    if (!trimmed && attachmentsToSend.length === 0) return;
     if (!currentUserId || !otherUserId) return;
-    setSendLoading(true);
+
     const replyToPayload = replyingTo?.messageId ?? null;
+    const pendingBatchId = `pending_${Date.now()}`;
+    const optimisticMessages: ChatMessage[] = [];
+
+    if (trimmed) {
+      optimisticMessages.push({
+        type: 'text',
+        text: trimmed,
+        timestamp: now(),
+        sent: true,
+        messageId: `${pendingBatchId}_text`,
+        sending: true,
+      });
+    }
+
+    attachmentsToSend.forEach((att, index) => {
+      if (att.type === 'image') {
+        optimisticMessages.push({
+          type: 'image',
+          uri: att.uri,
+          timestamp: now(),
+          sent: true,
+          messageId: `${pendingBatchId}_att_${index}`,
+          uploading: true,
+        });
+      } else {
+        optimisticMessages.push({
+          type: 'file',
+          uri: att.uri,
+          name: att.name,
+          timestamp: now(),
+          sent: true,
+          messageId: `${pendingBatchId}_att_${index}`,
+          uploading: true,
+        });
+      }
+    });
+
+    const clearComposerNative = () => {
+      const anyRef = inputRef as React.RefObject<TextInput & { setNativeProps?: (props: object) => void }>;
+      const current = anyRef?.current;
+      if (current?.setNativeProps) {
+        current.setNativeProps({ text: '', value: '' });
+      }
+    };
+    const clearComposer = () => {
+      clearComposerNative();
+      setInputText('');
+      if (Platform.OS === 'android') {
+        requestAnimationFrame(() => clearComposerNative());
+      }
+    };
+
+    const hasMediaToUpload = attachmentsToSend.length > 0;
+
+    if (!hasMediaToUpload) {
+      setSendLoading(true);
+    }
+    clearComposer();
+    setPendingAttachments([]);
+    setReplyingTo(null);
+    socketService.typing(currentUserId, otherUserId, false);
+
+    if (optimisticMessages.length > 0) {
+      setMessages((prev) => [...prev, ...optimisticMessages]);
+      bumpScrollAfterLocalSend();
+    }
+
+    const replaceOptimisticMessage = (pendingMessageId: string, next: ChatMessage | null) => {
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => m.messageId === pendingMessageId);
+        if (idx === -1) {
+          return next ? [...prev, next] : prev;
+        }
+        if (!next) {
+          return prev.filter((_, i) => i !== idx);
+        }
+        const copy = [...prev];
+        copy[idx] = next;
+        return copy;
+      });
+    };
+
+    const patchOptimisticMediaMessage = (
+      pendingMessageId: string,
+      patch: { uploading?: boolean; uploadFailed?: boolean },
+    ) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.messageId === pendingMessageId && (m.type === 'image' || m.type === 'file')
+            ? { ...m, ...patch }
+            : m,
+        ),
+      );
+    };
+
+    const markPendingMediaUploadsFailed = () => {
+      attachmentsToSend.forEach((_, index) => {
+        patchOptimisticMediaMessage(`${pendingBatchId}_att_${index}`, {
+          uploading: false,
+          uploadFailed: true,
+        });
+      });
+    };
+
+    let remainingBatchUploads = attachmentsToSend.length;
+
+    const pendingAttachmentMessages = (prev: ChatMessage[]) =>
+      prev.filter(
+        (m) =>
+          typeof m.messageId === 'string' &&
+          m.messageId.startsWith(`${pendingBatchId}_att_`),
+      );
+
     try {
-      let appendedOutgoing = false;
       let effectiveChatId = chatId;
       let justCreatedChatViaAdd = false;
 
-      // If there is no existing chat, create it first with the first message
       if (!effectiveChatId) {
         const addRes = await apiClient.post(endpoints.chat.addChat, {
           senderId: currentUserId,
@@ -1595,40 +1698,20 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         effectiveChatId = extractChatIdFromAddChatResponse(addRes);
 
         if (!effectiveChatId) {
+          if (hasMediaToUpload) {
+            markPendingMediaUploadsFailed();
+          }
           setSendLoading(false);
           return;
         }
-        
 
         setChatId(effectiveChatId);
-        // Update navigation params so future navigations have the chat id
         navigation.setParams({ chatId: effectiveChatId } as any);
         justCreatedChatViaAdd = true;
       }
 
-      const clearComposerNative = () => {
-        // For the Android native input we sometimes need to explicitly clear the
-        // underlying EditText so the UI + placeholder stay in sync.
-        const anyRef = inputRef as any;
-        const current = anyRef?.current;
-        if (current?.setNativeProps) {
-          current.setNativeProps({ text: '', value: '' });
-        }
-      };
-      const clearComposer = () => {
-        clearComposerNative();
-        setInputText('');
-        if (Platform.OS === 'android') {
-          requestAnimationFrame(() => clearComposerNative());
-        }
-      };
-
       if (trimmed) {
-        socketService.typing(currentUserId, otherUserId, false);
         if (justCreatedChatViaAdd) {
-          // firstMessage is already stored by addChat — avoid duplicate sendMessage + clear UI now
-          clearComposer();
-          setReplyingTo(null);
           try {
             const msgRes = await getChatMessagesApi({
               chatId: effectiveChatId!,
@@ -1646,22 +1729,14 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   .filter((m): m is ChatMessage => m != null)
                   .reverse()
               : [];
-            // Right after addChat, history can be briefly empty; still show what the user sent.
-            if (list.length === 0 && trimmed) {
-              setMessages([
-                {
-                  type: 'text',
-                  text: trimmed,
-                  timestamp: now(),
-                  sent: true,
-                },
-              ]);
-              appendedOutgoing = true;
+
+            if (list.length === 0) {
               bumpScrollAfterLocalSend();
             } else {
-              setMessages(list);
-              appendedOutgoing = list.length > 0;
+              setMessages((prev) => [...list, ...pendingAttachmentMessages(prev)]);
+              bumpScrollAfterLocalSend();
             }
+
             const meta = msgRes.data?.meta;
             const currentPage = meta?.currentPage ?? meta?.pageNo ?? 1;
             const totalPages = meta?.totalPages ?? 1;
@@ -1684,8 +1759,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             chatStatus: isRequest ? 'pending' : undefined,
           });
           if (ui) {
-            setMessages((prev) => [...prev, ui as ChatMessage]);
-            appendedOutgoing = true;
+            replaceOptimisticMessage(`${pendingBatchId}_text`, ui as ChatMessage);
             setTimeout(() => {
               scrollToBottom(true);
             }, 100);
@@ -1697,76 +1771,93 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               apiMessage as unknown as Record<string, unknown>
             );
           }
-          clearComposer();
-          setReplyingTo(null);
         }
       }
-      for (const att of pendingAttachments) {
+
+      if (attachmentsToSend.length > 0) {
+        setPendingMediaUploadCount((n) => n + attachmentsToSend.length);
+      }
+
+      for (let index = 0; index < attachmentsToSend.length; index += 1) {
+        const att = attachmentsToSend[index];
+        const pendingMessageId = `${pendingBatchId}_att_${index}`;
         const messageType = getMessageTypeFromAttachment(att);
         const mimeType = getMimeTypeFromAttachment(att);
         const fileName = att.type === 'image'
           ? firstNonEmptyString(att.name, `image_${Date.now()}.jpg`)!
           : att.name;
-        const { url, key } = await uploadChatFileApi(att.uri, { mimeType, fileName });
-        const res = await sendMessageApi({
-          chatId: effectiveChatId!,
-          content: '',
-          messageType,
-          files: [{ url, key }],
-          replyTo: replyToPayload,
-        });
-        const extracted = extractChatMessageFromSendResponse(res);
-        const base = enrichOutgoingMediaPayload(extracted, messageType, url);
-        const firstFile = Array.isArray(base.files) ? base.files[0] : undefined;
-        const normalizedApiMessage: ChatMessageApiItem = {
-          ...base,
-          files: [
-            {
-              ...(firstFile ?? {}),
-              url: firstNonEmptyString(firstFile?.url, firstFile?.uri, url),
-              uri: firstNonEmptyString(firstFile?.uri, firstFile?.url, url),
-              name: firstNonEmptyString(firstFile?.name, firstFile?.filename, fileName),
-            },
-          ],
-          name: firstNonEmptyString(
-            base.name,
-            firstFile?.name,
-            firstFile?.filename,
-            fileName,
-          ),
-        };
-        const ui = mapApiMessageToChatMessage(normalizedApiMessage, currentUserId, {
-          chatStatus: isRequest ? 'pending' : undefined,
-        });
-        if (ui) {
-          setMessages((prev) => [...prev, ui]);
-          appendedOutgoing = true;
-          bumpScrollAfterLocalSend();
+        try {
+          const { url, key } = await uploadChatFileApi(att.uri, { mimeType, fileName });
+          const res = await sendMessageApi({
+            chatId: effectiveChatId!,
+            content: '',
+            messageType,
+            files: [{ url, key }],
+            replyTo: replyToPayload,
+          });
+          const extracted = extractChatMessageFromSendResponse(res);
+          const base = enrichOutgoingMediaPayload(extracted, messageType, url);
+          const firstFile = Array.isArray(base.files) ? base.files[0] : undefined;
+          const normalizedApiMessage: ChatMessageApiItem = {
+            ...base,
+            files: [
+              {
+                ...(firstFile ?? {}),
+                url: firstNonEmptyString(firstFile?.url, firstFile?.uri, url),
+                uri: firstNonEmptyString(firstFile?.uri, firstFile?.url, url),
+                name: firstNonEmptyString(firstFile?.name, firstFile?.filename, fileName),
+              },
+            ],
+            name: firstNonEmptyString(
+              base.name,
+              firstFile?.name,
+              firstFile?.filename,
+              fileName,
+            ),
+          };
+          const ui = mapApiMessageToChatMessage(normalizedApiMessage, currentUserId, {
+            chatStatus: isRequest ? 'pending' : undefined,
+          });
+          if (ui) {
+            replaceOptimisticMessage(pendingMessageId, ui);
+            bumpScrollAfterLocalSend();
+          }
+          if (currentUserId && otherUserId) {
+            socketService.messageSendFromApi(
+              currentUserId,
+              otherUserId,
+              normalizedApiMessage as unknown as Record<string, unknown>
+            );
+          }
+        } catch {
+          patchOptimisticMediaMessage(pendingMessageId, {
+            uploading: false,
+            uploadFailed: true,
+          });
+          showErrorToast('Could not send attachment. Please try again.');
+        } finally {
+          remainingBatchUploads = Math.max(0, remainingBatchUploads - 1);
+          setPendingMediaUploadCount((n) => Math.max(0, n - 1));
         }
-        if (currentUserId && otherUserId) {
-          socketService.messageSendFromApi(
-            currentUserId,
-            otherUserId,
-            normalizedApiMessage as unknown as Record<string, unknown>
-          );
-        }
       }
-
-      // Clear composer text/reply state after sending attachments too.
-      clearComposer();
-      setReplyingTo(null);
-
-      if (pendingAttachments.length > 0) {
-        setPendingAttachments([]);
+    } catch {
+      if (remainingBatchUploads > 0) {
+        markPendingMediaUploadsFailed();
+        setPendingMediaUploadCount((n) => Math.max(0, n - remainingBatchUploads));
+        remainingBatchUploads = 0;
       }
-
-      if (appendedOutgoing) {
-        bumpScrollAfterLocalSend();
-      }
-    } catch (err: unknown) {
-      // Send failed
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.messageId === `${pendingBatchId}_text` && m.type === 'text'
+            ? { ...m, sending: false }
+            : m,
+        ),
+      );
+      // Send failed — optimistic bubbles remain until the user retries or refreshes.
     } finally {
-      setSendLoading(false);
+      if (!hasMediaToUpload) {
+        setSendLoading(false);
+      }
     }
   };
 
@@ -2126,12 +2217,17 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       if (callState) {
         return renderCallStateBubbleRow(callState, msg.sent, msg.timestamp, index);
       }
+      const isSending = msg.sending === true;
       return (
         <React.Fragment key={index}>
           <View style={[styles.messageRow, msg.sent ? undefined : styles.messageRowReceived]}>
             <View ref={(r) => setMessageBubbleRef(index, r)} collapsable={false}>
             <TouchableOpacity
-              style={[styles.bubble, msg.sent ? styles.bubbleSent : styles.bubbleReceived]}
+              style={[
+                styles.bubble,
+                msg.sent ? styles.bubbleSent : styles.bubbleReceived,
+                isSending && styles.bubbleSending,
+              ]}
               activeOpacity={1}
               onLongPress={() => handleMessageLongPress(index)}
             >
@@ -2150,6 +2246,13 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             </View>
           </View>
           <View style={[styles.timeRow, msg.sent ? undefined : styles.timeRowReceived]}>
+            {isSending ? (
+              <ActivityIndicator
+                size="small"
+                color={colors.neutral[500]}
+                style={styles.messageSendingSpinner}
+              />
+            ) : null}
             <Text style={styles.timeText}>{msg.timestamp}</Text>
           </View>
         </React.Fragment>
@@ -2261,31 +2364,43 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
     if (msg.type === 'image') {
       const imageUri = msg.uri;
+      const isUploading = msg.uploading === true;
+      const uploadFailed = msg.uploadFailed === true;
       return (
         <React.Fragment key={index}>
           <View style={[styles.messageRow, msg.sent ? undefined : styles.messageRowReceived]}>
             <View ref={(r) => setMessageBubbleRef(index, r)} collapsable={false}>
-            <TouchableOpacity
-              style={[
-                styles.imageBubble,
-                msg.sent ? undefined : styles.imageBubbleReceived,
-                { width: imageBubbleSize, height: imageBubbleSize },
-              ]}
-              activeOpacity={1}
-              onPress={() => openImagePreview(imageUri)}
-              onLongPress={() => handleMessageLongPress(index)}
-            >
-              <Image source={{ uri: imageUri }} style={styles.imageBubbleImage} resizeMode="cover" />
-            </TouchableOpacity>
+              <ChatBubbleImage
+                uri={imageUri}
+                width={imageBubbleSize}
+                height={imageBubbleSize}
+                sent={msg.sent}
+                isUploading={isUploading}
+                uploadFailed={uploadFailed}
+                onPress={() => {
+                  if (isUploading || uploadFailed) return;
+                  openImagePreview(imageUri);
+                }}
+                onLongPress={() => handleMessageLongPress(index)}
+              />
             </View>
           </View>
           <View style={[styles.timeRow, msg.sent ? undefined : styles.timeRowReceived]}>
+            {isUploading ? (
+              <ActivityIndicator
+                size="small"
+                color={colors.neutral[500]}
+                style={styles.messageSendingSpinner}
+              />
+            ) : null}
             <Text style={styles.timeText}>{msg.timestamp}</Text>
           </View>
         </React.Fragment>
       );
     }
     if (msg.type === 'file') {
+      const isUploading = msg.uploading === true;
+      const uploadFailed = msg.uploadFailed === true;
       return (
         <React.Fragment key={index}>
           <View style={[styles.messageRow, msg.sent ? undefined : styles.messageRowReceived]}>
@@ -2293,7 +2408,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             <TouchableOpacity
               style={[styles.fileBubble, msg.sent ? undefined : styles.fileBubbleReceived]}
               activeOpacity={0.9}
+              disabled={isUploading}
               onPress={() => {
+                if (isUploading || uploadFailed) return;
                 openDocument(msg.uri).catch(() => {});
               }}
               onLongPress={() => handleMessageLongPress(index)}
@@ -2304,10 +2421,27 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               <Text style={[styles.fileBubbleName, msg.sent ? undefined : styles.fileBubbleNameReceived]} numberOfLines={1}>
                 {msg.name}
               </Text>
+              {isUploading ? (
+                <View style={styles.messageUploadOverlay}>
+                  <ActivityIndicator size="large" color={colors.white} />
+                </View>
+              ) : null}
+              {uploadFailed ? (
+                <View style={styles.messageUploadOverlay}>
+                  <Text style={styles.messageUploadFailedText}>Failed to send</Text>
+                </View>
+              ) : null}
             </TouchableOpacity>
             </View>
           </View>
           <View style={[styles.timeRow, msg.sent ? undefined : styles.timeRowReceived]}>
+            {isUploading ? (
+              <ActivityIndicator
+                size="small"
+                color={colors.neutral[500]}
+                style={styles.messageSendingSpinner}
+              />
+            ) : null}
             <Text style={styles.timeText}>{msg.timestamp}</Text>
           </View>
         </React.Fragment>
@@ -4397,10 +4531,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         scrollEventThrottle={16}
       >
         {messagesLoading ? (
-          <View style={styles.messagesLoadingWrap}>
-            <ActivityIndicator size="large" color={colors.primary.purple} />
-            <Text style={styles.messagesLoadingText}>{STRINGS.CHAT.LOADING_MESSAGES}</Text>
-          </View>
+          <ChatMessagesSkeleton />
         ) : (
           <>
             {messagesLoadingMore && (
@@ -4558,135 +4689,51 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               </TouchableOpacity>
             </View>
           )}
-          {/* <View style={[styles.inputBar, { paddingBottom: 12 + insets.bottom }]}>
-            <View style={styles.inputBarContent}>
-              {otherUserTyping && (
-                <View style={styles.typingIndicatorWrap}>
-                  <Text style={styles.typingIndicatorText} numberOfLines={1}>{STRINGS.CHAT.TYPING_INDICATOR}</Text>
-                </View>
-              )}
-              <View style={styles.inputWrap}>
-            {pendingAttachments.length > 0 && (
-              <View style={styles.attachmentsInsidePill}>
-                {pendingAttachments.map((att, i) => (
-                  <View key={i} style={styles.attachmentPreviewWrapper}>
-                    <View style={att.type === 'image' ? styles.attachmentPreview : styles.attachmentPreviewFileCard}>
-                      {att.type === 'image' ? (
-                        <Image source={{ uri: att.uri }} style={styles.attachmentPreviewImage} resizeMode="cover" />
-                      ) : (
-                        <>
-                          <Text style={styles.attachmentPreviewFileType}>{getFileTypeLabel(att.name)}</Text>
-                          <Text style={styles.attachmentPreviewFileName} numberOfLines={2}>
-                            {att.name}
-                          </Text>
-                        </>
-                      )}
-                    </View>
-                    <TouchableOpacity
-                      style={styles.attachmentRemove}
-                      onPress={() => setPendingAttachments((p) => p.filter((_, idx) => idx !== i))}
+                    <View
+                      style={[
+                        styles.inputBar,
+                        { paddingBottom: 12 + bottomSafeInset },
+                        (pendingAttachments.length > 0 || isMultilineComposer) &&
+                          styles.inputBarWithAttachments,
+                      ]}
                     >
-                      <Text style={{ color: colors.white, fontSize: 12, fontWeight: '600' }}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-            <View style={styles.inputRow}>
-              <TouchableOpacity style={styles.attachButton} activeOpacity={0.7} onPress={() => setAttachmentSheetOpen(true)}>
-                <PlusIcon size={20} color={colors.black} />
-              </TouchableOpacity>
-              <TextInput
-                ref={inputRef}
-                style={styles.input}
-                placeholder={STRINGS.CHAT.START_CHAT_PLACEHOLDER}
-                placeholderTextColor={colors.neutral[600]}
-                value={inputText}
-                onChangeText={setInputText}
-                onFocus={() => {
-                  if (currentUserId && otherUserId) {
-                    if (typingStopRef.current) clearTimeout(typingStopRef.current);
-                    typingStopRef.current = null;
-                    socketService.typing(currentUserId, otherUserId, true);
-                  }
-                }}
-                onBlur={() => {
-                  if (currentUserId && otherUserId) {
-                    if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
-                    typingDebounceRef.current = null;
-                    if (typingStopRef.current) clearTimeout(typingStopRef.current);
-                    typingStopRef.current = null;
-                    socketService.typing(currentUserId, otherUserId, false);
-                  }
-                }}
-                multiline
-                scrollEnabled={false}
-                returnKeyType="default"
-                cursorColor={colors.primary.purple}
-                selectionColor={colors.primary[50]}
-              />
-            </View>
-            </View>
-            </View>
-          <TouchableOpacity
-            style={styles.sendButton}
-            activeOpacity={0.8}
-            onPress={handleSend}
-            disabled={sendLoading}
-          >
-            {sendLoading ? (
-              <ActivityIndicator size="small" color={colors.white} />
-            ) : (
-              <ForwardArrowIcon size={22} color={colors.white} />
-            )}
-          </TouchableOpacity>
-          </View> */}
-                    <View style={[styles.inputBar, { paddingBottom: 12 + bottomSafeInset }]}>
             <View
               style={[
                 styles.inputWrap,
-                pendingAttachments.length === 0 && styles.inputWrapCentered,
+                pendingAttachments.length > 0 && styles.inputWrapWithAttachments,
+                isMultilineComposer &&
+                  pendingAttachments.length === 0 &&
+                  styles.inputWrapExpandedMultiline,
               ]}
             >
             {pendingAttachments.length > 0 && (
-              <View style={styles.attachmentsInsidePill}>
-                {pendingAttachments.map((att, i) => (
-                  <View key={i} style={styles.attachmentPreviewWrapper}>
-                    <View style={att.type === 'image' ? styles.attachmentPreview : styles.attachmentPreviewFileCard}>
-                      {att.type === 'image' ? (
-                        <Image source={{ uri: att.uri }} style={styles.attachmentPreviewImage} resizeMode="cover" />
-                      ) : (
-                        <>
-                          <Text style={styles.attachmentPreviewFileType}>{getFileTypeLabel(att.name)}</Text>
-                          <Text style={styles.attachmentPreviewFileName} numberOfLines={2}>
-                            {att.name}
-                          </Text>
-                        </>
-                      )}
-                    </View>
-                    <TouchableOpacity
-                      style={styles.attachmentRemove}
-                      onPress={() => setPendingAttachments((p) => p.filter((_, idx) => idx !== i))}
-                    >
-                      <Text style={{ color: colors.white, fontSize: 12, fontWeight: '600' }}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
+              <ComposerAttachmentPreviews
+                attachments={pendingAttachments}
+                sendLoading={sendLoading || pendingMediaUploadCount > 0}
+                onRemove={(index) =>
+                  setPendingAttachments((p) => p.filter((_, idx) => idx !== index))
+                }
+              />
             )}
             <View
               style={[
                 styles.inputRow,
-                composerInputHeight > CHAT_INPUT_MIN_HEIGHT + 4 && styles.inputRowExpanded,
+                !isMultilineComposer && styles.inputRowCompact,
+                isMultilineComposer && styles.inputRowExpanded,
               ]}
             >
-              <TouchableOpacity style={styles.attachButton} activeOpacity={0.7} onPress={() => setAttachmentSheetOpen(true)}>
+              <TouchableOpacity
+                style={styles.attachButton}
+                activeOpacity={0.7}
+                disabled={voice.voiceSendLoading}
+                onPress={() => setAttachmentSheetOpen(true)}
+              >
                 <PlusIcon size={20} color={colors.black} />
               </TouchableOpacity>
               <View
                 style={[
                   styles.composerInputOuter,
-                  isSingleLineComposer && styles.composerInputOuterSingleLine,
+                  inputText.length === 0 && styles.composerInputOuterCompact,
                 ]}
               >
                 {inputText.length === 0 && (
@@ -4697,42 +4744,31 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   </View>
                 )}
                 <TextInput
-                  style={[
-                    styles.chatInput,
-                    isSingleLineComposer && styles.chatInputSingleLine,
-                    Platform.OS === 'android' && {
-                      height: isSingleLineComposer
-                        ? CHAT_INPUT_MIN_HEIGHT
-                        : composerInputHeight,
-                    },
-                  ]}
+                  style={styles.chatInput}
                   ref={inputRef}
                   placeholder=""
                   value={inputText}
-                  selection={composerSelection}
                   autoCorrect={false}
+                  editable={!voice.voiceSendLoading}
                   onChangeText={setInputText}
                   onSelectionChange={(event) => {
                     const { start, end } = event.nativeEvent.selection;
-                    setComposerSelection({ start, end });
+                    composerSelectionRef.current = { start, end };
                   }}
                   onKeyPress={(event) => {
                     if (Platform.OS !== 'ios' || event.nativeEvent.key !== 'Enter') return;
-                    const { start, end } = composerSelection;
+                    const { start, end } = composerSelectionRef.current;
                     const safeStart = Math.max(0, Math.min(start, inputText.length));
                     const safeEnd = Math.max(safeStart, Math.min(end, inputText.length));
                     const nextText = `${inputText.slice(0, safeStart)}\n${inputText.slice(safeEnd)}`;
                     const nextCursor = safeStart + 1;
                     setInputText(nextText);
-                    setComposerSelection({ start: nextCursor, end: nextCursor });
-                  }}
-                  onContentSizeChange={(event) => {
-                    const height = event.nativeEvent.contentSize.height;
-                    const newHeight = Math.max(
-                      CHAT_INPUT_MIN_HEIGHT,
-                      Math.min(CHAT_INPUT_MAX_HEIGHT, height),
-                    );
-                    setComposerInputHeight(newHeight);
+                    requestAnimationFrame(() => {
+                      composerSelectionRef.current = { start: nextCursor, end: nextCursor };
+                      inputRef.current?.setNativeProps({
+                        selection: { start: nextCursor, end: nextCursor },
+                      });
+                    });
                   }}
                   onFocus={() => {
                     if (currentUserId && otherUserId) {
@@ -4750,16 +4786,14 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                       socketService.typing(currentUserId, otherUserId, false);
                     }
                   }}
-                  multiline={!isSingleLineComposer}
+                  multiline
                   blurOnSubmit={false}
-                  scrollEnabled={composerInputHeight >= CHAT_INPUT_MAX_HEIGHT}
+                  scrollEnabled
                   underlineColorAndroid="transparent"
-                  textAlignVertical={isSingleLineComposer ? 'center' : 'top'}
+                  textAlignVertical="top"
                   disableFullscreenUI
                   returnKeyType="default"
                   keyboardType="default"
-                  cursorColor={colors.primary.purple}
-                  selectionColor={colors.primary[50]}
                 />
               </View>
             </View>
@@ -4767,7 +4801,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           <TouchableOpacity
             style={[
               styles.sendButton,
+              (pendingAttachments.length > 0 || isMultilineComposer) &&
+                styles.sendButtonWithAttachments,
               !inputText.trim() && pendingAttachments.length === 0 && styles.sendButtonMic,
+              (sendLoading || pendingMediaUploadCount > 0 || voice.voiceSendLoading) &&
+                styles.sendButtonDisabled,
             ]}
             activeOpacity={0.8}
             onPress={() => {
@@ -4777,9 +4815,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               }
               handleSend().catch(() => {});
             }}
-            disabled={sendLoading || voice.voiceSendLoading}
+            disabled={sendLoading || pendingMediaUploadCount > 0 || voice.voiceSendLoading}
           >
-            {sendLoading ? (
+            {sendLoading && pendingMediaUploadCount === 0 ? (
               <ActivityIndicator size="small" color={colors.white} />
             ) : !inputText.trim() && pendingAttachments.length === 0 ? (
               <MicIcon size={22} color={colors.black} />

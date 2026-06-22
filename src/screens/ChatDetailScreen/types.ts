@@ -6,6 +6,8 @@ export type ChatMessage =
       sent: boolean;
       replyTo?: { senderName: string; preview: string };
       messageId?: string;
+      /** Optimistic bubble waiting for send API confirmation. */
+      sending?: boolean;
     }
   | {
       type: 'rich';
@@ -21,8 +23,25 @@ export type ChatMessage =
       messageId?: string;
     }
   | { type: 'voice'; uri: string; timestamp: string; sent: boolean; messageId?: string }
-  | { type: 'image'; uri: string; timestamp: string; sent: boolean; messageId?: string }
-  | { type: 'file'; uri: string; name: string; timestamp: string; sent: boolean; messageId?: string }
+  | {
+      type: 'image';
+      uri: string;
+      timestamp: string;
+      sent: boolean;
+      messageId?: string;
+      uploading?: boolean;
+      uploadFailed?: boolean;
+    }
+  | {
+      type: 'file';
+      uri: string;
+      name: string;
+      timestamp: string;
+      sent: boolean;
+      messageId?: string;
+      uploading?: boolean;
+      uploadFailed?: boolean;
+    }
   /** Persisted call row from API `messageType: system_call` + `contentBlocks[].type === call_log`. */
   | {
       type: 'call_log';

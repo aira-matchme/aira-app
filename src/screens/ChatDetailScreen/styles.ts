@@ -6,15 +6,24 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export const H_PADDING = 16;
 const INPUT_PILL_BG = '#f3f3f3';
 const INPUT_RADIUS = 999;
+/** Figma 2652-23073 / 2652-23137 — rounded card for multiline text or attachment previews. */
+const INPUT_RADIUS_WITH_ATTACHMENTS = 24;
+export const COMPOSER_ATTACHMENT_PREVIEW_SIZE = 56;
 export const INPUT_BAR_HEIGHT = 56;
 /** Min/max for composer TextInput: grows with text, then scrolls inside at max. */
 export const CHAT_INPUT_MIN_HEIGHT = 36;
 export const CHAT_INPUT_MAX_HEIGHT = 120;
+/** Pill cap when attachment previews + multiline text are both at max (text scrolls inside). */
+export const COMPOSER_WRAP_MAX_WITH_ATTACHMENTS =
+  12 + COMPOSER_ATTACHMENT_PREVIEW_SIZE + 4 + CHAT_INPUT_MAX_HEIGHT + 10;
+/** Pill cap for multiline text only (Figma 2652-23073) — same text max as attachment composer. */
+export const COMPOSER_WRAP_MAX_MULTILINE = 12 + CHAT_INPUT_MAX_HEIGHT + 10;
 const INPUT_MAX_HEIGHT = CHAT_INPUT_MAX_HEIGHT;
 /** Figma 3339-7411 / Match AI composer: 48px circular actions + 12px row inset */
 const MESSAGE_COMPOSER_ACTION_SIZE = 52;
+const COMPOSER_ATTACH_BUTTON_SIZE = 48;
+const COMPOSER_ATTACH_GAP = 8;
 const MESSAGE_COMPOSER_ROW_PADDING_H = 12;
-const ATTACH_BUTTON_SIZE = MESSAGE_COMPOSER_ACTION_SIZE;
 const IMAGE_BUBBLE_SIZE = 200;
 const SEND_BUTTON_SIZE = MESSAGE_COMPOSER_ACTION_SIZE;
 export const BUBBLE_MAX_WIDTH = SCREEN_WIDTH * 0.75;
@@ -2390,6 +2399,9 @@ export const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingVertical: 8,
   },
+  messageSendingSpinner: {
+    marginRight: 4,
+  },
   messageRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -2407,6 +2419,9 @@ export const styles = StyleSheet.create({
   },
   bubbleSent: {
     backgroundColor: colors.primary.purple,
+  },
+  bubbleSending: {
+    opacity: 0.88,
   },
   bubbleReceived: {
     backgroundColor: colors.primary[50],
@@ -2574,6 +2589,9 @@ export const styles = StyleSheet.create({
     paddingBottom: 12,
     backgroundColor: colors.white,
   },
+  inputBarWithAttachments: {
+    alignItems: 'flex-end',
+  },
   inputBarContent: {
     flex: 1,
     flexDirection: 'column',
@@ -2591,36 +2609,59 @@ export const styles = StyleSheet.create({
     flexDirection: 'column',
     backgroundColor: INPUT_PILL_BG,
     borderRadius: INPUT_RADIUS,
-    paddingLeft: 16,
-    paddingRight: 16,
+    paddingHorizontal: MESSAGE_COMPOSER_ROW_PADDING_H,
     paddingVertical: 0,
     minHeight: INPUT_BAR_HEIGHT,
-    maxHeight: INPUT_MAX_HEIGHT + 80,
-    justifyContent: 'flex-start',
-  },
-  /** Vertically center composer row in pill when there are no attachment previews */
-  inputWrapCentered: {
+    maxHeight: COMPOSER_WRAP_MAX_MULTILINE,
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  /** Multiline text only — same card treatment as attachment composer (Figma 2652-23073). */
+  inputWrapExpandedMultiline: {
+    borderRadius: INPUT_RADIUS_WITH_ATTACHMENTS,
+    paddingTop: 12,
+    paddingBottom: 10,
+    justifyContent: 'flex-start',
+    maxHeight: COMPOSER_WRAP_MAX_MULTILINE,
+  },
+  inputWrapWithAttachments: {
+    paddingTop: 12,
+    paddingBottom: 10,
+    justifyContent: 'flex-start',
+    borderRadius: INPUT_RADIUS_WITH_ATTACHMENTS,
+    minHeight: 0,
+    maxHeight: COMPOSER_WRAP_MAX_WITH_ATTACHMENTS,
+    overflow: 'hidden',
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: MESSAGE_COMPOSER_ACTION_SIZE,
+    minHeight: INPUT_BAR_HEIGHT,
+    width: '100%',
   },
-  /** Multiline: pin + and field to bottom of growing pill */
+  /** Single-line idle: vertically center + and field in the pill */
+  inputRowCompact: {
+    alignItems: 'center',
+    minHeight: INPUT_BAR_HEIGHT,
+  },
+  /** Multiline / attachments: pin + to bottom-left of growing row */
   inputRowExpanded: {
     alignItems: 'flex-end',
+    minHeight: MESSAGE_COMPOSER_ACTION_SIZE,
   },
-  /** Wraps TextInput + placeholder; centers short field with attach + send. */
+  /** Wraps TextInput + placeholder. */
   composerInputOuter: {
     flex: 1,
     minHeight: CHAT_INPUT_MIN_HEIGHT,
-    justifyContent: 'flex-end',
+    maxHeight: CHAT_INPUT_MAX_HEIGHT,
+    justifyContent: 'flex-start',
     alignSelf: 'stretch',
     position: 'relative',
+    overflow: 'hidden',
   },
-  composerInputOuterSingleLine: {
+  composerInputOuterCompact: {
     justifyContent: 'center',
+    alignSelf: 'center',
   },
   composerPlaceholderWrap: {
     ...StyleSheet.absoluteFillObject,
@@ -2634,21 +2675,25 @@ export const styles = StyleSheet.create({
   },
   attachmentsInsidePill: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
     gap: 8,
-    paddingBottom: 8,
+    height: COMPOSER_ATTACHMENT_PREVIEW_SIZE,
+    maxWidth: '100%',
+    paddingBottom: 4,
     overflow: 'visible',
   },
-  /** Plus sits on pill surface — no nested ring (Figma 3339-7411 / Match composer) */
+  /** Plus on pill surface — centered with text when idle; row flex-end handles multiline */
   attachButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: COMPOSER_ATTACH_BUTTON_SIZE,
+    height: COMPOSER_ATTACH_BUTTON_SIZE,
+    borderRadius: COMPOSER_ATTACH_BUTTON_SIZE / 2,
     backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'center',
-    marginRight: 8,
+    flexShrink: 0,
+    marginRight: COMPOSER_ATTACH_GAP,
   },
   input: {
     ...typography.body,
@@ -2665,23 +2710,19 @@ export const styles = StyleSheet.create({
     alignSelf: 'stretch',
     minHeight: CHAT_INPUT_MIN_HEIGHT,
     maxHeight: CHAT_INPUT_MAX_HEIGHT,
-    paddingTop: Platform.OS === 'ios' ? 10 : 6,
-    paddingBottom: Platform.OS === 'ios' ? 10 : 6,
+    paddingTop: Platform.OS === 'ios' ? 7 : 5,
+    paddingBottom: Platform.OS === 'ios' ? 7 : 5,
     paddingHorizontal: 0,
     fontSize: 16,
+    lineHeight: 22,
     color: '#000',
+    backgroundColor: 'transparent',
     ...Platform.select({
       android: {
         includeFontPadding: false,
       },
     }),
     textAlignVertical: 'top',
-  },
-  chatInputSingleLine: {
-    paddingTop: 0,
-    paddingBottom: 0,
-    minHeight: CHAT_INPUT_MIN_HEIGHT,
-    maxHeight: CHAT_INPUT_MIN_HEIGHT,
   },
   askAiraChipGradientWrap: {
     alignSelf: 'center',
@@ -2807,11 +2848,18 @@ export const styles = StyleSheet.create({
     marginLeft: 8,
     alignSelf: 'center',
   },
+  sendButtonWithAttachments: {
+    alignSelf: 'flex-end',
+    marginBottom: 2,
+  },
   /** Mic / idle — same treatment as MatchScreen sendButtonDisabled */
   sendButtonMic: {
     backgroundColor: INPUT_PILL_BG,
     borderWidth: 1,
     borderColor: colors.neutral[200],
+  },
+  sendButtonDisabled: {
+    opacity: 0.45,
   },
   inputArea: {
     backgroundColor: colors.white,
@@ -2992,11 +3040,14 @@ borderRadius: 16,
   },
   attachmentPreviewWrapper: {
     position: 'relative',
+    flexShrink: 0,
+    width: COMPOSER_ATTACHMENT_PREVIEW_SIZE,
+    height: COMPOSER_ATTACHMENT_PREVIEW_SIZE,
     overflow: 'visible',
   },
   attachmentPreview: {
-    width: 56,
-    height: 56,
+    width: COMPOSER_ATTACHMENT_PREVIEW_SIZE,
+    height: COMPOSER_ATTACHMENT_PREVIEW_SIZE,
     borderRadius: 12,
     backgroundColor: colors.neutral[100],
     overflow: 'hidden',
@@ -3006,27 +3057,29 @@ borderRadius: 16,
     height: '100%',
   },
   attachmentPreviewFileCard: {
-    width: 72,
-    minHeight: 56,
+    width: COMPOSER_ATTACHMENT_PREVIEW_SIZE,
+    height: COMPOSER_ATTACHMENT_PREVIEW_SIZE,
     borderRadius: 12,
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.neutral[200],
-    paddingTop: 8,
-    paddingHorizontal: 8,
-    paddingBottom: 8,
+    paddingTop: 6,
+    paddingHorizontal: 6,
+    paddingBottom: 6,
     overflow: 'hidden',
+    justifyContent: 'center',
   },
   attachmentPreviewFileType: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
     color: colors.neutral[600],
-    marginBottom: 4,
+    marginBottom: 2,
   },
   attachmentPreviewFileName: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '500',
     color: colors.black,
+    lineHeight: 12,
   },
   attachmentPreviewFile: {
     width: '100%',
@@ -3036,15 +3089,39 @@ borderRadius: 16,
   },
   attachmentRemove: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    top: 4,
+    right: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: colors.neutral[700],
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1,
+  },
+  attachmentRemoveLabel: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 14,
+  },
+  attachmentOverflowTile: {
+    width: COMPOSER_ATTACHMENT_PREVIEW_SIZE,
+    height: COMPOSER_ATTACHMENT_PREVIEW_SIZE,
+    borderRadius: 12,
+    backgroundColor: colors.primary[50],
+    borderWidth: 1,
+    borderColor: colors.primary[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  attachmentOverflowText: {
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '600',
+    color: colors.primary.purple,
+    letterSpacing: 0.28,
   },
   imageBubble: {
     maxWidth: BUBBLE_MAX_WIDTH,
@@ -3060,6 +3137,18 @@ borderRadius: 16,
     width: '100%',
     height: '100%',
   },
+  messageUploadOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.58)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  messageUploadFailedText: {
+    ...typography.bodyMedium,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.white,
+  },
   fileBubble: {
     maxWidth: BUBBLE_MAX_WIDTH,
     flexDirection: 'row',
@@ -3070,6 +3159,7 @@ borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
     gap: 12,
+    overflow: 'hidden',
   },
   fileBubbleReceived: {
     backgroundColor: colors.primary[50],
