@@ -372,12 +372,13 @@ export const styles = StyleSheet.create({
   },
   chipsRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   chip: {
     flex: 1,
+    minWidth: 0,
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     borderRadius: MATCH_CHIP_BORDER_RADIUS,
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderWidth: 1,
@@ -386,11 +387,14 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chipLabel: {
-    fontSize: 12,
+    width: '100%',
+    fontSize: 11,
     fontWeight: '500',
-    lineHeight: 18,
-    letterSpacing: 0.48,
+    lineHeight: 14,
+    letterSpacing: 0.24,
     color: '#e6e6e6',
+    textAlign: 'center',
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
   },
   chipPercent: {
     fontSize: 14,

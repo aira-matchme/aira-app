@@ -406,14 +406,4 @@ export const styles = StyleSheet.create({
     lineHeight: 18,
     letterSpacing: 0.24,
   },
-  restoreLink: {
-    alignSelf: 'center',
-    paddingVertical: spacing.sm,
-  },
-  restoreLinkText: {
-    fontSize: 14,
-    fontFamily: typography.fontFamily.medium,
-    color: 'rgba(255,255,255,0.7)',
-    textDecorationLine: 'underline',
-  },
 });

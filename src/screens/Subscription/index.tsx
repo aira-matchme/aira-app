@@ -195,11 +195,9 @@ type PurchaseFooterProps = {
   isLoading: boolean;
   hasProduct: boolean;
   showRetry: boolean;
-  showRestore?: boolean;
   bottomInset: number;
   onBuy: () => void;
   onRetry: () => void;
-  onRestore?: () => void;
 };
 
 const PurchaseFooter: React.FC<PurchaseFooterProps> = ({
@@ -207,11 +205,9 @@ const PurchaseFooter: React.FC<PurchaseFooterProps> = ({
   isLoading,
   hasProduct,
   showRetry,
-  showRestore = false,
   bottomInset,
   onBuy,
   onRetry,
-  onRestore,
 }) => (
   <View style={styles.purchaseWrap}>
     <View style={styles.bottomPanelWrap}>
@@ -244,17 +240,6 @@ const PurchaseFooter: React.FC<PurchaseFooterProps> = ({
           </TouchableOpacity>
         ) : null}
 
-        {showRestore ? (
-          <TouchableOpacity
-            style={styles.restoreLink}
-            onPress={onRestore}
-            activeOpacity={0.7}
-            disabled={isLoading}
-          >
-            <Text style={styles.restoreLinkText}>Restore purchases</Text>
-          </TouchableOpacity>
-        ) : null}
-
         <Text style={styles.legalText}>
           Subscription auto-renews monthly. Cancel anytime from your Play Store or App Store
           settings.
@@ -282,7 +267,6 @@ export const SubscriptionScreen: React.FC = () => {
     isInitializing,
     isLoading,
     buySubscription,
-    restorePurchases,
     reloadProducts,
   } = useIAP({ enabled: isAuthenticated });
 
@@ -395,11 +379,9 @@ export const SubscriptionScreen: React.FC = () => {
             isLoading={isLoading}
             hasProduct={Boolean(monthlyProduct)}
             showRetry={subscriptions.length === 0 && !isLoading}
-            showRestore
             bottomInset={bottomInset}
             onBuy={() => monthlyProduct && handleBuy(monthlyProduct.id)}
             onRetry={() => void reloadProducts()}
-            onRestore={() => void restorePurchases()}
           />
         </View>
       </SafeAreaView>

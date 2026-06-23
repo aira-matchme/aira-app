@@ -77,6 +77,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { STRINGS } from '../../constants/strings';
 import { colors, typography } from '../../theme';
 import type { ChatStackParamList } from '../../navigation/types';
+import { navigateToSubscription } from '../../navigation/navigateToSubscription';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { setChatRequestActionApi, blockUserApi, reportUserApi, getChatMessagesApi, mapApiMessageToChatMessage, markChatSeenApi, sendMessageApi, uploadChatFileApi, postAIMessagesApi, getAiSuggestionsApi, deleteMessageApi, extractChatMessageFromSendResponse, type ChatMessageApiItem } from '../../modules/chat/api';
@@ -1553,16 +1554,9 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
   };
 
-  const navigateToSubscription = useCallback(() => {
-    const rootNav = navigation.getParent?.()?.getParent?.() ?? navigation.getParent?.();
-    if (rootNav && typeof (rootNav as any).navigate === 'function') {
-      (rootNav as any).navigate('Profile', { screen: 'Subscription' });
-    }
-  }, [navigation]);
-
   const handleSend = async () => {
     if (!isSubscribed) {
-      navigateToSubscription();
+      navigateToSubscription(navigation);
       return;
     }
 
@@ -4556,7 +4550,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         <TouchableOpacity
           style={[styles.subscriptionGateBanner, { paddingBottom: 12 + bottomSafeInset }]}
           activeOpacity={0.8}
-          onPress={navigateToSubscription}
+          onPress={() => navigateToSubscription(navigation)}
         >
           <LinearGradient
             colors={['#7B2FF2', '#C94CF8']}

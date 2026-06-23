@@ -124,6 +124,20 @@ type CursorPageResult = {
   prevCursor: string | null;
 };
 
+/** Keeps long labels (e.g. Personality) on one line across iOS and Android. */
+function MatchChipLabel({ children }: { children: string }) {
+  return (
+    <Text
+      style={styles.chipLabel}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.75}
+    >
+      {children}
+    </Text>
+  );
+}
+
 export const DashboardScreen = () => {
   const insets = useSafeAreaInsets();
   const tabBarOccupiedHeight = useTabBarOccupiedHeight();
@@ -829,19 +843,19 @@ export const DashboardScreen = () => {
                       </View>
                       <View style={styles.chipsRow}>
                         <View style={styles.chip}>
-                          <Text style={styles.chipLabel}>Lifestyle</Text>
+                          <MatchChipLabel>Lifestyle</MatchChipLabel>
                           <Text style={styles.chipPercent}>
                             {match.lifestylePercent}%
                           </Text>
                         </View>
                         <View style={styles.chip}>
-                          <Text style={styles.chipLabel}>Personality</Text>
+                          <MatchChipLabel>Personality</MatchChipLabel>
                           <Text style={styles.chipPercent}>
                             {match.personalityPercent}%
                           </Text>
                         </View>
                         <View style={styles.chip}>
-                          <Text style={styles.chipLabel}>Others</Text>
+                          <MatchChipLabel>Others</MatchChipLabel>
                           <Text style={styles.chipPercent}>
                             {match.otherPercent}%
                           </Text>
