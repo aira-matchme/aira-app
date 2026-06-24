@@ -585,6 +585,8 @@ export const STRINGS = {
     MICROPHONE_PERMISSION_TITLE: 'AIRA Would Like To Access The Microphone',
     MICROPHONE_PERMISSION_DESCRIPTION:
       'AIRA uses the microphone to record and send voice messages in chat. These can be managed in Settings.',
+    SOCKET_DISCONNECTED:
+      'Not connected to the server. Check your network and try again.',
   },
 } as const;
 

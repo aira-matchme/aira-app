@@ -91,5 +91,6 @@ export const endpoints = {
     googleSync: '/iap/google/sync',
     entitlements: '/iap/entitlements',
     transactions: '/iap/transactions',
+    cancelRequest: '/iap/cancel-request',
   },
 };

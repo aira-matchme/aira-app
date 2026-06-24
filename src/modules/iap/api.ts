@@ -1,6 +1,8 @@
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
 import type {
+  CancelSubscriptionRequest,
+  CancelSubscriptionResponse,
   IapEntitlementsResponse,
   IapTransactionsResponse,
   RegisterAppAccountTokenRequest,
@@ -66,6 +68,17 @@ export const getIapTransactionsApi = async (
   const { data } = await apiClient.get<IapTransactionsResponse>(
     endpoints.iap.transactions,
     { params: { page, limit } },
+  );
+  return data;
+};
+
+/** Store cancellation reason before redirecting user to App / Play Store. */
+export const postCancelSubscriptionRequestApi = async (
+  payload: CancelSubscriptionRequest,
+): Promise<CancelSubscriptionResponse> => {
+  const { data } = await apiClient.post<CancelSubscriptionResponse>(
+    endpoints.iap.cancelRequest,
+    { reason: payload.reason.trim().slice(0, 120) },
   );
   return data;
 };

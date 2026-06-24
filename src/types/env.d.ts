@@ -2,6 +2,8 @@ declare module '@env' {
   /** Sentry project DSN; leave empty to disable Sentry in local builds. */
   export const SENTRY_DSN: string | undefined;
   export const API_BASE_URL: string;
+  /** Optional — Socket.IO server; derived from API_BASE_URL when omitted. */
+  export const SOCKET_URL: string | undefined;
   export const NODE_ENV: string;
   export const API_KEY: string;
   export const GOOGLE_CLIENT_ID: string;

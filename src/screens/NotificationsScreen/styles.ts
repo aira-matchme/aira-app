@@ -1,19 +1,31 @@
-import { StyleSheet, Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { colors, typography } from '../../theme';
+import { NOTIFICATIONS_FIGMA } from './notificationsLayout';
 
-/** Match ChatScreen — Figma chat list horizontal inset */
-export const H_PADDING = 15;
+const {
+  H_PADDING,
+  LIST_TOP,
+  ROW_PADDING_V,
+  ROW_PADDING_H,
+  ICON_SIZE,
+  ICON_GAP,
+  TITLE_SIZE,
+  TITLE_LINE,
+  TITLE_LETTER,
+  BODY_SIZE,
+  BODY_LINE,
+  BODY_LETTER,
+  UNREAD_DOT,
+  TAB_TOP,
+  TAB_BOTTOM,
+  HEADER_TOP,
+} = NOTIFICATIONS_FIGMA;
 
-/** Figma 2586-6121: unread row tint (press state) */
+/** Figma 2652-24244 — unread row tint */
 export const UNREAD_ROW_BG = '#F5F1FE';
-const AVATAR_PLACEHOLDER = '#F7F7F7';
-const AVATAR = 40;
-const TITLE_TO_AVATAR_GAP = 10.2;
 const BODY_GRAY = '#4D4D4D';
-const TIME_READ = '#999999';
 
 export const styles = StyleSheet.create({
-  /** ChatScreen: neutral canvas */
   screen: {
     flex: 1,
     backgroundColor: colors.white,
@@ -24,16 +36,21 @@ export const styles = StyleSheet.create({
   },
   safe: {
     flex: 1,
+    minHeight: 0,
   },
-  /** ChatScreen headerRow — back + title use same row as title + bell */
+  topChrome: {
+    zIndex: 2,
+    ...Platform.select({
+      android: { elevation: 2 },
+      default: {},
+    }),
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: H_PADDING,
-    marginTop: 8,
+    marginTop: HEADER_TOP,
   },
-  /** Same shell as ChatScreen notifButton */
   backButton: {
     width: 48,
     height: 48,
@@ -43,30 +60,26 @@ export const styles = StyleSheet.create({
     borderColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.07,
-        shadowRadius: 14,
-      },
-      android: { elevation: 3 },
-    }),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+    elevation: 3,
   },
-  /** ChatScreen title (h3) */
   title: {
-    ...typography.h3,
-    fontWeight: '600',
-    color: colors.black,
+    fontSize: 24,
+    lineHeight: 32,
     letterSpacing: -0.24,
+    fontFamily: typography.fontFamily.semibold,
+    color: colors.black,
     flex: 1,
     marginLeft: 8,
   },
-  /** ChatScreen tabRow */
   tabRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: TAB_TOP,
+    marginBottom: TAB_BOTTOM,
     marginHorizontal: H_PADDING,
     gap: 4,
   },
@@ -86,20 +99,25 @@ export const styles = StyleSheet.create({
     borderColor: colors.neutral[200],
   },
   tabLabelActive: {
-    ...typography.bodyMedium,
     fontSize: 12,
-    fontWeight: '500',
     lineHeight: 18,
     letterSpacing: 0.48,
+    fontFamily: typography.fontFamily.medium,
     color: colors.white,
   },
   tabLabelInactive: {
     fontSize: 12,
-    fontWeight: '400',
     lineHeight: 18,
     letterSpacing: 0.48,
-    color: colors.black,
     fontFamily: typography.fontFamily.regular,
+    color: colors.black,
+  },
+  tabLabelUnreadInactive: {
+    fontSize: 12,
+    lineHeight: 18,
+    letterSpacing: 0.48,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.primary.purple,
   },
   tabUnreadWrap: {
     flexDirection: 'row',
@@ -112,11 +130,14 @@ export const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: colors.primary.purple,
   },
-  /** ChatScreen list chrome */
   list: {
     flex: 1,
-    paddingHorizontal: H_PADDING,
-    paddingTop: 12,
+    minHeight: 0,
+    zIndex: 0,
+  },
+  listContent: {
+    paddingTop: LIST_TOP,
+    paddingBottom: 4,
   },
   loadMoreFooter: {
     paddingVertical: 16,
@@ -135,21 +156,23 @@ export const styles = StyleSheet.create({
   },
   emptyStateText: {
     marginTop: 16,
-    ...typography.bodyMedium,
     fontSize: 14,
-    fontWeight: '500',
     lineHeight: 20,
     letterSpacing: 0.28,
+    fontFamily: typography.fontFamily.medium,
     color: colors.neutral[900],
     textAlign: 'center',
   },
-  /** List row: hairline divider on bottom only (no card shadow / full border). */
+  /** Figma 2652-24244 — flat list row, hairline divider only */
   rowCard: {
-    // backgroundColor: colors.white,
-    paddingVertical: 20,
-    paddingHorizontal: 20,
+    paddingVertical: ROW_PADDING_V,
+    paddingHorizontal: ROW_PADDING_H,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.neutral[200],
+    backgroundColor: colors.white,
+  },
+  rowCardUnread: {
+    backgroundColor: UNREAD_ROW_BG,
   },
   rowPressedTint: {
     backgroundColor: UNREAD_ROW_BG,
@@ -159,73 +182,69 @@ export const styles = StyleSheet.create({
     alignItems: 'flex-start',
     width: '100%',
   },
-  avatar: {
-    width: AVATAR,
-    height: AVATAR,
-    borderRadius: AVATAR / 2,
-    backgroundColor: AVATAR_PLACEHOLDER,
+  avatarImage: {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+    borderRadius: ICON_SIZE / 2,
+    backgroundColor: colors.primary[50],
     overflow: 'hidden',
   },
-  avatarImage: {
-    width: AVATAR,
-    height: AVATAR,
-    borderRadius: AVATAR / 2,
-    backgroundColor: AVATAR_PLACEHOLDER,
+  typeIconBadge: {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+    borderRadius: ICON_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
+  },
+  typeIconBadgeSubscription: {
+    backgroundColor: colors.primary[50],
+  },
+  typeIconBadgeGallery: {
+    backgroundColor: colors.primary[50],
+  },
+  typeIconBadgeMatch: {
+    backgroundColor: colors.primary[50],
+  },
+  typeIconBadgeChat: {
+    backgroundColor: colors.primary[50],
+  },
+  typeIconBadgeDefault: {
+    backgroundColor: colors.neutral[100],
   },
   rowTextCol: {
     flex: 1,
-    marginLeft: TITLE_TO_AVATAR_GAP,
+    marginLeft: ICON_GAP,
     minWidth: 0,
-  },
-  titleBodyGroup: {
-    width: '100%',
   },
   titleLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     width: '100%',
   },
   rowTitle: {
-    flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '600',
+    flexShrink: 1,
+    fontSize: TITLE_SIZE,
+    lineHeight: TITLE_LINE,
     fontFamily: typography.fontFamily.semibold,
     color: colors.black,
-    letterSpacing: -0.65,
+    letterSpacing: TITLE_LETTER,
   },
   unreadDotInline: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: UNREAD_DOT,
+    height: UNREAD_DOT,
+    borderRadius: UNREAD_DOT / 2,
     backgroundColor: colors.primary.purple,
     marginLeft: 6,
+    flexShrink: 0,
   },
   rowBody: {
-    marginTop: 0,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: '400',
+    marginTop: 2,
+    fontSize: BODY_SIZE,
+    lineHeight: BODY_LINE,
+    fontFamily: typography.fontFamily.regular,
     color: BODY_GRAY,
-    fontFamily: typography.fontFamily.regular,
-    letterSpacing: -0.056,
-  },
-  timeBelow: {
-    marginTop: 4,
-    fontSize: 9,
-    lineHeight: 12,
-    fontWeight: '400',
-    textAlign: 'right',
-    alignSelf: 'stretch',
-    fontFamily: typography.fontFamily.regular,
-  },
-  timeBelowUnread: {
-    color: colors.black,
-  },
-  timeBelowRead: {
-    color: TIME_READ,
+    letterSpacing: BODY_LETTER,
   },
   loadingBlock: {
     flex: 1,

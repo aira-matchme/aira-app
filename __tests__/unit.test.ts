@@ -23,6 +23,7 @@ import {
   type ChatMessageApiItem,
 } from '../src/modules/chat/api';
 import { getAdjustedApiUrl } from '../src/utils/network';
+import { resolveSocketUrl } from '../src/utils/socketUrl';
 import type { PreferencesState } from '../src/store/preferences.store';
 
 // --- Mock AsyncStorage for auth store ---
@@ -500,6 +501,36 @@ describe('Network getAdjustedApiUrl', () => {
 
   it('returns empty string when baseUrl is empty', () => {
     expect(getAdjustedApiUrl('')).toBe('');
+  });
+});
+
+describe('resolveSocketUrl', () => {
+  it('uses explicit SOCKET_URL and normalizes wss to https', () => {
+    expect(resolveSocketUrl('http://localhost:3001', 'wss://custom.example.com')).toBe(
+      'https://custom.example.com'
+    );
+  });
+
+  it('derives dev-socket host from dev-api API URL', () => {
+    expect(resolveSocketUrl('https://dev-api.airamatchme.com', undefined)).toBe(
+      'https://dev-socket.airamatchme.com'
+    );
+  });
+
+  it('derives socket host from api subdomain', () => {
+    expect(resolveSocketUrl('https://api.example.com/v1', undefined)).toBe(
+      'https://socket.example.com'
+    );
+  });
+
+  it('uses same origin for local API URLs', () => {
+    expect(resolveSocketUrl('http://192.168.1.43:3001', undefined)).toBe(
+      'http://192.168.1.43:3001'
+    );
+  });
+
+  it('falls back to default dev socket when API URL is empty', () => {
+    expect(resolveSocketUrl('', undefined)).toBe('https://dev-socket.airamatchme.com');
   });
 });
 

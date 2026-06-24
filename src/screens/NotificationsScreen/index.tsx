@@ -24,6 +24,8 @@ import { ChatEmptyIcon } from '../../assets/icons/home_figma/ChatEmptyIcon';
 import { ProfileScreenGradient } from '../../components/ProfileScreenGradient';
 import { STRINGS } from '../../constants/strings';
 import type { HomeStackParamList, TabStackParamList } from '../../navigation/types';
+import { navigateToEditProfile } from '../../navigation/navigateToProfile';
+import { navigateToSubscription } from '../../navigation/navigateToSubscription';
 import {
   patchNotificationSeen,
   postNotificationsList,
@@ -31,6 +33,17 @@ import {
 } from '../../modules/notifications/api';
 import { showErrorToast } from '../../services/toast.srvice';
 import { colors } from '../../theme';
+import { NotificationListIcon } from './NotificationListIcon';
+import {
+  isGalleryCompletionReminder,
+  isSubscriptionNotification,
+  normalizeNotificationType,
+  NOTIFICATION_TYPE,
+  OPEN_CHAT_DETAIL_TYPES,
+  resolveNotificationIconKind,
+  shouldUseSenderAvatar,
+  type NotificationIconKind,
+} from './notificationTypes';
 import { styles } from './styles';
 
 type NotificationsNav = CompositeNavigationProp<
@@ -40,20 +53,6 @@ type NotificationsNav = CompositeNavigationProp<
 
 type FilterTab = 'all' | 'unread';
 
-/** API `data.type` / `type` — see notifications service */
-const NOTIFICATION_TYPE = {
-  MATCH_FOUND: 'MATCH_FOUND',
-  NEW_MESSAGE: 'NEW_MESSAGE',
-  CHAT_REQUEST: 'CHAT_REQUEST',
-  CHAT_ACCEPTED: 'CHAT_ACCEPTED',
-} as const;
-
-const OPEN_CHAT_DETAIL_TYPES = new Set<string>([
-  NOTIFICATION_TYPE.NEW_MESSAGE,
-  NOTIFICATION_TYPE.CHAT_REQUEST,
-  NOTIFICATION_TYPE.CHAT_ACCEPTED,
-]);
-
 type NotificationRow = {
   id: string;
   title: string;
@@ -62,6 +61,7 @@ type NotificationRow = {
   avatarUri: string | null;
   unread: boolean;
   notificationType: string;
+  iconKind: NotificationIconKind;
   /** From `options.chatId` / `data.chatId` */
   chatId: string | null;
   contactName: string;
@@ -259,7 +259,7 @@ function mapNotificationItem(item: unknown): NotificationRow | null {
       typeof src.nickName === 'string' ? src.nickName : undefined
     ) ?? 'Chat';
 
-  const notifType = pickNotificationType(o);
+  const notifType = normalizeNotificationType(pickNotificationType(o));
 
   return {
     id,
@@ -270,6 +270,7 @@ function mapNotificationItem(item: unknown): NotificationRow | null {
       avatarFromObject(src) ?? firstNonEmptyString(o.imageUrl, o.iconUrl) ?? null,
     unread,
     notificationType: notifType,
+    iconKind: resolveNotificationIconKind(notifType),
     chatId: pickChatId(o),
     contactName,
     senderId,
@@ -395,6 +396,16 @@ export const NotificationsScreen = () => {
     (item: NotificationRow) => {
       markNotificationSeen(item.id);
 
+      if (isSubscriptionNotification(item.notificationType)) {
+        navigateToSubscription(navigation);
+        return;
+      }
+
+      if (isGalleryCompletionReminder(item.notificationType)) {
+        navigateToEditProfile(navigation);
+        return;
+      }
+
       if (item.notificationType === NOTIFICATION_TYPE.MATCH_FOUND) {
         const uid = item.matchUserId;
         if (!uid) {
@@ -428,6 +439,7 @@ export const NotificationsScreen = () => {
   const renderItem = useCallback(
     ({ item }: { item: NotificationRow }) => {
     const showUnreadChrome = item.unread;
+    const showAvatar = shouldUseSenderAvatar(item.iconKind, item.avatarUri);
     return (
       <Pressable
         accessibilityRole="button"
@@ -435,39 +447,29 @@ export const NotificationsScreen = () => {
         onPress={() => handleNotificationPress(item)}
         style={(state) => [
           styles.rowCard,
+          showUnreadChrome && styles.rowCardUnread,
           (state.pressed ||
             ('hovered' in state && (state as { hovered?: boolean }).hovered)) &&
+            !showUnreadChrome &&
             styles.rowPressedTint,
         ]}
       >
         <View style={styles.rowInner}>
-          {item.avatarUri ? (
+          {showAvatar && item.avatarUri ? (
             <Image source={{ uri: item.avatarUri }} style={styles.avatarImage} />
           ) : (
-            <View style={styles.avatar} />
+            <NotificationListIcon kind={item.iconKind} />
           )}
           <View style={styles.rowTextCol}>
-            <View style={styles.titleBodyGroup}>
-              <View style={styles.titleLine}>
-                <Text style={styles.rowTitle} numberOfLines={1}>
-                  {item.title}
-                </Text>
-                {showUnreadChrome ? <View style={styles.unreadDotInline} /> : null}
-              </View>
-              {item.body ? (
-                <Text style={styles.rowBody} numberOfLines={2}>
-                  {item.body}
-                </Text>
-              ) : null}
+            <View style={styles.titleLine}>
+              <Text style={styles.rowTitle} numberOfLines={2}>
+                {item.title}
+              </Text>
+              {showUnreadChrome ? <View style={styles.unreadDotInline} /> : null}
             </View>
-            {item.timeLabel ? (
-              <Text
-                style={[
-                  styles.timeBelow,
-                  showUnreadChrome ? styles.timeBelowUnread : styles.timeBelowRead,
-                ]}
-              >
-                {item.timeLabel}
+            {item.body ? (
+              <Text style={styles.rowBody} numberOfLines={3}>
+                {item.body}
               </Text>
             ) : null}
           </View>
@@ -501,54 +503,58 @@ export const NotificationsScreen = () => {
       />
       <View style={styles.screenFill} pointerEvents="none" />
       <View style={[styles.safe, { paddingTop: insets.top }]}>
-        <ProfileScreenGradient />
-        <View style={styles.headerRow}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-          >
-            <BackArrowIcon
-              size={48}
-              backgroundColor={colors.white}
-              strokeColor={colors.black}
-            />
-          </TouchableOpacity>
-          <Text style={styles.title} numberOfLines={1}>
-            {STRINGS.NOTIFICATIONS.TITLE}
-          </Text>
-        </View>
-
-        <View style={styles.tabRow}>
-          <TouchableOpacity
-            style={[styles.tab, filter === 'all' ? styles.tabActive : styles.tabInactive]}
-            onPress={() => setFilter('all')}
-            activeOpacity={0.8}
-          >
-            <Text style={filter === 'all' ? styles.tabLabelActive : styles.tabLabelInactive}>
-              {STRINGS.NOTIFICATIONS.TAB_ALL}
+        <View style={styles.topChrome}>
+          <ProfileScreenGradient />
+          <View style={styles.headerRow}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+            >
+              <BackArrowIcon
+                size={48}
+                backgroundColor={colors.white}
+                strokeColor={colors.black}
+              />
+            </TouchableOpacity>
+            <Text style={styles.title} numberOfLines={1}>
+              {STRINGS.NOTIFICATIONS.TITLE}
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, filter === 'unread' ? styles.tabActive : styles.tabInactive]}
-            onPress={() => setFilter('unread')}
-            activeOpacity={0.8}
-          >
-            <View style={styles.tabUnreadWrap}>
-              <Text
-                style={
-                  filter === 'unread' ? styles.tabLabelActive : styles.tabLabelInactive
-                }
-              >
-                {STRINGS.NOTIFICATIONS.TAB_UNREAD}
+          </View>
+
+          <View style={styles.tabRow}>
+            <TouchableOpacity
+              style={[styles.tab, filter === 'all' ? styles.tabActive : styles.tabInactive]}
+              onPress={() => setFilter('all')}
+              activeOpacity={0.8}
+            >
+              <Text style={filter === 'all' ? styles.tabLabelActive : styles.tabLabelInactive}>
+                {STRINGS.NOTIFICATIONS.TAB_ALL}
               </Text>
-              {filter === 'all' && hasUnreadInList ? (
-                <View style={styles.requestsDot} />
-              ) : null}
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, filter === 'unread' ? styles.tabActive : styles.tabInactive]}
+              onPress={() => setFilter('unread')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.tabUnreadWrap}>
+                <Text
+                  style={
+                    filter === 'unread'
+                      ? styles.tabLabelActive
+                      : styles.tabLabelUnreadInactive
+                  }
+                >
+                  {STRINGS.NOTIFICATIONS.TAB_UNREAD}
+                </Text>
+                {filter === 'all' && hasUnreadInList ? (
+                  <View style={styles.requestsDot} />
+                ) : null}
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {loading && rows.length === 0 ? (
@@ -575,10 +581,13 @@ export const NotificationsScreen = () => {
             }
             onEndReached={onEndReached}
             onEndReachedThreshold={0.4}
-            contentContainerStyle={{
-              paddingBottom: listBottomPadding,
-              flexGrow: 1,
-            }}
+            contentContainerStyle={[
+              styles.listContent,
+              {
+                paddingBottom: listBottomPadding,
+                flexGrow: 1,
+              },
+            ]}
             ListFooterComponent={
               loadingMore ? (
                 <View style={styles.loadMoreFooter}>

@@ -2553,11 +2553,19 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
   const handleHeaderVideoCallPress = useCallback(() => {
     const start = async () => {
+      if (!socketService.isConnected()) {
+        showErrorToast(STRINGS.CHAT.SOCKET_DISCONNECTED);
+        return;
+      }
       const permission = await checkCameraPermission();
       const granted =
         permission === 'granted' || (await requestCameraPermission()) === 'granted';
       if (!granted) {
         showErrorToast('Camera permission is required for video calls.');
+        return;
+      }
+      if (!socketService.isConnected()) {
+        showErrorToast(STRINGS.CHAT.SOCKET_DISCONNECTED);
         return;
       }
       if (chatId && otherUserId) {
@@ -2582,6 +2590,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   }, [chatId, otherUserId, outgoingCallMeta]);
 
   const handleHeaderVoiceCallPress = useCallback(() => {
+    if (!socketService.isConnected()) {
+      showErrorToast(STRINGS.CHAT.SOCKET_DISCONNECTED);
+      return;
+    }
     if (chatId && otherUserId) {
       socketService.callRequest(otherUserId, chatId, 'audio', outgoingCallMeta);
     }
@@ -2647,7 +2659,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     setSwitchToVideoPopupVisible(false);
     setCallConnectedAtMs(null);
     setCallDurationSec(0);
-  }, [activeCallId]);
+    refreshChatMessagesFromApi();
+  }, [activeCallId, refreshChatMessagesFromApi]);
 
   const minimizeCallState = useCallback(() => {
     setCallStateVisible(false);

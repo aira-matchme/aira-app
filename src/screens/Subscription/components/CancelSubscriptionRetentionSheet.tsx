@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import {
+  ActivityIndicator,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -20,6 +21,7 @@ type Props = {
   onClose: () => void;
   onStay: () => void;
   onCancelAnyway: () => void;
+  isCancelling?: boolean;
 };
 
 function formatMatchLabel(count: number): string {
@@ -35,6 +37,7 @@ export const CancelSubscriptionRetentionSheet: React.FC<Props> = ({
   onClose,
   onStay,
   onCancelAnyway,
+  isCancelling = false,
 }) => {
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -111,8 +114,13 @@ export const CancelSubscriptionRetentionSheet: React.FC<Props> = ({
             onPress={onCancelAnyway}
             activeOpacity={0.85}
             style={styles.secondaryButton}
+            disabled={isCancelling}
           >
-            <Text style={styles.secondaryButtonText}>Cancel Anyway</Text>
+            {isCancelling ? (
+              <ActivityIndicator size="small" color={colors.black} />
+            ) : (
+              <Text style={styles.secondaryButtonText}>Cancel Anyway</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>

@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
+  Alert,
   Linking,
   Platform,
   ScrollView,
@@ -10,14 +11,21 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 
 import { Button } from '../../components/Button';
-import { getStoreManageSubscriptionsUrl } from '../../modules/iap/entitlements';
+import {
+  getIapEntitlementsApi,
+  postCancelSubscriptionRequestApi,
+} from '../../modules/iap/api';
+import { getStoreManageSubscriptionsUrl, normalizeEntitlements } from '../../modules/iap/entitlements';
 import type { ProfileStackParamList } from '../../navigation/types';
 import { useSubscriptionStore } from '../../store/subscription.store';
 import { colors, typography } from '../../theme';
+import { resolveUserFacingError } from '../../utils/resolveUserFacingError';
+import { buildCancelSubscriptionApiReason } from './cancelSubscription';
 import { PlusPlanGradientCard } from './components/PlusPlanGradientCard';
 import {
   SubscriptionPlusFeaturesList,
@@ -29,9 +37,14 @@ import { MANAGE_FOOTER_BUTTON_HEIGHT, MANAGE_HERO_HEIGHT, MANAGE_SCREEN_PAD_H } 
 
 export const CancelSubscriptionConfirmScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
+  const route = useRoute<RouteProp<ProfileStackParamList, 'CancelSubscriptionConfirm'>>();
   const insets = useSafeAreaInsets();
   const entitlement = useSubscriptionStore((s) => s.entitlements[0] ?? null);
+  const setEntitlements = useSubscriptionStore((s) => s.setEntitlements);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
+
+  const { reason, otherReason } = route.params;
 
   const handleStay = useCallback(() => {
     navigation.popToTop();
@@ -42,15 +55,52 @@ export const CancelSubscriptionConfirmScreen: React.FC = () => {
   }, []);
 
   const handleCancelAnyway = useCallback(async () => {
-    setSheetOpen(false);
-    const platform = entitlement?.platform ?? (Platform.OS === 'ios' ? 'apple' : 'google');
-    const url = getStoreManageSubscriptionsUrl(platform);
-    const canOpen = await Linking.canOpenURL(url);
-    if (canOpen) {
-      await Linking.openURL(url);
+    if (isSubmittingCancel) return;
+
+    const reasonPayload = buildCancelSubscriptionApiReason(reason, otherReason);
+    if (!reasonPayload) {
+      Alert.alert('Reason required', 'Please go back and select a cancellation reason.');
+      return;
     }
-    navigation.popToTop();
-  }, [entitlement?.platform, navigation]);
+
+    setIsSubmittingCancel(true);
+    setSheetOpen(false);
+
+    try {
+      await postCancelSubscriptionRequestApi({ reason: reasonPayload });
+
+      try {
+        const entitlementsResponse = await getIapEntitlementsApi();
+        setEntitlements(normalizeEntitlements(entitlementsResponse));
+      } catch {
+        // Store redirect can still proceed if entitlements refresh fails.
+      }
+
+      const platform = entitlement?.platform ?? (Platform.OS === 'ios' ? 'apple' : 'google');
+      const url = getStoreManageSubscriptionsUrl(platform);
+      const canOpen = await Linking.canOpenURL(url);
+      if (canOpen) {
+        await Linking.openURL(url);
+      }
+
+      navigation.popToTop();
+    } catch (error) {
+      Alert.alert(
+        'Unable to continue',
+        resolveUserFacingError(error, 'subscription'),
+        [{ text: 'OK' }],
+      );
+    } finally {
+      setIsSubmittingCancel(false);
+    }
+  }, [
+    entitlement?.platform,
+    isSubmittingCancel,
+    navigation,
+    otherReason,
+    reason,
+    setEntitlements,
+  ]);
 
   return (
     <View style={styles.screen}>
@@ -89,6 +139,7 @@ export const CancelSubscriptionConfirmScreen: React.FC = () => {
             onPress={handleOpenRetention}
             activeOpacity={0.85}
             style={styles.secondaryButton}
+            disabled={isSubmittingCancel}
           >
             <Text style={styles.secondaryButtonText}>I still want to cancel</Text>
           </TouchableOpacity>
@@ -98,6 +149,7 @@ export const CancelSubscriptionConfirmScreen: React.FC = () => {
           isOpen={sheetOpen}
           onClose={() => setSheetOpen(false)}
           onStay={() => setSheetOpen(false)}
+          isCancelling={isSubmittingCancel}
           onCancelAnyway={() => void handleCancelAnyway()}
         />
       </SafeAreaView>

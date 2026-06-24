@@ -83,3 +83,17 @@ export type IapTransactionsResponse = IapApiResponse<IapTransactionsData>;
 export type RegisterAppAccountTokenResponse = IapApiResponse;
 export type SyncApplePurchaseResponse = IapApiResponse;
 export type SyncGooglePurchaseResponse = IapApiResponse;
+
+export interface CancelSubscriptionRequest {
+  reason: string;
+}
+
+export interface CancelSubscriptionResponseData {
+  ok: boolean;
+  subscriptionId: string;
+  accessUntil: string;
+  status: string;
+  autoRenewEnabled: boolean;
+}
+
+export type CancelSubscriptionResponse = IapApiResponse<CancelSubscriptionResponseData>;

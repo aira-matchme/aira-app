@@ -1,5 +1,6 @@
 import {
   API_BASE_URL,
+  SOCKET_URL,
   NODE_ENV,
   API_KEY,
   GOOGLE_CLIENT_ID,
@@ -12,6 +13,7 @@ import {
 
 export const env = {
   API_BASE_URL,
+  SOCKET_URL,
   NODE_ENV,
   API_KEY,
   GOOGLE_CLIENT_ID,

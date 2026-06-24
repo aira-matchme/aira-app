@@ -10,3 +10,16 @@ export type CancelSubscriptionReasonId =
   (typeof CANCEL_SUBSCRIPTION_REASONS)[number]['id'];
 
 export const SUPPORT_EMAIL_URL = 'mailto:support@airamatchme.com';
+
+const CANCEL_REASON_MAX_LENGTH = 120;
+
+/** Maps UI selection to POST /iap/cancel-request `reason` (max 120 chars). */
+export function buildCancelSubscriptionApiReason(
+  reasonId: CancelSubscriptionReasonId,
+  otherReason?: string,
+): string {
+  if (reasonId === 'other') {
+    return (otherReason ?? '').trim().slice(0, CANCEL_REASON_MAX_LENGTH);
+  }
+  return reasonId.slice(0, CANCEL_REASON_MAX_LENGTH);
+}

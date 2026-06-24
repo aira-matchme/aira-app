@@ -1,5 +1,7 @@
 /** Payloads for socket events (adjust to match your backend) */
 import { io, type Socket } from 'socket.io-client';
+import { env } from '../../config/env';
+import { resolveSocketUrl } from '../../utils/socketUrl';
 
 export interface JoinPayload {
   chatId: string;
@@ -162,7 +164,7 @@ class SocketService {
   };
 
   /** Set to `true` temporarily when debugging socket/call traffic (otherwise every event logs to Metro). */
-  private static readonly ENABLE_CALL_SOCKET_LOGS = false;
+  private static readonly ENABLE_CALL_SOCKET_LOGS = true;
 
   private logCallSocket(direction: 'emit' | 'receive' | 'state', event: string, payload?: unknown) {
     if (!SocketService.ENABLE_CALL_SOCKET_LOGS) return;
@@ -212,7 +214,9 @@ class SocketService {
    * - Client emit: join({ chatId } | { userId }) | typing({ sender, receiver, isTyping }) | message_send({ sender, receiver, message }) | message_delete({ sender, receiver, messageId })
    * - Server emit: join_success (presence/online), typing({ sender, receiver, isTyping }), message_send/message_receive({ sender, receiver, message?, messageId?, timestamp? }), message_delete
    */
-  private static readonly SOCKET_URL = 'wss://dev-socket.airamatchme.com';
+  private getSocketUrl(): string {
+    return resolveSocketUrl(env.API_BASE_URL, env.SOCKET_URL);
+  }
 
   private getBearerToken() {
     if (!this.token) return null;
@@ -251,10 +255,12 @@ class SocketService {
 
     this.token = token;
     const bearer = this.getBearerToken();
+    const socketUrl = this.getSocketUrl();
 
+    this.logCallSocket('state', 'connecting', { socketUrl });
 
-    this.socket = io(SocketService.SOCKET_URL, {
-      transports: ['websocket'],
+    this.socket = io(socketUrl, {
+      transports: ['polling', 'websocket'],
       reconnection: true,
       auth: bearer
         ? {
@@ -268,7 +274,7 @@ class SocketService {
     });
 
     this.socket.on('connect', () => {
-      this.logCallSocket('state', 'connect', { userId: this.userId });
+      this.logCallSocket('state', 'connect', { userId: this.userId, socketUrl });
       this.notifyConnectionState(true);
       const payload = this.userId ? { userId: this.userId } : {};
       this.send('join', payload);
@@ -280,7 +286,7 @@ class SocketService {
     });
 
     this.socket.on('connect_error', (_err) => {
-      this.logCallSocket('state', 'connect_error', _err);
+      this.logCallSocket('state', 'connect_error', { socketUrl, error: _err });
     });
 
     this.socket.onAny((_event, ..._args) => {
