@@ -13,6 +13,8 @@ const DONT_SHOW_ASK_AIRA_CONFIRM_KEY = 'dont_show_ask_aira_confirm';
 interface UseAiraSuggestionsParams {
   chatId: string | null;
   setInputText: (text: string) => void;
+  /** When false, blocks AI suggestion API calls (premium gate). */
+  canUseAiraSuggestions?: boolean;
 }
 
 interface UseAiraSuggestionsResult {
@@ -41,6 +43,7 @@ interface UseAiraSuggestionsResult {
 export function useAiraSuggestions({
   chatId,
   setInputText,
+  canUseAiraSuggestions = true,
 }: UseAiraSuggestionsParams): UseAiraSuggestionsResult {
   const [askAiraGenerating, setAskAiraGenerating] = useState(false);
   const [generatedReplies, setGeneratedReplies] = useState<string[] | null>(null);
@@ -125,7 +128,7 @@ export function useAiraSuggestions({
 
   const requestAiSuggestions = useCallback(
     (opts?: { closeConfirmSheetOnStart?: boolean }) => {
-      if (!chatId) return;
+      if (!chatId || !canUseAiraSuggestions) return;
       const requestId = ++aiSuggestionsRequestIdRef.current;
       setAskAiraConfirmLoading(true);
 
@@ -173,7 +176,7 @@ export function useAiraSuggestions({
           setAskAiraGenerating(false);
         });
     },
-    [applyAiSuggestionsResponse, chatId]
+    [applyAiSuggestionsResponse, canUseAiraSuggestions, chatId]
   );
 
   const handleCancelAiSuggestions = useCallback(() => {
@@ -187,11 +190,12 @@ export function useAiraSuggestions({
   }, []);
 
   const handleInsertReply = useCallback(() => {
+    if (!canUseAiraSuggestions) return;
     if (!generatedReplies?.length || selectedReplyIndex >= generatedReplies.length) return;
     setInputText(generatedReplies[selectedReplyIndex]);
     setGeneratedReplies(null);
     setSelectedReplyIndex(0);
-  }, [generatedReplies, selectedReplyIndex, setInputText]);
+  }, [canUseAiraSuggestions, generatedReplies, selectedReplyIndex, setInputText]);
 
   return {
     askAiraGenerating,

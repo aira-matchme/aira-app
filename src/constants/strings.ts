@@ -587,6 +587,8 @@ export const STRINGS = {
       'AIRA uses the microphone to record and send voice messages in chat. These can be managed in Settings.',
     SOCKET_DISCONNECTED:
       'Not connected to the server. Check your network and try again.',
+    PREMIUM_CALLS_REQUIRED: 'Subscribe to Aira+ to start voice and video calls.',
+    PREMIUM_ASK_AIRA_REQUIRED: 'Subscribe to Aira+ to use chat assistance.',
   },
 } as const;
 

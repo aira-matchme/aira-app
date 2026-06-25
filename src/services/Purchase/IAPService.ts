@@ -33,10 +33,10 @@ import type {
 /** Store product IDs — must match App Store Connect & Google Play Console. */
 export const SUBSCRIPTION_SKUS = Platform.select({
   ios: [
-    'premium_monthly'
+    'premium_monthly_new'
   ],
   android: [
-    'premium_monthly'
+     'premium_monthly'
   ],
   default: [],
 }) as string[];

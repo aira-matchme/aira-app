@@ -41,6 +41,12 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
+  screenColumn: {
+    flex: 1,
+    minHeight: 0,
+    flexDirection: 'column',
+    backgroundColor: colors.white,
+  },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -103,6 +109,9 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 4,
+  },
+  headerPremiumFeatureDisabled: {
+    opacity: 0.38,
   },
   moreButton: {
     width: 40,
@@ -2864,12 +2873,18 @@ export const styles = StyleSheet.create({
   inputArea: {
     backgroundColor: colors.white,
   },
-  bottomComposerContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
+  chatContentShell: {
+    flex: 1,
+    minHeight: 0,
+    flexDirection: 'column',
+  },
+  chatMessagesScroll: {
+    flex: 1,
+  },
+  chatFooter: {
     backgroundColor: colors.white,
-    zIndex: 10,
+    flexShrink: 0,
+    width: '100%',
   },
   replyToBar: {
     flexDirection: 'row',
@@ -3238,23 +3253,17 @@ borderRadius: 16,
     letterSpacing: 0.28,
     color: colors.neutral[700],
   },
-  subscriptionGateBanner: {
+  subscriptionGateDock: {
+    flexShrink: 0,
+    width: '100%',
+    backgroundColor: colors.white,
+  },
+  subscriptionGateInner: {
     paddingHorizontal: H_PADDING,
     paddingTop: 12,
+    backgroundColor: colors.white,
   },
-  subscriptionGateGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 999,
-    gap: 8,
-  },
-  subscriptionGateText: {
-    ...typography.bodyMedium,
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.white,
+  subscriptionGateButton: {
+    width: '100%',
   },
 });

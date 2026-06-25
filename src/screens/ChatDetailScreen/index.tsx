@@ -21,7 +21,7 @@ import {
   useWindowDimensions,
   type ImageSourcePropType,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets, initialWindowMetrics } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
@@ -183,10 +183,22 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   } = route.params;
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const bottomSafeInset = insets.bottom;
+  // Tab navigator passes safeAreaInsets.bottom = 0; use device inset for home indicator.
+  const bottomSafeInset = Math.max(
+    insets.bottom,
+    initialWindowMetrics?.insets.bottom ?? 0,
+    Platform.OS === 'ios' ? 34 : 0,
+  );
   const imageBubbleSize = Math.max(160, Math.min(Math.round(windowWidth * 0.75), 320));
   const currentUserId = useAuthStore((s) => s.user?.id);
   const isSubscribed = useSubscriptionStore((s) => s.isSubscribed);
+
+  const ensurePremiumAccess = useCallback((): boolean => {
+    if (isSubscribed) return true;
+    navigateToSubscription(navigation);
+    return false;
+  }, [isSubscribed, navigation]);
+
   const [chatId, setChatId] = useState<string | null>(initialChatId ?? null);
   const [name, setName] = useState<string>(initialName ?? 'Chat');
   const [avatar, setAvatar] = useState<typeof initialAvatar | undefined>(initialAvatar);
@@ -428,7 +440,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const handledIncomingCallRef = useRef<string | null>(null);
   const inputRef = useRef<TextInput>(null);
   const scrollViewRef = useRef<ScrollView>(null);
-  const { keyboardHeight, composerBottomOffset, resetKeyboard } = useKeyboardOffset({
+  const { composerBottomOffset, resetKeyboard } = useKeyboardOffset({
     windowHeight,
     scrollViewRef,
   });
@@ -453,7 +465,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     requestAiSuggestions,
     handleCancelAiSuggestions,
     handleInsertReply,
-  } = useAiraSuggestions({ chatId, setInputText });
+  } = useAiraSuggestions({ chatId, setInputText, canUseAiraSuggestions: isSubscribed });
   // Prevent the "auto scroll to bottom" effect from running when we prepend older messages.
   // (When pagination prepends items, ScrollView tends to jump if we always scrollToEnd.)
   const isPrependingOlderMessagesRef = useRef(false);
@@ -517,11 +529,16 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
   }, []);
 
-  const scrollToBottom = (animated = true) => {
+  const scrollToBottom = useCallback((animated = true) => {
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated });
     }, 50);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!isSubscribed || composerBottomOffset <= 0) return;
+    scrollToBottom(true);
+  }, [isSubscribed, composerBottomOffset, composerHeight, scrollToBottom]);
 
   useFocusEffect(
     useCallback(() => {
@@ -2552,6 +2569,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   }, []);
 
   const handleHeaderVideoCallPress = useCallback(() => {
+    if (!ensurePremiumAccess()) return;
+
     const start = async () => {
       if (!socketService.isConnected()) {
         showErrorToast(STRINGS.CHAT.SOCKET_DISCONNECTED);
@@ -2587,9 +2606,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setCallStateVisible(true);
     };
     void start();
-  }, [chatId, otherUserId, outgoingCallMeta]);
+  }, [chatId, otherUserId, outgoingCallMeta, ensurePremiumAccess]);
 
   const handleHeaderVoiceCallPress = useCallback(() => {
+    if (!ensurePremiumAccess()) return;
+
     if (!socketService.isConnected()) {
       showErrorToast(STRINGS.CHAT.SOCKET_DISCONNECTED);
       return;
@@ -2610,7 +2631,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     setCallConnectedAtMs(null);
     setCallDurationSec(0);
     setCallStateVisible(true);
-  }, [chatId, otherUserId, outgoingCallMeta]);
+  }, [chatId, otherUserId, outgoingCallMeta, ensurePremiumAccess]);
 
   const toggleCallAudio = useCallback(() => {
     setCallAudioEnabled((prev) => {
@@ -2671,6 +2692,15 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   }, []);
 
   const acceptIncomingVoiceCall = useCallback(() => {
+    if (!ensurePremiumAccess()) {
+      if (incomingVoiceCallId) {
+        socketService.callReject(incomingVoiceCallId);
+      }
+      setIncomingVoiceCallVisible(false);
+      setIncomingVoiceCallId(null);
+      setIncomingCallBannerVisible(false);
+      return;
+    }
     if (incomingVoiceCallId) {
       socketService.callAccept(incomingVoiceCallId);
       setActiveCallId(incomingVoiceCallId);
@@ -2689,7 +2719,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     setCallConnectedAtMs(Date.now());
     setCallDurationSec(0);
     setCallStateVisible(true);
-  }, [incomingVoiceCallId]);
+  }, [incomingVoiceCallId, ensurePremiumAccess]);
 
   const declineIncomingVoiceCall = useCallback(() => {
     if (incomingVoiceCallId) {
@@ -2743,6 +2773,15 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
   const acceptIncomingVideoCall = useCallback(() => {
     const accept = async () => {
+      if (!ensurePremiumAccess()) {
+        if (incomingVideoCallId) {
+          socketService.callReject(incomingVideoCallId);
+        }
+        setIncomingVideoCallVisible(false);
+        setIncomingVideoCallId(null);
+        setIncomingCallBannerVisible(false);
+        return;
+      }
       const permission = await checkCameraPermission();
       const granted =
         permission === 'granted' || (await requestCameraPermission()) === 'granted';
@@ -2770,7 +2809,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setCallStateVisible(true);
     };
     void accept();
-  }, [incomingVideoCallId]);
+  }, [incomingVideoCallId, ensurePremiumAccess]);
 
   const declineIncomingVideoCall = useCallback(() => {
     if (incomingVideoCallId) {
@@ -3131,7 +3170,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-      <View style={styles.screen}>
+      <View style={styles.screenColumn}>
         <StatusBar barStyle="dark-content" translucent backgroundColor={colors.white}/>
         <View style={styles.headerBar}>
         <TouchableOpacity
@@ -3158,10 +3197,13 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         </TouchableOpacity>
         {!askAiraGenerating && generatedReplies == null && (
           <TouchableOpacity
-            style={styles.headerAskAiraButton}
+            style={[
+              styles.headerAskAiraButton,
+              !isSubscribed && styles.headerPremiumFeatureDisabled,
+            ]}
             onPress={() => {
+              if (!ensurePremiumAccess()) return;
               if (dontShowAskAiraPersisted && chatId) {
-                console.log('requestAiSuggestions');
                 requestAiSuggestions();
               } else {
                 setAskAiraConfirmVisible(true);
@@ -3169,25 +3211,36 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
             }}
             activeOpacity={0.8}
             disabled={askAiraConfirmLoading}
+            accessibilityRole="button"
+            accessibilityLabel={STRINGS.CHAT.ASK_AIRA}
+            accessibilityState={{ disabled: !isSubscribed || askAiraConfirmLoading }}
           >
             <AskAiraSendIcon width={52} height={52} />
           </TouchableOpacity>
         )}
         <TouchableOpacity
-          style={styles.headerCallButton}
+          style={[
+            styles.headerCallButton,
+            !isSubscribed && styles.headerPremiumFeatureDisabled,
+          ]}
           onPress={handleHeaderVideoCallPress}
           activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel="Video call"
+          accessibilityState={{ disabled: !isSubscribed }}
         >
           <ChatHeaderVideoCallIcon size={24} color={colors.black} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.headerCallButton}
+          style={[
+            styles.headerCallButton,
+            !isSubscribed && styles.headerPremiumFeatureDisabled,
+          ]}
           onPress={handleHeaderVoiceCallPress}
           activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel="Voice call"
+          accessibilityState={{ disabled: !isSubscribed }}
         >
           <ChatHeaderVoiceCallIcon size={24} color={colors.black} />
         </TouchableOpacity>
@@ -4163,6 +4216,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 <TouchableOpacity
                   style={styles.askAiraConfirmGenerateButton}
                   onPress={() => {
+                    if (!ensurePremiumAccess()) {
+                      setAskAiraConfirmVisible(false);
+                      return;
+                    }
                     if (!chatId) return;
                     if (dontShowAskAiraAgain) {
                       AsyncStorage.setItem(DONT_SHOW_ASK_AIRA_CONFIRM_KEY, 'true').then(() => {
@@ -4507,77 +4564,48 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-      <View style={{ flex: 1 }}>
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.screen}
-        onLayout={(e) => {
-          layoutHeightRef.current = e.nativeEvent.layout.height;
-        }}
-        // contentContainerStyle={{
-        //   ...styles.scrollContent,
-        //   paddingBottom:
-        //     (styles.scrollContent?.paddingBottom ?? 16) +
-        //     composerHeight +
-        //     12,
-        // }}
-        contentContainerStyle={{
-          ...styles.scrollContent,
-          paddingBottom:
-            (styles.scrollContent?.paddingBottom ?? 16) +
-            composerHeight +
-            keyboardHeight + // ✅ THIS IS THE KEY
-            12,
-        }}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        onScroll={handleMessagesScroll}
-        onContentSizeChange={(w, h) => {
-          contentHeightRef.current = h;
-        }}
-        scrollEventThrottle={16}
-      >
-        {messagesLoading ? (
-          <ChatMessagesSkeleton />
-        ) : (
-          <>
-            {messagesLoadingMore && (
-              <View style={styles.messagesLoadingMoreWrap}>
-                <ActivityIndicator size="small" color={colors.primary.purple} />
-              </View>
-            )}
-            <View style={styles.datePill}>
-              <Text style={styles.datePillText}>{STRINGS.CHAT.TODAY}</Text>
-            </View>
-            {messages.map((msg, index) => renderMessage(msg, index))}
-          </>
-        )}
-      </ScrollView>
-      </View>
-
       <View
-        style={[styles.bottomComposerContainer, { bottom: composerBottomOffset }]}
-        onLayout={handleComposerLayout}
+        style={[
+          styles.chatContentShell,
+          isSubscribed &&
+            composerBottomOffset > 0 && { paddingBottom: composerBottomOffset },
+        ]}
       >
-      {!isSubscribed ? (
-        <TouchableOpacity
-          style={[styles.subscriptionGateBanner, { paddingBottom: 12 + bottomSafeInset }]}
-          activeOpacity={0.8}
-          onPress={() => navigateToSubscription(navigation)}
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.chatMessagesScroll}
+          onLayout={(e) => {
+            layoutHeightRef.current = e.nativeEvent.layout.height;
+          }}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          onScroll={handleMessagesScroll}
+          onContentSizeChange={(w, h) => {
+            contentHeightRef.current = h;
+          }}
+          scrollEventThrottle={16}
         >
-          <LinearGradient
-            colors={['#7B2FF2', '#C94CF8']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.subscriptionGateGradient}
-          >
-            <Text style={styles.subscriptionGateText}>
-              Subscribe to Aira+ to send messages
-            </Text>
-            <ForwardArrowIcon size={18} color={colors.white} />
-          </LinearGradient>
-        </TouchableOpacity>
-      ) : voice.voiceBarVisible ? (
+          {messagesLoading ? (
+            <ChatMessagesSkeleton />
+          ) : (
+            <>
+              {messagesLoadingMore && (
+                <View style={styles.messagesLoadingMoreWrap}>
+                  <ActivityIndicator size="small" color={colors.primary.purple} />
+                </View>
+              )}
+              <View style={styles.datePill}>
+                <Text style={styles.datePillText}>{STRINGS.CHAT.TODAY}</Text>
+              </View>
+              {messages.map((msg, index) => renderMessage(msg, index))}
+            </>
+          )}
+        </ScrollView>
+
+        {isSubscribed ? (
+        <View style={styles.chatFooter} onLayout={handleComposerLayout}>
+      {voice.voiceBarVisible ? (
         <View style={[styles.voiceBar, { paddingBottom: 12 + bottomSafeInset }]}>
           <TouchableOpacity
             style={styles.voiceBarTrash}
@@ -4699,7 +4727,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                     <View
                       style={[
                         styles.inputBar,
-                        { paddingBottom: 12 + bottomSafeInset },
+                        {
+                          paddingBottom:
+                            12 + (composerBottomOffset > 0 ? 0 : bottomSafeInset),
+                        },
                         (pendingAttachments.length > 0 || isMultilineComposer) &&
                           styles.inputBarWithAttachments,
                       ]}
@@ -4835,6 +4866,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         </View>
         </View>
       )}
+        </View>
+        ) : null}
       </View>
 
       <AttachmentOptionsBottomSheet
@@ -5118,6 +5151,24 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         </View>
       </ReusableBottomSheet>
       </View>
+
+      {!isSubscribed ? (
+        <View style={styles.subscriptionGateDock}>
+          <View
+            style={[
+              styles.subscriptionGateInner,
+              { paddingBottom: 12 + bottomSafeInset },
+            ]}
+          >
+            <Button
+              title="Subscribe to Aira+ to send messages"
+              onPress={() => navigateToSubscription(navigation)}
+              centerTitleOnly
+              style={styles.subscriptionGateButton}
+            />
+          </View>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 };
