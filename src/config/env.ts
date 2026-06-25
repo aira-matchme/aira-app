@@ -9,6 +9,7 @@ import {
   IOS_APP_STORE_ID,
   STORE_UPDATE_CHECK_IN_DEV,
   AGORA_APP_ID,
+  WAITLIST,
 } from '@env';
 
 export const env = {
@@ -24,6 +25,14 @@ export const env = {
   /** When `true` / `1`, run store update checks while `__DEV__` is true (local testing only). */
   STORE_UPDATE_CHECK_IN_DEV,
   AGORA_APP_ID,
+  /** When `true` / `1`, logged-in users see the waitlist screen instead of the main app. */
+  WAITLIST,
 };
+
+/** Returns true when `.env` has `WAITLIST=true` or `WAITLIST=1`. */
+export function isWaitlistEnabled(): boolean {
+  const v = String(WAITLIST ?? '').toLowerCase();
+  return v === 'true' || v === '1';
+}
 
 

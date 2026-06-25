@@ -7,6 +7,7 @@ import { usePreferencesStore } from './preferences.store';
 import { useOnboardingStore } from './onboarding.store';
 import { useUserStore } from './user.store';
 import { useSubscriptionStore } from './subscription.store';
+import { useWaitlistStore } from './waitlist.store';
 
 export interface User {
   id: string;
@@ -120,6 +121,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     useOnboardingStore.getState().clearOnboarding();
     useUserStore.getState().clearUser();
     useSubscriptionStore.getState().clearSubscription();
+    useWaitlistStore.getState().reset();
     syncSentryUser(null);
     set({
       accessToken: null,

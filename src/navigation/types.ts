@@ -8,6 +8,7 @@ export type RootStackParamList = {
   LostAccessEmail: undefined;
   OTPVerification: { email: string };
   Splash: undefined;
+  Waitlist: undefined;
   Auth: undefined;
   Login: undefined;
   Dashboard: undefined;

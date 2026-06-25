@@ -16,6 +16,9 @@ import { ApiErrorModal } from '../components/ApiErrorModal';
 import ConnectivityWatcher from '../components/ConnectivityWatcher';
 import { RequestTimeoutModal } from '../components/RequestTimeoutModal';
 import { StoreUpdatePrompt } from '../components/StoreUpdatePrompt';
+import { WaitlistScreen } from '../screens/WaitlistScreen';
+import { isWaitlistEnabled } from '../config/env';
+import { useWaitlistStore } from '../store/waitlist.store';
 
 const RootStack = createNativeStackNavigator();
 
@@ -30,8 +33,14 @@ export const RootNavigator = () => {
     hideError: hideApiError,
   } = useApiErrorStore();
   const postAuthScreen = getPostAuthScreen(user ?? null, shouldShowEnableNotifications);
+  const waitlistActive = isWaitlistEnabled();
+  const hasEnteredWaitlistApp = useWaitlistStore((s) => s.hasEnteredApp);
+  const waitlistGateOpen = waitlistActive && !hasEnteredWaitlistApp;
+  const shouldShowWaitlist = isAuthenticated && waitlistGateOpen;
   const shouldShowTabs =
-    isAuthenticated && (postAuthScreen === 'Likes' || preferenceFlowCompleted);
+    isAuthenticated &&
+    !waitlistGateOpen &&
+    (postAuthScreen === 'Likes' || preferenceFlowCompleted);
 
   useEffect(() => {
     // Disable Android back button behavior
@@ -66,7 +75,9 @@ export const RootNavigator = () => {
           <RootStack.Screen name="Splash" component={SplashScreen} />
         ) : (
           <>
-            {shouldShowTabs ? (
+            {shouldShowWaitlist ? (
+              <RootStack.Screen name="Waitlist" component={WaitlistScreen} />
+            ) : shouldShowTabs ? (
               <RootStack.Screen name="Tabs" component={TabNavigator} />
             ) : (
               <RootStack.Screen name="AuthStack" component={AuthNavigator} />

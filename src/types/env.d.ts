@@ -17,5 +17,10 @@ declare module '@env' {
    */
   export const STORE_UPDATE_CHECK_IN_DEV: string | undefined;
   export const AGORA_APP_ID: string | undefined;
+  /**
+   * Optional — set to `true` in `.env` to show the waitlist gate for logged-in users.
+   * When `false` or unset, the app behaves normally.
+   */
+  export const WAITLIST: string | undefined;
 }
 

@@ -58,6 +58,26 @@ export const STRINGS = {
     GET_STARTED: 'Get Started',
   },
 
+  WAITLIST: {
+    TITLE_LINE_1: 'Welcome to the',
+    TITLE_LINE_2: 'inner circle',
+    SUBTITLE:
+      'You are one of the first 250 selected to lead the next generation of dating.',
+    PREMIUM_TITLE: 'Free 3 Months Premium',
+    PREMIUM_DESCRIPTION_LINE_1: 'Enjoy free unlimited use on us while the',
+    PREMIUM_DESCRIPTION_LINE_2: 'word gets out.',
+    EARLY_DAYS_TITLE_LINE_1: 'Early',
+    EARLY_DAYS_TITLE_LINE_2: 'Days',
+    EARLY_DAYS_DESCRIPTION_LINE_1: 'Matches might be',
+    EARLY_DAYS_DESCRIPTION_LINE_2: 'quiet at first.',
+    EARN_TITLE_LINE_1: 'Earn',
+    EARN_TITLE_LINE_2: 'with Aira',
+    EARN_DESCRIPTION_LINE_1: 'Curated rewards',
+    EARN_DESCRIPTION_LINE_2: 'program.',
+    ENTER_CTA: 'Enter Aira Match',
+    EXPLORE_EARNING: 'Explore Earning Opportunities',
+  },
+
   /** App tab walkthrough — Home + main tabs (Figma frames 517–573). */
   DASHBOARD_WALKTHROUGH: {
     WELCOME_TITLE: 'Welcome to Aira',
