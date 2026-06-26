@@ -11,13 +11,13 @@ import {
   TextInput,
   LayoutChangeEvent,
   useWindowDimensions,
-  type KeyboardEvent,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { TabStackParamList } from '../navigation/types';
+import { useComposerKeyboardOffset } from '../hooks/useComposerKeyboardOffset';
 
 import { BackArrowIcon } from '../assets/icons/common/BackArrowIcon';
 import { TabAICenterIcon } from '../assets/icons/tabs/TabAICenterIcon';
@@ -59,40 +59,6 @@ type ChatItem =
       };
     }
   | { id: string; from: 'aira'; blocks: AiraBlock[] };
-
-/** Keyboard overlap with the app window — works across iOS/Android OEM quirks. */
-function keyboardOverlapFromEvent(windowHeight: number, e: KeyboardEvent): number {
-  const ec = e.endCoordinates;
-  if (!ec || windowHeight <= 0) return 0;
-
-  if (Platform.OS === 'ios') {
-    const screenY = typeof ec.screenY === 'number' ? ec.screenY : windowHeight;
-    return Math.max(0, Math.min(windowHeight, windowHeight - screenY));
-  }
-
-  const fromHeight = typeof ec.height === 'number' && ec.height > 0 ? ec.height : 0;
-  const fromScreenY =
-    typeof ec.screenY === 'number' ? Math.max(0, windowHeight - ec.screenY) : 0;
-
-  // Ignore unrealistic values so old-device quirks do not push composer too high.
-  const maxReasonableKeyboard = Math.floor(windowHeight * 0.45);
-  const minReasonableKeyboard = 80;
-  const candidates = [fromHeight, fromScreenY].filter(
-    (v) => v >= minReasonableKeyboard && v <= maxReasonableKeyboard
-  );
-  if (candidates.length > 0) {
-    // Some Android builds report inflated `height`; prefer the smaller sane value.
-    return Math.min(...candidates);
-  }
-
-  // Last fallback: prefer `screenY` overlap when available, then clamp.
-  const raw = Math.max(fromHeight, fromScreenY);
-  if (raw <= 0) return 0;
-  if (fromScreenY > 0) {
-    return Math.min(maxReasonableKeyboard, fromScreenY);
-  }
-  return Math.min(maxReasonableKeyboard, Math.max(minReasonableKeyboard, raw));
-}
 
 /** Split `**bold**` segments (markdown-style) for inline bold in React Native `Text`. */
 function splitMarkdownBoldSegments(text: string): Array<{ text: string; bold: boolean }> {
@@ -157,12 +123,11 @@ export const MatchScreen = () => {
     beforeContentH: number;
   } | null>(null);
   const [composerHeight, setComposerHeight] = React.useState(100);
-  const [keyboardHeight, setKeyboardHeight] = React.useState(0);
-  const [isKeyboardVisible, setIsKeyboardVisible] = React.useState(false);
-  const androidBaseWindowHeightRef = React.useRef(windowHeight);
-  const keyboardHideDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const keyboardHeightRef = React.useRef(0);
   const bottomSafeInset = insets.bottom;
+  const { composerBottomOffset, isKeyboardVisible, resetKeyboard } = useComposerKeyboardOffset({
+    windowHeight,
+    scrollViewRef: scrollRef,
+  });
 
   const hasText = message.trim().length > 0;
   const isInputEmpty = message.length === 0;
@@ -614,11 +579,10 @@ export const MatchScreen = () => {
           clearTimeout(reenableAutoScrollTimeoutRef.current);
           reenableAutoScrollTimeoutRef.current = null;
         }
-        setIsKeyboardVisible(false);
-        setKeyboardHeight(0);
+        resetKeyboard();
         Keyboard.dismiss();
       };
-    }, [loadChatHistory])
+    }, [loadChatHistory, resetKeyboard])
   );
 
   // React.useEffect(() => {
@@ -648,79 +612,6 @@ export const MatchScreen = () => {
     }
   }, []);
 
-  const scrollToEndAfterKeyboard = React.useCallback((animated: boolean) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        scrollRef.current?.scrollToEnd({ animated });
-      });
-    });
-  }, []);
-
-  React.useEffect(() => {
-    const cancelDebounce = () => {
-      if (keyboardHideDebounceRef.current) {
-        clearTimeout(keyboardHideDebounceRef.current);
-        keyboardHideDebounceRef.current = null;
-      }
-    };
-
-    const applyOverlap = (e: KeyboardEvent) => {
-      cancelDebounce();
-      const overlap = keyboardOverlapFromEvent(windowHeight, e);
-      const finalHeight =
-        Platform.OS === 'android' ? (overlap < 120 ? 280 : overlap) : overlap;
-      keyboardHeightRef.current = finalHeight;
-      setIsKeyboardVisible(finalHeight > 0);
-      setKeyboardHeight(finalHeight);
-      scrollToEndAfterKeyboard(true);
-    };
-
-    if (Platform.OS === 'ios') {
-      const frameSub = Keyboard.addListener('keyboardWillChangeFrame', applyOverlap);
-      return () => {
-        cancelDebounce();
-        frameSub.remove();
-      };
-    }
-
-    const showSub = Keyboard.addListener('keyboardDidShow', applyOverlap);
-    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
-      cancelDebounce();
-      keyboardHideDebounceRef.current = setTimeout(() => {
-        if (keyboardHeightRef.current < 100) return;
-        setIsKeyboardVisible(false);
-        setKeyboardHeight(0);
-        keyboardHideDebounceRef.current = null;
-      }, 180);
-      scrollToEndAfterKeyboard(false);
-    });
-    return () => {
-      cancelDebounce();
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, [windowHeight, scrollToEndAfterKeyboard]);
-
-  React.useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    // Learn the "keyboard hidden" baseline for this device/orientation.
-    if (!isKeyboardVisible && windowHeight > androidBaseWindowHeightRef.current) {
-      androidBaseWindowHeightRef.current = windowHeight;
-    }
-  }, [isKeyboardVisible, windowHeight]);
-
-  const androidWindowShrink = Math.max(
-    0,
-    androidBaseWindowHeightRef.current - windowHeight
-  );
-  const isKeyboardHandledBySystem = Platform.OS === 'android' && androidWindowShrink > 100;
-  const composerBottomOffset =
-    Platform.OS === 'ios'
-      ? keyboardHeight
-      : isKeyboardHandledBySystem
-      ? androidWindowShrink
-      : keyboardHeight;
-
   return (
       <View style={styles.screen}>
               <ProfileScreenGradient />
@@ -744,11 +635,7 @@ export const MatchScreen = () => {
                 flexGrow: 1,
                 paddingHorizontal: 16,
                 paddingTop: 36,
-                // Inset for fixed bottom composer + keyboard so messages stay scrollable above both.
-                paddingBottom:
-                  composerHeight +
-                  12 +
-                  composerBottomOffset,
+                paddingBottom: composerHeight + 12,
               }}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
@@ -990,10 +877,13 @@ export const MatchScreen = () => {
             <View
               onLayout={handleComposerLayout}
               style={[
-                styles.composerBottomFixed,
+                styles.composerFooter,
+                composerBottomOffset > 0 && { marginBottom: composerBottomOffset },
+                Platform.OS === 'android' &&
+                  isKeyboardVisible &&
+                  composerBottomOffset <= 0 && { marginBottom: Math.round(windowHeight * 0.36) },
                 {
-                  bottom: composerBottomOffset,
-                  paddingBottom: 12 + bottomSafeInset,
+                  paddingBottom: 12 + (isKeyboardVisible ? 0 : bottomSafeInset),
                 },
               ]}
             >
@@ -1395,15 +1285,11 @@ const MATCH_INPUT_WRAP_MAX = 142;
       lineHeight: 18,
       letterSpacing: 0.28,
     },
-    composerBottomFixed: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
+    composerFooter: {
       backgroundColor: colors.white,
+      flexShrink: 0,
+      width: '100%',
       zIndex: 5,
-      // borderTopWidth: StyleSheet.hairlineWidth,
-      // borderTopColor: colors.neutral[200],
     },
     composerRow: {
       flexDirection: 'row',

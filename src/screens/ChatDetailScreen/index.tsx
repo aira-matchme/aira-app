@@ -732,7 +732,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   });
   const inputRef = useRef<TextInput>(null);
   const scrollViewRef = useRef<ScrollView>(null);
-  const { composerBottomOffset, resetKeyboard } = useKeyboardOffset({
+  const { composerBottomOffset, isKeyboardVisible, resetKeyboard } = useKeyboardOffset({
     windowHeight,
     scrollViewRef,
   });
@@ -3881,7 +3881,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <View style={styles.screenColumn}>
-        <StatusBar barStyle="dark-content" translucent backgroundColor={colors.white}/>
+        <StatusBar
+          barStyle="dark-content"
+          translucent={Platform.OS === 'android' ? false : undefined}
+          backgroundColor={colors.white}
+        />
         <View style={styles.headerBar}>
         <TouchableOpacity
           onPress={() => navigation.navigate('ChatList')}
@@ -5267,13 +5271,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-      <View
-        style={[
-          styles.chatContentShell,
-          isSubscribed &&
-            composerBottomOffset > 0 && { paddingBottom: composerBottomOffset },
-        ]}
-      >
+      <View style={styles.chatContentShell}>
         <ScrollView
           ref={scrollViewRef}
           style={styles.chatMessagesScroll}
@@ -5282,6 +5280,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           }}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           showsVerticalScrollIndicator={false}
           onScroll={handleMessagesScroll}
           onContentSizeChange={(w, h) => {
@@ -5307,7 +5306,16 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         </ScrollView>
 
         {isSubscribed ? (
-        <View style={styles.chatFooter} onLayout={handleComposerLayout}>
+        <View
+          style={[
+            styles.chatFooter,
+            composerBottomOffset > 0 && { marginBottom: composerBottomOffset },
+            Platform.OS === 'android' &&
+              isKeyboardVisible &&
+              composerBottomOffset <= 0 && { marginBottom: Math.round(windowHeight * 0.36) },
+          ]}
+          onLayout={handleComposerLayout}
+        >
       {voice.voiceBarVisible ? (
         <View style={[styles.voiceBar, { paddingBottom: 12 + bottomSafeInset }]}>
           <TouchableOpacity
