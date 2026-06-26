@@ -16,6 +16,7 @@ import {
   Alert,
   Linking,
   StatusBar,
+  AppState,
   ActivityIndicator,
   LayoutChangeEvent,
   useWindowDimensions,
@@ -52,6 +53,7 @@ import { VoiceControlVideoOffIcon } from '../../assets/icons/common/VoiceControl
 import { VoiceControlMicIcon } from '../../assets/icons/common/VoiceControlMicIcon';
 import { VoiceControlMicOffIcon } from '../../assets/icons/common/VoiceControlMicOffIcon';
 import { VoiceControlMessageIcon } from '../../assets/icons/common/VoiceControlMessageIcon';
+import { IncomingCallNotificationIcon } from '../../assets/icons/common/IncomingCallNotificationIcon';
 import { AudioBluetoothIcon } from '../../assets/icons/common/AudioBluetoothIcon';
 import { AudioEarpieceIcon } from '../../assets/icons/common/AudioEarpieceIcon';
 import { AudioOptionCheckIcon } from '../../assets/icons/common/AudioOptionCheckIcon';
@@ -75,6 +77,14 @@ import { AttachmentOptionsBottomSheet, type AttachmentOption } from '../../compo
 import { GradientText } from '../../components/GradientText';
 import LinearGradient from 'react-native-linear-gradient';
 import { STRINGS } from '../../constants/strings';
+import { CALL_RING_TIMEOUT_MS } from '../../constants/call';
+import {
+  markCallTerminated as markGlobalCallTerminated,
+  clearCallTerminated as clearGlobalCallTerminated,
+  isCallTerminated as isGlobalCallTerminated,
+  onCallTerminated,
+} from '../../services/call/callSessionRegistry';
+import { buildCallLogBubbleLayout } from '../../modules/chat/callLogLayout';
 import { colors, typography } from '../../theme';
 import type { ChatStackParamList } from '../../navigation/types';
 import { navigateToSubscription } from '../../navigation/navigateToSubscription';
@@ -129,23 +139,11 @@ const APPROX_MESSAGE_CONTEXT_HEIGHT = 132;
 const MESSAGE_CONTEXT_GAP = 8;
 const MESSAGE_CONTEXT_MIN_WIDTH = 172;
 
-// Figma banner icons (Incoming video call banner, node 3629:22256).
-// These remote assets expire after a short time, so keep them temporary.
-const INCOMING_CALL_VIDEO_BADGE_ICON = {
-  uri: 'https://www.figma.com/api/mcp/asset/0a37e746-e5f5-4ee3-a5c9-324da371c8c7',
-};
-const INCOMING_CALL_VIDEO_ACCEPT_ICON = {
-  uri: 'https://www.figma.com/api/mcp/asset/89d6ce01-2f86-4db1-8392-3e33106e0684',
-};
-const INCOMING_CALL_VIDEO_DECLINE_ICON = {
-  uri: 'https://www.figma.com/api/mcp/asset/a8735b4f-d963-4b30-a427-4c11913733fd',
-};
 type ActiveCallMode = 'voice' | 'video';
 type IncomingCallPrompt = {
   callerName: string;
   mode: ActiveCallMode;
   callId?: string;
-  callerAvatar?: string;
 };
 type AudioDevice = 'speaker' | 'earpiece' | 'bluetooth' | 'wired';
 
@@ -170,6 +168,108 @@ function resolvePartnerDisplaySource(partner: ChatDetailRouteAvatar | undefined)
     if (uri.length > 0) return partner;
   }
   return DEFAULT_PARTNER_AVATAR;
+}
+
+type CallUiSnapshot = {
+  activeCallId: string | null;
+  activeCallMode: ActiveCallMode;
+  incomingVoiceCallId: string | null;
+  incomingVideoCallId: string | null;
+  incomingCallBannerVisible: boolean;
+  incomingVoiceCallVisible: boolean;
+  incomingVideoCallVisible: boolean;
+  callStateVisible: boolean;
+  isOutgoingVoiceRinging: boolean;
+  callConnectedAtMs: number | null;
+  chatId: string | null;
+  currentUserId?: string;
+  otherUserId?: string;
+};
+
+function callParticipantsMatch(
+  payload: { callerId?: string; receiverId?: string; endedBy?: string; chatId?: string },
+  snap: CallUiSnapshot,
+): boolean {
+  const payloadChatId = payload.chatId?.trim();
+  const screenChatId = snap.chatId?.trim();
+  if (payloadChatId && screenChatId) {
+    return payloadChatId === screenChatId;
+  }
+  const me = snap.currentUserId?.trim();
+  const other = snap.otherUserId?.trim();
+  if (!me || !other) return false;
+  const ids = [payload.callerId, payload.receiverId, payload.endedBy]
+    .map((id) => id?.trim())
+    .filter(Boolean) as string[];
+  return ids.includes(me) && ids.includes(other);
+}
+
+/** True when a call lifecycle socket event should update this chat screen. */
+function isCallLifecycleRelevant(payload: CallLifecyclePayload, snap: CallUiSnapshot): boolean {
+  const callId = payload.callId?.trim() ?? '';
+  const trackedIds = [snap.activeCallId, snap.incomingVoiceCallId, snap.incomingVideoCallId]
+    .map((id) => id?.trim() ?? '')
+    .filter(Boolean);
+
+  if (callId && trackedIds.includes(callId)) return true;
+
+  const hasIncomingUi =
+    snap.incomingCallBannerVisible || snap.incomingVoiceCallVisible || snap.incomingVideoCallVisible;
+  const hasCallSession =
+    snap.callStateVisible || snap.isOutgoingVoiceRinging || Boolean(snap.activeCallId?.trim());
+
+  if (!hasIncomingUi && !hasCallSession) return false;
+
+  if (callParticipantsMatch(payload, snap) && (hasIncomingUi || hasCallSession)) {
+    return true;
+  }
+
+  if (callId) {
+    if (trackedIds.length > 0) return false;
+    return callParticipantsMatch(payload, snap);
+  }
+
+  return callParticipantsMatch(payload, snap) || trackedIds.length > 0;
+}
+
+const CALL_LOG_STATUS_PRIORITY: Record<string, number> = {
+  REJECTED: 40,
+  DECLINED: 40,
+  NO_ANSWER: 30,
+  TIMEOUT: 30,
+  TIMED_OUT: 30,
+  CANCELLED: 25,
+  CANCELED: 25,
+  MISSED: 20,
+  ENDED: 10,
+};
+
+function callLogStatusPriority(status: string): number {
+  return CALL_LOG_STATUS_PRIORITY[status.toUpperCase()] ?? 0;
+}
+
+/** Keep client call-log rows until the API returns the matching `system_call` message. */
+function mergeApiMessagesWithPendingCallLogs(
+  apiMessages: ChatMessage[],
+  previousMessages: ChatMessage[],
+): ChatMessage[] {
+  const persistedCallIds = new Set(
+    apiMessages
+      .filter((m): m is Extract<ChatMessage, { type: 'call_log' }> => m.type === 'call_log')
+      .map((m) => m.callId.trim())
+      .filter((id) => id.length > 0),
+  );
+
+  const pendingCallLogs = previousMessages.filter(
+    (m): m is Extract<ChatMessage, { type: 'call_log' }> =>
+      m.type === 'call_log' &&
+      !m.messageId &&
+      m.callId.trim().length > 0 &&
+      !persistedCallIds.has(m.callId.trim()),
+  );
+
+  if (pendingCallLogs.length === 0) return apiMessages;
+  return [...apiMessages, ...pendingCallLogs];
 }
 
 export const ChatDetailScreen = ({ route, navigation }: Props) => {
@@ -256,7 +356,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
               .filter((m): m is ChatMessage => m != null)
               .reverse()
           : [];
-        setMessages(list);
+        setMessages((prev) => mergeApiMessagesWithPendingCallLogs(list, prev));
         const meta = res.data?.meta;
         const currentPage = meta?.currentPage ?? meta?.pageNo ?? 1;
         const totalPages = meta?.totalPages ?? 1;
@@ -265,6 +365,74 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       })
       .catch(() => {});
   }, [chatId, currentUserId]);
+
+  const callLogRefreshTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const clearCallLogRefreshTimers = useCallback(() => {
+    callLogRefreshTimersRef.current.forEach(clearTimeout);
+    callLogRefreshTimersRef.current = [];
+  }, []);
+
+  /** Backend call logs can arrive slightly after the socket event — retry fetch a few times. */
+  const refreshChatMessagesAfterCall = useCallback(() => {
+    clearCallLogRefreshTimers();
+    const delays = [400, 1000, 2000, 4000];
+    callLogRefreshTimersRef.current = delays.map((delay) =>
+      setTimeout(() => refreshChatMessagesFromApi(), delay),
+    );
+  }, [clearCallLogRefreshTimers, refreshChatMessagesFromApi]);
+
+  useEffect(() => () => clearCallLogRefreshTimers(), [clearCallLogRefreshTimers]);
+
+  const upsertOptimisticCallLog = useCallback(
+    (params: {
+      callId: string;
+      callType: 'audio' | 'video';
+      callStatus: string;
+      sent: boolean;
+    }) => {
+      const id = params.callId.trim();
+      if (!id) return;
+      const nextPriority = callLogStatusPriority(params.callStatus);
+      const timestamp = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      setMessages((prev) => {
+        const persisted = prev.find((m) => m.type === 'call_log' && m.callId === id && m.messageId);
+        if (persisted) return prev;
+
+        const existingOptimistic = prev.find(
+          (m) => m.type === 'call_log' && m.callId === id && !m.messageId,
+        );
+        if (
+          existingOptimistic &&
+          callLogStatusPriority(existingOptimistic.callStatus) >= nextPriority
+        ) {
+          return prev;
+        }
+
+        const withoutStaleOptimistic = prev.filter(
+          (m) => !(m.type === 'call_log' && m.callId === id && !m.messageId),
+        );
+        const entry: ChatMessage = {
+          type: 'call_log',
+          callId: id,
+          callType: params.callType,
+          callStatus: params.callStatus,
+          durationSec: 0,
+          label: '',
+          displayAsSummaryLine: false,
+          timestamp,
+          sent: params.sent,
+        };
+        return [...withoutStaleOptimistic, entry];
+      });
+    },
+    [],
+  );
+
+  const upsertOptimisticCallLogRef = useRef(upsertOptimisticCallLog);
+  upsertOptimisticCallLogRef.current = upsertOptimisticCallLog;
+  const refreshChatMessagesAfterCallRef = useRef(refreshChatMessagesAfterCall);
+  refreshChatMessagesAfterCallRef.current = refreshChatMessagesAfterCall;
   const [inputText, setInputText] = useState('');
   const [attachmentSheetOpen, setAttachmentSheetOpen] = useState(false);
 
@@ -323,6 +491,11 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const [selectedAudioDevice, setSelectedAudioDevice] = useState<AudioDevice>('earpiece');
   const [switchToVideoPopupVisible, setSwitchToVideoPopupVisible] = useState(false);
   const [incomingCallSwitchRequestVisible, setIncomingCallSwitchRequestVisible] = useState(false);
+  const [callMediaResumeNonce, setCallMediaResumeNonce] = useState(0);
+  const selectedAudioDeviceRef = useRef<AudioDevice>('earpiece');
+  selectedAudioDeviceRef.current = selectedAudioDevice;
+  const callVideoEnabledRef = useRef(callVideoEnabled);
+  callVideoEnabledRef.current = callVideoEnabled;
   const AgoraRtcSurfaceView = useMemo(() => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires,global-require
@@ -334,6 +507,99 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   }, []);
   const callStateVisibleRef = useRef(callStateVisible);
   callStateVisibleRef.current = callStateVisible;
+  const callConnectedAtMsRef = useRef(callConnectedAtMs);
+  callConnectedAtMsRef.current = callConnectedAtMs;
+
+  useEffect(() => {
+    callUiRef.current = {
+      activeCallId,
+      activeCallMode,
+      incomingVoiceCallId,
+      incomingVideoCallId,
+      incomingCallBannerVisible,
+      incomingVoiceCallVisible,
+      incomingVideoCallVisible,
+      callStateVisible,
+      isOutgoingVoiceRinging,
+      callConnectedAtMs,
+      chatId,
+      currentUserId: currentUserId ?? undefined,
+      otherUserId,
+    };
+  }, [
+    activeCallId,
+    activeCallMode,
+    incomingVoiceCallId,
+    incomingVideoCallId,
+    incomingCallBannerVisible,
+    incomingVoiceCallVisible,
+    incomingVideoCallVisible,
+    callStateVisible,
+    isOutgoingVoiceRinging,
+    callConnectedAtMs,
+    chatId,
+    currentUserId,
+    otherUserId,
+  ]);
+
+  const dismissIncomingCallUi = useCallback((options?: { clearPendingRtc?: boolean }) => {
+    const snap = callUiRef.current;
+    const incomingId = snap.incomingVideoCallId ?? snap.incomingVoiceCallId;
+    const incomingMode: ActiveCallMode | undefined = snap.incomingVideoCallId
+      ? 'video'
+      : snap.incomingVoiceCallId
+        ? 'voice'
+        : undefined;
+    if (incomingId?.trim()) {
+      const trimmed = incomingId.trim();
+      handledIncomingCallIdsRef.current.add(trimmed);
+      if (incomingMode) {
+        handledIncomingCallRef.current = `${incomingMode}:${trimmed}`;
+      }
+    }
+    setIncomingVoiceCallVisible(false);
+    setIncomingVideoCallVisible(false);
+    setIncomingCallBannerVisible(false);
+    setIncomingVoiceCallId(null);
+    setIncomingVideoCallId(null);
+    setIncomingVoiceCallerName('');
+    setIncomingVideoCallerName('');
+    if (options?.clearPendingRtc !== false && !callStateVisibleRef.current) {
+      setActiveCallId(null);
+      setActiveCallChannelName(null);
+      setActiveCallRtcToken(null);
+    }
+  }, []);
+
+  const clearOutgoingRingTimer = useCallback(() => {
+    if (outgoingRingTimerRef.current) {
+      clearTimeout(outgoingRingTimerRef.current);
+      outgoingRingTimerRef.current = null;
+    }
+  }, []);
+
+  const markCallTerminated = useCallback(
+    (callId?: string | null) => {
+      const id = callId?.trim();
+      if (!id) return;
+      markGlobalCallTerminated(id);
+      clearOutgoingRingTimer();
+    },
+    [clearOutgoingRingTimer],
+  );
+
+  const registerHandledIncomingCall = useCallback((callId?: string | null, mode?: ActiveCallMode) => {
+    const id = callId?.trim();
+    if (!id) return;
+    handledIncomingCallIdsRef.current.add(id);
+    if (mode) {
+      handledIncomingCallRef.current = `${mode}:${id}`;
+    }
+  }, []);
+
+  const isCallTerminated = useCallback((callId?: string | null) => {
+    return isGlobalCallTerminated(callId);
+  }, []);
 
   /** Bottom chrome + PIP (Figma 812). SafeAreaView already applies `bottom` inset — do not add insets.bottom again. */
   const videoControlsApproxHeight = Math.round((68 / 812) * windowHeight);
@@ -372,6 +638,15 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       { text: 'Open Settings', onPress: () => void Linking.openSettings() },
     ]);
   };
+
+  const ensureMicrophoneForCall = useCallback(async (): Promise<boolean> => {
+    const status = await checkMicrophonePermission();
+    if (status === 'granted') return true;
+    const requested = await requestMicrophonePermission();
+    if (requested === 'granted') return true;
+    showSettingsAlert('microphone');
+    return false;
+  }, []);
 
   /** Send-message responses often omit `content` or nest the document; merge so the bubble shows immediately. */
   const enrichOutgoingTextPayload = (
@@ -438,6 +713,23 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const otherUserTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handledIncomingRouteCallRef = useRef<string | null>(null);
   const handledIncomingCallRef = useRef<string | null>(null);
+  const handledIncomingCallIdsRef = useRef<Set<string>>(new Set());
+  const outgoingRingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const callUiRef = useRef<CallUiSnapshot>({
+    activeCallId: null,
+    activeCallMode: 'voice',
+    incomingVoiceCallId: null,
+    incomingVideoCallId: null,
+    incomingCallBannerVisible: false,
+    incomingVoiceCallVisible: false,
+    incomingVideoCallVisible: false,
+    callStateVisible: false,
+    isOutgoingVoiceRinging: false,
+    callConnectedAtMs: null,
+    chatId: null,
+    currentUserId: undefined,
+    otherUserId: undefined,
+  });
   const inputRef = useRef<TextInput>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const { composerBottomOffset, resetKeyboard } = useKeyboardOffset({
@@ -479,6 +771,8 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   const bumpScrollAfterLocalSend = useCallback(() => {
     setScrollAfterLocalSendNonce((n) => n + 1);
   }, []);
+  const bumpScrollAfterLocalSendRef = useRef(bumpScrollAfterLocalSend);
+  bumpScrollAfterLocalSendRef.current = bumpScrollAfterLocalSend;
 
   const onSendVoice = useCallback(async (filePath: string) => {
     if (!currentUserId || !otherUserId) return;
@@ -542,12 +836,16 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
   useFocusEffect(
     useCallback(() => {
+      if (chatId) {
+        socketService.ensureConnected();
+        socketService.join(chatId);
+      }
       return () => {
         voice.resetVoiceState();
         resetKeyboard();
         Keyboard.dismiss();
       };
-    }, [voice.resetVoiceState, resetKeyboard])
+    }, [chatId, voice.resetVoiceState, resetKeyboard])
   );
 
   const isOtherUserOnlineFromPayload = useCallback(
@@ -609,6 +907,17 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     [otherUserId]
   );
 
+  const storeIncomingCallRtc = useCallback((payload: IncomingCallPayload) => {
+    const channelName = String(payload.channelName ?? '').trim();
+    if (channelName) {
+      setActiveCallChannelName(channelName);
+    }
+    const rtcToken = String(payload.rtcToken ?? '').trim();
+    if (rtcToken) {
+      setActiveCallRtcToken(rtcToken);
+    }
+  }, []);
+
   const parseIncomingCallPayload = useCallback(
     (data: IncomingCallPayload): IncomingCallPrompt | null => {
       if (otherUserId && data.senderId && data.senderId !== otherUserId) {
@@ -616,7 +925,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       }
       const mode: ActiveCallMode = data.callType === 'video' ? 'video' : 'voice';
       const rawCallerName = String(data.callerName ?? '').trim();
-      const rawCallerAvatar = String(data.callerAvatar ?? '').trim();
       const fallbackName = String(name ?? '').trim();
       const callerName =
         rawCallerName || (fallbackName && fallbackName !== 'Chat' ? fallbackName : 'Incoming call');
@@ -624,7 +932,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         callerName,
         mode,
         callId: data.callId,
-        callerAvatar: rawCallerAvatar || undefined,
       };
     },
     [name, otherUserId]
@@ -639,9 +946,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         }
         return prev;
       });
-    }
-    if (incoming.callerAvatar) {
-      setPartnerAvatar({ uri: incoming.callerAvatar } as any);
     }
     if (incoming.mode === 'video') {
       setIncomingVideoCallerName(incoming.callerName);
@@ -661,7 +965,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   }, [incomingCallBannerMode]);
 
   const showIncomingCallBanner = useCallback(
-    (incoming: IncomingCallPrompt) => {
+    (incoming: IncomingCallPrompt, rtc?: Pick<IncomingCallPayload, 'channelName' | 'rtcToken'>) => {
+      if (rtc) {
+        storeIncomingCallRtc(rtc);
+      }
       if (incoming.callerName && incoming.callerName !== 'Incoming call') {
         setName((prev) => {
           const current = String(prev ?? '').trim();
@@ -670,9 +977,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           }
           return prev;
         });
-      }
-      if (incoming.callerAvatar) {
-        setPartnerAvatar({ uri: incoming.callerAvatar } as any);
       }
 
       setIncomingCallBannerMode(incoming.mode);
@@ -693,7 +997,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setIncomingVideoCallVisible(false);
       setIncomingCallBannerVisible(true);
     },
-    [setIncomingCallBannerMode],
+    [storeIncomingCallRtc],
   );
 
   useEffect(() => {
@@ -701,6 +1005,10 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     if (!incomingFromRoute) return;
     const dedupeKey = `${incomingFromRoute.callId ?? 'no-call-id'}:${incomingFromRoute.mode}:${incomingFromRoute.senderId ?? ''}`;
     if (handledIncomingRouteCallRef.current === dedupeKey) return;
+    if (incomingFromRoute.callId && isGlobalCallTerminated(incomingFromRoute.callId)) {
+      handledIncomingRouteCallRef.current = dedupeKey;
+      return;
+    }
     handledIncomingRouteCallRef.current = dedupeKey;
 
     if (incomingFromRoute.senderId && !otherUserId) {
@@ -708,12 +1016,6 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     }
     if (incomingFromRoute.callerName && (!name || name === 'Chat')) {
       setName(incomingFromRoute.callerName);
-    }
-    if (incomingFromRoute.callerAvatar) {
-      setPartnerAvatar({ uri: incomingFromRoute.callerAvatar } as any);
-    }
-    if (incomingFromRoute.callId) {
-      setActiveCallId(incomingFromRoute.callId);
     }
     if (incomingFromRoute.channelName) {
       setActiveCallChannelName(incomingFromRoute.channelName);
@@ -725,12 +1027,14 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     const key = `${incomingFromRoute.mode}:${incomingFromRoute.callId ?? ''}`;
     handledIncomingCallRef.current = key;
 
-    showIncomingCallBanner({
-      mode: incomingFromRoute.mode,
-      callerName: incomingFromRoute.callerName ?? name ?? 'Incoming call',
-      callId: incomingFromRoute.callId,
-      callerAvatar: incomingFromRoute.callerAvatar,
-    });
+      showIncomingCallBanner({
+        mode: incomingFromRoute.mode,
+        callerName: incomingFromRoute.callerName ?? name ?? 'Incoming call',
+        callId: incomingFromRoute.callId,
+      }, {
+        channelName: incomingFromRoute.channelName,
+        rtcToken: incomingFromRoute.rtcToken,
+      });
   }, [initialIncomingCall, name, otherUserId, route.params, showIncomingCallBanner]);
 
 
@@ -1006,6 +1310,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         setOtherUserOnline(false);
       }
       if (connected) {
+        socketService.ensureConnected();
         // Ensure we (re)join the chat room after reconnect so
         // incoming messages are received reliably (especially on iOS).
         if (chatId) {
@@ -1031,22 +1336,37 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       }
     });
     const showIncomingCallPrompt = (payload: IncomingCallPayload) => {
+      storeIncomingCallRtc(payload);
       const parsed = parseIncomingCallPayload(payload);
       if (!parsed) return;
-      // If we already handled this call (route navigation or banner already visible), ignore duplicates.
+      const incomingCallId = parsed.callId?.trim();
+      if (incomingCallId && handledIncomingCallIdsRef.current.has(incomingCallId)) return;
+      if (incomingCallId && isGlobalCallTerminated(incomingCallId)) return;
+
+      const snap = callUiRef.current;
+      if (snap.callStateVisible) return;
+      if (parsed.mode === 'voice' && snap.incomingVoiceCallVisible) return;
+      if (parsed.mode === 'video' && snap.incomingVideoCallVisible) return;
+      if (snap.incomingCallBannerVisible && parsed.callId) {
+        const pendingId = snap.incomingVoiceCallId ?? snap.incomingVideoCallId;
+        if (pendingId && pendingId === parsed.callId) return;
+      }
       const key = `${parsed.mode}:${parsed.callId ?? ''}`;
       if (handledIncomingCallRef.current === key) return;
       handledIncomingCallRef.current = key;
 
-      // If call UI is already showing, don't override it.
-      if (callStateVisible) return;
-      if (parsed.mode === 'voice' && incomingVoiceCallVisible) return;
-      if (parsed.mode === 'video' && incomingVideoCallVisible) return;
-
-      showIncomingCallBanner(parsed);
+      showIncomingCallBanner(parsed, payload);
     };
     const onCallAccepted = (payload: CallLifecyclePayload) => {
       if (!payload.callId) return;
+      const acceptedId = payload.callId.trim();
+      if (acceptedId) {
+        clearGlobalCallTerminated(acceptedId);
+      }
+      if (outgoingRingTimerRef.current) {
+        clearTimeout(outgoingRingTimerRef.current);
+        outgoingRingTimerRef.current = null;
+      }
       setActiveCallId(payload.callId);
       setActiveCallChannelName(payload.channelName ?? null);
       setActiveCallRtcToken(payload.rtcToken ?? null);
@@ -1063,9 +1383,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setIsOutgoingVoiceRinging(false);
       setCallConnectedAtMs(Date.now());
       setCallStateVisible(true);
-      setIncomingVoiceCallVisible(false);
-      setIncomingVideoCallVisible(false);
-      setIncomingCallBannerVisible(false);
+      dismissIncomingCallUi({ clearPendingRtc: false });
       setSwitchToVideoPopupVisible(false);
       setIncomingCallSwitchRequestVisible(false);
     };
@@ -1079,12 +1397,32 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         setActiveCallMode(mode);
         setCallVideoEnabled(mode === 'video');
       }
+      scheduleOutgoingRingTimeoutRef.current(payload.callId);
     };
     const onCallFailed = (payload: CallFailedPayload) => {
+      const snap = callUiRef.current;
+      const failedCallId = payload.callId?.trim() ?? '';
+      const trackedIds = [snap.activeCallId, snap.incomingVoiceCallId, snap.incomingVideoCallId]
+        .map((id) => id?.trim() ?? '')
+        .filter(Boolean);
+      const hasIncomingUi =
+        snap.incomingCallBannerVisible || snap.incomingVoiceCallVisible || snap.incomingVideoCallVisible;
+      const applies =
+        hasIncomingUi ||
+        snap.callStateVisible ||
+        snap.isOutgoingVoiceRinging ||
+        (failedCallId ? trackedIds.includes(failedCallId) : trackedIds.length > 0);
+      if (!applies) return;
+
       const normalizedCode = String(payload.code ?? '').toUpperCase();
-      setIncomingVoiceCallVisible(false);
-      setIncomingVideoCallVisible(false);
-      setIncomingCallBannerVisible(false);
+      if (failedCallId) {
+        markGlobalCallTerminated(failedCallId);
+        if (outgoingRingTimerRef.current) {
+          clearTimeout(outgoingRingTimerRef.current);
+          outgoingRingTimerRef.current = null;
+        }
+      }
+      dismissIncomingCallUi();
       setCallStateVisible(false);
       setActiveCallId(null);
       setPartnerAudioEnabled(true);
@@ -1101,7 +1439,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       void agoraCallService.leaveChannel();
       const refetchThisChat =
         chatId &&
-        (payload.callId == null || activeCallId == null || payload.callId === activeCallId);
+        (payload.callId == null || snap.activeCallId == null || payload.callId === snap.activeCallId);
       if (refetchThisChat) {
         refreshChatMessagesFromApi();
       }
@@ -1109,14 +1447,76 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         showErrorToast('User is offline right now.');
         return;
       }
+      if (hasIncomingUi && !snap.callStateVisible) return;
       showErrorToast(payload.message || 'Call failed. Please try again.');
     };
-    const onCallRejected = (payload: CallLifecyclePayload) => {
-      if (!payload.callId) return;
-      if (activeCallId && payload.callId !== activeCallId) return;
-      setIncomingVoiceCallVisible(false);
-      setIncomingVideoCallVisible(false);
-      setIncomingCallBannerVisible(false);
+    const teardownCallSession = (payload: CallLifecyclePayload, toastMessage?: string) => {
+      const snap = callUiRef.current;
+      if (!isCallLifecycleRelevant(payload, snap)) return false;
+
+      const wasIncomingOnly =
+        !snap.callStateVisible &&
+        (snap.incomingCallBannerVisible || snap.incomingVoiceCallVisible || snap.incomingVideoCallVisible);
+      const wasConnected = snap.callConnectedAtMs != null;
+      const callId =
+        payload.callId?.trim() ||
+        snap.activeCallId?.trim() ||
+        snap.incomingVoiceCallId?.trim() ||
+        snap.incomingVideoCallId?.trim() ||
+        '';
+
+      if (callId && isGlobalCallTerminated(callId)) {
+        const hadIncoming =
+          snap.incomingCallBannerVisible || snap.incomingVoiceCallVisible || snap.incomingVideoCallVisible;
+        const wasOutgoingUnanswered =
+          Boolean(snap.activeCallId?.trim()) && snap.callConnectedAtMs == null && !hadIncoming;
+        dismissIncomingCallUi();
+        setCallStateVisible(false);
+        setActiveCallId(null);
+        setIsOutgoingVoiceRinging(false);
+        setCallConnectedAtMs(null);
+        setCallDurationSec(0);
+        setActiveCallChannelName(null);
+        setActiveCallRtcToken(null);
+        setLocalRtcUid(0);
+        void agoraCallService.leaveChannel();
+
+        if (!wasConnected && callId) {
+          const toastLower = toastMessage?.toLowerCase() ?? '';
+          const callStatus = toastLower.includes('declined')
+            ? 'REJECTED'
+            : toastLower.includes('no answer')
+              ? 'NO_ANSWER'
+              : hadIncoming
+                ? 'MISSED'
+                : wasOutgoingUnanswered
+                  ? 'NO_ANSWER'
+                  : 'MISSED';
+          const callType =
+            snap.incomingVideoCallId || snap.activeCallMode === 'video' ? 'video' : 'audio';
+          upsertOptimisticCallLogRef.current({
+            callId,
+            callType,
+            callStatus,
+            sent: wasOutgoingUnanswered || (!hadIncoming && Boolean(snap.activeCallId?.trim())),
+          });
+        }
+
+        refreshChatMessagesAfterCallRef.current();
+        bumpScrollAfterLocalSendRef.current();
+        return true;
+      }
+
+      if (callId) {
+        markGlobalCallTerminated(callId);
+        handledIncomingCallIdsRef.current.add(callId);
+        if (outgoingRingTimerRef.current) {
+          clearTimeout(outgoingRingTimerRef.current);
+          outgoingRingTimerRef.current = null;
+        }
+      }
+
+      dismissIncomingCallUi();
       setCallStateVisible(false);
       setActiveCallId(null);
       setPartnerAudioEnabled(true);
@@ -1131,56 +1531,102 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setActiveCallRtcToken(null);
       setLocalRtcUid(0);
       void agoraCallService.leaveChannel();
-      if (shouldRefetchMessagesAfterCall(payload)) {
-        refreshChatMessagesFromApi();
+
+      if (!wasConnected && callId) {
+        const hasIncomingUi =
+          snap.incomingCallBannerVisible || snap.incomingVoiceCallVisible || snap.incomingVideoCallVisible;
+        const sentLog = Boolean(snap.activeCallId?.trim()) && !hasIncomingUi;
+        const toastLower = toastMessage?.toLowerCase() ?? '';
+        const callStatus = toastLower.includes('declined')
+          ? 'REJECTED'
+          : toastLower.includes('no answer')
+            ? 'NO_ANSWER'
+            : 'MISSED';
+        const callType =
+          snap.incomingVideoCallId || snap.activeCallMode === 'video' ? 'video' : 'audio';
+        upsertOptimisticCallLogRef.current({
+          callId,
+          callType,
+          callStatus,
+          sent: sentLog,
+        });
       }
+
+      if (shouldRefetchMessagesAfterCall(payload)) {
+        refreshChatMessagesAfterCallRef.current();
+      }
+      if (!wasConnected && callId) {
+        bumpScrollAfterLocalSendRef.current();
+      }
+      if (toastMessage && !wasIncomingOnly) {
+        showSuccessToast(toastMessage);
+      }
+      return true;
+    };
+    const onCallRejected = (payload: CallLifecyclePayload) => {
+      if (teardownCallSession(payload, 'Call was declined.')) return;
+      const snap = callUiRef.current;
+      const callId =
+        payload.callId?.trim() ||
+        snap.activeCallId?.trim() ||
+        snap.incomingVoiceCallId?.trim() ||
+        snap.incomingVideoCallId?.trim() ||
+        '';
+      if (!callId || !callParticipantsMatch(payload, snap)) return;
+      if (callId) markGlobalCallTerminated(callId);
+      dismissIncomingCallUi();
+      setCallStateVisible(false);
+      setActiveCallId(null);
+      setIsOutgoingVoiceRinging(false);
+      cleanupCallSessionLocal();
+      upsertOptimisticCallLogRef.current({
+        callId,
+        callType: snap.activeCallMode === 'video' ? 'video' : 'audio',
+        callStatus: 'REJECTED',
+        sent: Boolean(snap.activeCallId?.trim()) && !snap.incomingCallBannerVisible,
+      });
+      refreshChatMessagesAfterCallRef.current();
+      bumpScrollAfterLocalSendRef.current();
       showSuccessToast('Call was declined.');
     };
     const onCallEnded = (payload: CallLifecyclePayload) => {
-      if (!payload.callId) return;
-      if (activeCallId && payload.callId !== activeCallId) return;
-      setIncomingVoiceCallVisible(false);
-      setIncomingVideoCallVisible(false);
-      setIncomingCallBannerVisible(false);
-      setCallStateVisible(false);
-      setActiveCallId(null);
-      setPartnerAudioEnabled(true);
-      setPartnerVideoEnabled(true);
-      setIsOutgoingVoiceRinging(false);
-      setIsSwitchingVoiceToVideo(false);
-      setSwitchToVideoPopupVisible(false);
-      setIncomingCallSwitchRequestVisible(false);
-      setCallConnectedAtMs(null);
-      setCallDurationSec(0);
-      setActiveCallChannelName(null);
-      setActiveCallRtcToken(null);
-      setLocalRtcUid(0);
-      void agoraCallService.leaveChannel();
-      if (shouldRefetchMessagesAfterCall(payload)) {
-        refreshChatMessagesFromApi();
-      }
-      showSuccessToast('Call ended.');
+      const snap = callUiRef.current;
+      const hasIncomingUi =
+        snap.incomingCallBannerVisible || snap.incomingVoiceCallVisible || snap.incomingVideoCallVisible;
+      const wasConnected = snap.callConnectedAtMs != null;
+      const wasOutgoingUnanswered =
+        Boolean(snap.activeCallId?.trim()) && !wasConnected && !hasIncomingUi;
+      const toastMessage = wasConnected
+        ? 'Call ended.'
+        : wasOutgoingUnanswered
+          ? 'No answer.'
+          : undefined;
+      teardownCallSession(payload, toastMessage);
     };
     const onCallPartnerAudio = (payload: CallPartnerAudioPayload) => {
+      const snap = callUiRef.current;
       if (!payload.userId || payload.userId !== otherUserId) return;
-      if (activeCallId && payload.callId && payload.callId !== activeCallId) return;
+      if (snap.activeCallId && payload.callId && payload.callId !== snap.activeCallId) return;
       setPartnerAudioEnabled(payload.enabled);
     };
     const onCallPartnerVideo = (payload: CallPartnerVideoPayload) => {
+      const snap = callUiRef.current;
       if (!payload.userId || payload.userId !== otherUserId) return;
-      if (activeCallId && payload.callId && payload.callId !== activeCallId) return;
+      if (snap.activeCallId && payload.callId && payload.callId !== snap.activeCallId) return;
       setPartnerVideoEnabled(payload.enabled);
     };
     const onCallSwitchRequest = (payload: CallSwitchRequestPayload) => {
+      const snap = callUiRef.current;
       if (!payload.callId || payload.targetType !== 'video') return;
-      if (!callStateVisible || !activeCallId || payload.callId !== activeCallId) return;
-      if (activeCallMode !== 'voice') return;
+      if (!snap.callStateVisible || !snap.activeCallId || payload.callId !== snap.activeCallId) return;
+      if (snap.activeCallMode !== 'voice') return;
       if (payload.fromUserId && currentUserId && payload.fromUserId === currentUserId) return;
       if (payload.chatId && chatId && payload.chatId !== chatId) return;
       setIncomingCallSwitchRequestVisible(true);
     };
     const onCallSwitchApplied = (payload: CallSwitchAppliedPayload) => {
-      if (!payload.callId || !activeCallId || payload.callId !== activeCallId) return;
+      const snap = callUiRef.current;
+      if (!payload.callId || !snap.activeCallId || payload.callId !== snap.activeCallId) return;
       const raw = String(payload.callType ?? payload.targetType ?? '').toLowerCase();
       if (!raw) return;
       const isVoiceOnly = raw === 'voice' || raw === 'audio' || raw === 'voice_call' || raw === 'audio_call';
@@ -1221,20 +1667,20 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       unsubCallPartnerVideo();
       unsubCallSwitchRequest();
       unsubCallSwitchApplied();
+      if (chatId) {
+        socketService.leaveChat(chatId);
+      }
     };
   }, [
-    activeCallId,
-    activeCallMode,
     chatId,
     currentUserId,
+    dismissIncomingCallUi,
+    otherUserId,
     refreshChatMessagesFromApi,
     isOtherUserOnlineFromPayload,
-    otherUserId,
-    incomingVoiceCallVisible,
-    incomingVideoCallVisible,
-    callStateVisible,
     showIncomingCallBanner,
     parseIncomingCallPayload,
+    storeIncomingCallRtc,
   ]);
 
   useEffect(() => {
@@ -2109,58 +2555,15 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         | 'voiceMissed';
     };
 
-    const buildCallLogLayout = (m: Extract<ChatMessage, { type: 'call_log' }>): CallBubbleLayout => {
-      const status = m.callStatus.toUpperCase();
-      const isVideo = m.callType === 'video';
-      const summary = m.displayAsSummaryLine === true ? m.label.trim() : '';
-      if (summary.length > 0) {
-        if (status === 'REJECTED' || status === 'MISSED' || status === 'NO_ANSWER' || status === 'CANCELLED') {
-          return {
-            title: summary,
-            subtitle: '',
-            variant: 'missed',
-            icon: isVideo ? 'videoMissed' : 'voiceMissed',
-          };
-        }
-        return {
-          title: summary,
-          subtitle: '',
-          variant: m.sent ? 'sent' : 'received',
-          icon: m.sent ? (isVideo ? 'videoOutgoing' : 'voiceOutgoing') : isVideo ? 'videoIncoming' : 'voiceIncoming',
-        };
-      }
-      if (status === 'REJECTED') {
-        return {
-          title: isVideo ? 'Video Call' : 'Voice Call',
-          subtitle: 'Declined',
-          variant: 'missed',
-          icon: isVideo ? 'videoMissed' : 'voiceMissed',
-        };
-      }
-      if (status === 'ENDED') {
-        return {
-          title: isVideo ? 'Video Call' : 'Voice Call',
-          subtitle: formatCallDurationSec(m.durationSec),
-          variant: m.sent ? 'sent' : 'received',
-          icon: m.sent ? (isVideo ? 'videoOutgoing' : 'voiceOutgoing') : isVideo ? 'videoIncoming' : 'voiceIncoming',
-        };
-      }
-      if (status === 'MISSED' || status === 'NO_ANSWER' || status === 'CANCELLED') {
-        return {
-          title: isVideo ? 'Missed Video Call' : 'Missed Voice Call',
-          subtitle: '',
-          variant: 'missed',
-          icon: isVideo ? 'videoMissed' : 'voiceMissed',
-        };
-      }
-      const short = m.label.trim();
-      return {
-        title: short || (isVideo ? 'Video call' : 'Voice call'),
-        subtitle: '',
-        variant: 'received',
-        icon: isVideo ? 'videoIncoming' : 'voiceIncoming',
-      };
-    };
+    const buildCallLogLayout = (m: Extract<ChatMessage, { type: 'call_log' }>): CallBubbleLayout =>
+      buildCallLogBubbleLayout({
+        callStatus: m.callStatus,
+        callType: m.callType,
+        durationSec: m.durationSec,
+        label: m.label,
+        displayAsSummaryLine: m.displayAsSummaryLine,
+        sent: m.sent,
+      });
 
     const renderCallStateBubbleRow = (
       callState: CallBubbleLayout,
@@ -2572,19 +2975,18 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     if (!ensurePremiumAccess()) return;
 
     const start = async () => {
-      if (!socketService.isConnected()) {
+      const connected = await socketService.waitForConnection();
+      if (!connected) {
         showErrorToast(STRINGS.CHAT.SOCKET_DISCONNECTED);
         return;
       }
+      const micGranted = await ensureMicrophoneForCall();
+      if (!micGranted) return;
       const permission = await checkCameraPermission();
       const granted =
         permission === 'granted' || (await requestCameraPermission()) === 'granted';
       if (!granted) {
         showErrorToast('Camera permission is required for video calls.');
-        return;
-      }
-      if (!socketService.isConnected()) {
-        showErrorToast(STRINGS.CHAT.SOCKET_DISCONNECTED);
         return;
       }
       if (chatId && otherUserId) {
@@ -2606,32 +3008,38 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setCallStateVisible(true);
     };
     void start();
-  }, [chatId, otherUserId, outgoingCallMeta, ensurePremiumAccess]);
+  }, [chatId, otherUserId, outgoingCallMeta, ensurePremiumAccess, ensureMicrophoneForCall]);
 
   const handleHeaderVoiceCallPress = useCallback(() => {
     if (!ensurePremiumAccess()) return;
 
-    if (!socketService.isConnected()) {
-      showErrorToast(STRINGS.CHAT.SOCKET_DISCONNECTED);
-      return;
-    }
-    if (chatId && otherUserId) {
-      socketService.callRequest(otherUserId, chatId, 'audio', outgoingCallMeta);
-    }
-    setActiveCallId(null);
-    setActiveCallMode('voice');
-    setCallAudioEnabled(true);
-    setCallVideoEnabled(false);
-    setPartnerAudioEnabled(true);
-    setPartnerVideoEnabled(true);
-    setIsOutgoingVoiceRinging(true);
-    setIsSwitchingVoiceToVideo(false);
-    setSelectedAudioDevice('earpiece');
+    const start = async () => {
+      const connected = await socketService.waitForConnection();
+      if (!connected) {
+        showErrorToast(STRINGS.CHAT.SOCKET_DISCONNECTED);
+        return;
+      }
+      const micGranted = await ensureMicrophoneForCall();
+      if (!micGranted) return;
+      if (chatId && otherUserId) {
+        socketService.callRequest(otherUserId, chatId, 'audio', outgoingCallMeta);
+      }
+      setActiveCallId(null);
+      setActiveCallMode('voice');
+      setCallAudioEnabled(true);
+      setCallVideoEnabled(false);
+      setPartnerAudioEnabled(true);
+      setPartnerVideoEnabled(true);
+      setIsOutgoingVoiceRinging(true);
+      setIsSwitchingVoiceToVideo(false);
+      setSelectedAudioDevice('earpiece');
       setAudioDeviceSheetVisible(false);
-    setCallConnectedAtMs(null);
-    setCallDurationSec(0);
-    setCallStateVisible(true);
-  }, [chatId, otherUserId, outgoingCallMeta, ensurePremiumAccess]);
+      setCallConnectedAtMs(null);
+      setCallDurationSec(0);
+      setCallStateVisible(true);
+    };
+    void start();
+  }, [chatId, otherUserId, outgoingCallMeta, ensurePremiumAccess, ensureMicrophoneForCall]);
 
   const toggleCallAudio = useCallback(() => {
     setCallAudioEnabled((prev) => {
@@ -2660,11 +3068,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     void toggle();
   }, [callVideoEnabled]);
 
-  const closeCallState = useCallback(() => {
-    if (activeCallId) {
-      socketService.callEnd(activeCallId);
-      setActiveCallId(null);
-    }
+  const cleanupCallSessionLocal = useCallback(() => {
     setIncomingCallBannerVisible(false);
     setActiveCallChannelName(null);
     setActiveCallRtcToken(null);
@@ -2680,8 +3084,217 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     setSwitchToVideoPopupVisible(false);
     setCallConnectedAtMs(null);
     setCallDurationSec(0);
-    refreshChatMessagesFromApi();
-  }, [activeCallId, refreshChatMessagesFromApi]);
+  }, []);
+
+  /** Dismiss call UI when any screen learns the call ended (global registry). */
+  useEffect(() => {
+    return onCallTerminated((callId) => {
+      const snap = callUiRef.current;
+      const matches =
+        snap.activeCallId === callId ||
+        snap.incomingVoiceCallId === callId ||
+        snap.incomingVideoCallId === callId;
+      if (!matches) return;
+
+      clearOutgoingRingTimer();
+      dismissIncomingCallUi();
+      if (snap.callStateVisible && snap.callConnectedAtMs == null) {
+        setActiveCallId(null);
+        setIsOutgoingVoiceRinging(false);
+        cleanupCallSessionLocal();
+      }
+    });
+  }, [clearOutgoingRingTimer, cleanupCallSessionLocal, dismissIncomingCallUi]);
+
+  const endCallLocally = useCallback(
+    (params: {
+      callId: string;
+      callType: 'audio' | 'video';
+      callStatus: string;
+      sent: boolean;
+      emitTimeout?: boolean;
+      emitCancel?: boolean;
+      emitEnd?: boolean;
+      skipSocketEmit?: boolean;
+      toastMessage?: string;
+      errorToast?: boolean;
+    }) => {
+      const id = params.callId.trim();
+      if (!id) return;
+
+      const alreadyTerminated = isGlobalCallTerminated(id);
+
+      if (!alreadyTerminated) {
+        markCallTerminated(id);
+        registerHandledIncomingCall(id, params.callType === 'video' ? 'video' : 'audio');
+      }
+
+      if (!params.skipSocketEmit) {
+        if (params.emitTimeout) socketService.callTimeout(id);
+        else if (params.emitCancel) socketService.callCancel(id, 'caller_cancelled');
+        else if (params.emitEnd) socketService.callEnd(id);
+      }
+
+      upsertOptimisticCallLog({
+        callId: id,
+        callType: params.callType,
+        callStatus: params.callStatus,
+        sent: params.sent,
+      });
+
+      setActiveCallId(null);
+      cleanupCallSessionLocal();
+      dismissIncomingCallUi();
+      refreshChatMessagesAfterCall();
+      bumpScrollAfterLocalSend();
+
+      if (params.toastMessage) {
+        if (params.errorToast) showErrorToast(params.toastMessage);
+        else showSuccessToast(params.toastMessage);
+      }
+    },
+    [
+      bumpScrollAfterLocalSend,
+      cleanupCallSessionLocal,
+      dismissIncomingCallUi,
+      markCallTerminated,
+      refreshChatMessagesAfterCall,
+      registerHandledIncomingCall,
+      upsertOptimisticCallLog,
+    ],
+  );
+
+  const scheduleOutgoingRingTimeout = useCallback(
+    (callId: string) => {
+      const trimmed = callId.trim();
+      if (!trimmed || isCallTerminated(trimmed)) return;
+      clearOutgoingRingTimer();
+      outgoingRingTimerRef.current = setTimeout(() => {
+        if (isCallTerminated(trimmed)) return;
+        const snap = callUiRef.current;
+        if (snap.callConnectedAtMs != null) return;
+        if (snap.activeCallId?.trim() !== trimmed) return;
+        const hasIncomingUi =
+          snap.incomingCallBannerVisible ||
+          snap.incomingVoiceCallVisible ||
+          snap.incomingVideoCallVisible;
+        if (hasIncomingUi) return;
+
+        endCallLocally({
+          callId: trimmed,
+          callType: snap.activeCallMode === 'video' ? 'video' : 'audio',
+          callStatus: 'NO_ANSWER',
+          sent: true,
+          emitTimeout: true,
+          skipSocketEmit: false,
+          toastMessage: 'No answer.',
+          errorToast: true,
+        });
+      }, CALL_RING_TIMEOUT_MS);
+    },
+    [clearOutgoingRingTimer, endCallLocally, isCallTerminated],
+  );
+
+  const scheduleOutgoingRingTimeoutRef = useRef(scheduleOutgoingRingTimeout);
+  scheduleOutgoingRingTimeoutRef.current = scheduleOutgoingRingTimeout;
+
+  const closeCallState = useCallback(() => {
+    const callId = activeCallId?.trim();
+    if (callId) {
+      const wasConnected = callConnectedAtMsRef.current != null;
+      if (wasConnected) {
+        markCallTerminated(callId);
+        socketService.callEnd(callId);
+        setActiveCallId(null);
+        cleanupCallSessionLocal();
+        refreshChatMessagesAfterCall();
+        return;
+      }
+      endCallLocally({
+        callId,
+        callType: activeCallMode === 'video' ? 'video' : 'audio',
+        callStatus: 'CANCELLED',
+        sent: true,
+        emitCancel: true,
+        skipSocketEmit: false,
+      });
+      return;
+    }
+    cleanupCallSessionLocal();
+    refreshChatMessagesAfterCall();
+  }, [
+    activeCallId,
+    activeCallMode,
+    cleanupCallSessionLocal,
+    endCallLocally,
+    markCallTerminated,
+    refreshChatMessagesAfterCall,
+  ]);
+
+  /** Auto-end outgoing calls when the receiver does not answer within 30 seconds. */
+  useEffect(() => {
+    const callId = activeCallId?.trim();
+    if (!callId || callConnectedAtMs != null || isCallTerminated(callId)) return;
+
+    const hasIncomingUi =
+      incomingCallBannerVisible || incomingVoiceCallVisible || incomingVideoCallVisible;
+    if (hasIncomingUi) return;
+
+    scheduleOutgoingRingTimeout(callId);
+    return () => clearOutgoingRingTimer();
+  }, [
+    activeCallId,
+    callConnectedAtMs,
+    incomingCallBannerVisible,
+    incomingVoiceCallVisible,
+    incomingVideoCallVisible,
+    isCallTerminated,
+    scheduleOutgoingRingTimeout,
+    clearOutgoingRingTimer,
+  ]);
+
+  /** Dismiss stale incoming-call UI if the server never sends a lifecycle event. */
+  useEffect(() => {
+    const hasIncomingUi =
+      incomingCallBannerVisible || incomingVoiceCallVisible || incomingVideoCallVisible;
+    if (!hasIncomingUi) return;
+
+    const timer = setTimeout(() => {
+      const snap = callUiRef.current;
+      const stillIncoming =
+        snap.incomingCallBannerVisible ||
+        snap.incomingVoiceCallVisible ||
+        snap.incomingVideoCallVisible;
+      if (!stillIncoming || snap.callConnectedAtMs != null) return;
+      const pendingId = snap.incomingVideoCallId ?? snap.incomingVoiceCallId;
+      if (pendingId?.trim() && isGlobalCallTerminated(pendingId.trim())) {
+        dismissIncomingCallUi();
+        return;
+      }
+      const trimmedPendingId = pendingId?.trim();
+      if (trimmedPendingId) {
+        markGlobalCallTerminated(trimmedPendingId);
+        registerHandledIncomingCall(trimmedPendingId, snap.incomingVideoCallId ? 'video' : 'voice');
+        upsertOptimisticCallLogRef.current({
+          callId: trimmedPendingId,
+          callType: snap.incomingVideoCallId ? 'video' : 'audio',
+          callStatus: 'MISSED',
+          sent: false,
+        });
+        refreshChatMessagesAfterCallRef.current();
+        bumpScrollAfterLocalSendRef.current();
+      }
+      dismissIncomingCallUi();
+    }, CALL_RING_TIMEOUT_MS);
+
+    return () => clearTimeout(timer);
+  }, [
+    incomingCallBannerVisible,
+    incomingVoiceCallVisible,
+    incomingVideoCallVisible,
+    dismissIncomingCallUi,
+    registerHandledIncomingCall,
+  ]);
 
   const minimizeCallState = useCallback(() => {
     setCallStateVisible(false);
@@ -2692,43 +3305,69 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   }, []);
 
   const acceptIncomingVoiceCall = useCallback(() => {
-    if (!ensurePremiumAccess()) {
-      if (incomingVoiceCallId) {
-        socketService.callReject(incomingVoiceCallId);
+    const accept = async () => {
+      const callId = incomingVoiceCallId?.trim();
+      if (!callId || isGlobalCallTerminated(callId)) {
+        showErrorToast('This call is no longer available.');
+        dismissIncomingCallUi();
+        return;
       }
-      setIncomingVoiceCallVisible(false);
-      setIncomingVoiceCallId(null);
-      setIncomingCallBannerVisible(false);
-      return;
-    }
-    if (incomingVoiceCallId) {
-      socketService.callAccept(incomingVoiceCallId);
-      setActiveCallId(incomingVoiceCallId);
-    }
-    setIncomingVoiceCallVisible(false);
-    setIncomingCallBannerVisible(false);
-    setActiveCallMode('voice');
-    setCallAudioEnabled(true);
-    setCallVideoEnabled(false);
-    setPartnerAudioEnabled(true);
-    setPartnerVideoEnabled(true);
-    setIsOutgoingVoiceRinging(false);
-    setIsSwitchingVoiceToVideo(false);
-    setSelectedAudioDevice('earpiece');
-    setSwitchToVideoPopupVisible(false);
-    setCallConnectedAtMs(Date.now());
-    setCallDurationSec(0);
-    setCallStateVisible(true);
-  }, [incomingVoiceCallId, ensurePremiumAccess]);
+      if (!ensurePremiumAccess()) {
+        if (incomingVoiceCallId) {
+          socketService.callReject(incomingVoiceCallId);
+        }
+        dismissIncomingCallUi();
+        return;
+      }
+      const micGranted = await ensureMicrophoneForCall();
+      if (!micGranted) {
+        if (incomingVoiceCallId) {
+          socketService.callReject(incomingVoiceCallId);
+        }
+        dismissIncomingCallUi();
+        return;
+      }
+      if (!callId || isGlobalCallTerminated(callId)) {
+        showErrorToast('This call is no longer available.');
+        dismissIncomingCallUi();
+        return;
+      }
+      if (incomingVoiceCallId) {
+        socketService.callAccept(incomingVoiceCallId);
+        setActiveCallId(incomingVoiceCallId);
+      }
+      dismissIncomingCallUi({ clearPendingRtc: false });
+      setActiveCallMode('voice');
+      setCallAudioEnabled(true);
+      setCallVideoEnabled(false);
+      setPartnerAudioEnabled(true);
+      setPartnerVideoEnabled(true);
+      setIsOutgoingVoiceRinging(false);
+      setIsSwitchingVoiceToVideo(false);
+      setSelectedAudioDevice('earpiece');
+      setSwitchToVideoPopupVisible(false);
+      setCallConnectedAtMs(Date.now());
+      setCallDurationSec(0);
+      setCallStateVisible(true);
+    };
+    void accept();
+  }, [incomingVoiceCallId, ensurePremiumAccess, dismissIncomingCallUi, ensureMicrophoneForCall]);
 
   const declineIncomingVoiceCall = useCallback(() => {
-    if (incomingVoiceCallId) {
-      socketService.callReject(incomingVoiceCallId);
+    const callId = incomingVoiceCallId?.trim();
+    if (!callId) {
+      dismissIncomingCallUi();
+      return;
     }
-    setIncomingVoiceCallVisible(false);
-    setIncomingVoiceCallId(null);
-    setIncomingCallBannerVisible(false);
-  }, [incomingVoiceCallId]);
+    socketService.callReject(callId);
+    endCallLocally({
+      callId,
+      callType: 'audio',
+      callStatus: 'REJECTED',
+      sent: false,
+      skipSocketEmit: true,
+    });
+  }, [incomingVoiceCallId, dismissIncomingCallUi, endCallLocally]);
 
   const incomingVoiceSwipeY = useRef(new Animated.Value(0)).current;
   const resetIncomingVoiceSwipe = useCallback(() => {
@@ -2773,13 +3412,25 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
   const acceptIncomingVideoCall = useCallback(() => {
     const accept = async () => {
+      const callId = incomingVideoCallId?.trim();
+      if (!callId || isGlobalCallTerminated(callId)) {
+        showErrorToast('This call is no longer available.');
+        dismissIncomingCallUi();
+        return;
+      }
       if (!ensurePremiumAccess()) {
         if (incomingVideoCallId) {
           socketService.callReject(incomingVideoCallId);
         }
-        setIncomingVideoCallVisible(false);
-        setIncomingVideoCallId(null);
-        setIncomingCallBannerVisible(false);
+        dismissIncomingCallUi();
+        return;
+      }
+      const micGranted = await ensureMicrophoneForCall();
+      if (!micGranted) {
+        if (incomingVideoCallId) {
+          socketService.callReject(incomingVideoCallId);
+        }
+        dismissIncomingCallUi();
         return;
       }
       const permission = await checkCameraPermission();
@@ -2789,12 +3440,16 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         showErrorToast('Camera permission is required to accept video call.');
         return;
       }
+      if (!callId || isGlobalCallTerminated(callId)) {
+        showErrorToast('This call is no longer available.');
+        dismissIncomingCallUi();
+        return;
+      }
       if (incomingVideoCallId) {
         socketService.callAccept(incomingVideoCallId);
         setActiveCallId(incomingVideoCallId);
       }
-      setIncomingVideoCallVisible(false);
-      setIncomingCallBannerVisible(false);
+      dismissIncomingCallUi({ clearPendingRtc: false });
       setActiveCallMode('video');
       setCallAudioEnabled(true);
       setCallVideoEnabled(true);
@@ -2809,16 +3464,23 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setCallStateVisible(true);
     };
     void accept();
-  }, [incomingVideoCallId, ensurePremiumAccess]);
+  }, [incomingVideoCallId, ensurePremiumAccess, dismissIncomingCallUi, ensureMicrophoneForCall]);
 
   const declineIncomingVideoCall = useCallback(() => {
-    if (incomingVideoCallId) {
-      socketService.callReject(incomingVideoCallId);
+    const callId = incomingVideoCallId?.trim();
+    if (!callId) {
+      dismissIncomingCallUi();
+      return;
     }
-    setIncomingVideoCallVisible(false);
-    setIncomingVideoCallId(null);
-    setIncomingCallBannerVisible(false);
-  }, [incomingVideoCallId]);
+    socketService.callReject(callId);
+    endCallLocally({
+      callId,
+      callType: 'video',
+      callStatus: 'REJECTED',
+      sent: false,
+      skipSocketEmit: true,
+    });
+  }, [incomingVideoCallId, dismissIncomingCallUi, endCallLocally]);
 
   const incomingVideoSwipeY = useRef(new Animated.Value(0)).current;
   const resetIncomingVideoSwipe = useCallback(() => {
@@ -2976,6 +3638,19 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   }, []);
 
   useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active') return;
+      socketService.ensureConnected();
+      if (chatId) {
+        socketService.join(chatId);
+      }
+      if (!callStateVisibleRef.current) return;
+      setCallMediaResumeNonce((n) => n + 1);
+    });
+    return () => subscription.remove();
+  }, [chatId]);
+
+  useEffect(() => {
     if (!callStateVisible || !activeCallId || !activeCallChannelName) return;
     let cancelled = false;
     const join = async () => {
@@ -2990,8 +3665,16 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         token: resolvedToken,
         uid: resolvedUid,
         isVideoCall: activeCallMode === 'video',
-        localVideoEnabled: activeCallMode === 'video' ? callVideoEnabled : false,
+        localVideoEnabled: activeCallMode === 'video' ? callVideoEnabledRef.current : false,
       });
+      if (!cancelled) {
+        await agoraCallService.applyAudioOutputRoute(selectedAudioDeviceRef.current);
+        if (Platform.OS === 'android' && activeCallMode === 'video' && callVideoEnabledRef.current) {
+          setTimeout(() => {
+            if (!cancelled) void agoraCallService.ensureLocalVideoPreviewReady();
+          }, 280);
+        }
+      }
     };
     void join();
     return () => {
@@ -3001,9 +3684,36 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     activeCallId,
     activeCallChannelName,
     activeCallRtcToken,
+    activeCallMode,
     callStateVisible,
     fetchAgoraRtcToken,
     getAgoraUidForCurrentUser,
+  ]);
+
+  useEffect(() => {
+    if (!callStateVisible || !activeCallId || !activeCallChannelName || callMediaResumeNonce === 0) {
+      return;
+    }
+    let cancelled = false;
+    const resume = async () => {
+      await agoraCallService.rejoinLastChannelIfNeeded();
+      if (cancelled) return;
+      if (Platform.OS === 'android' && activeCallMode === 'video' && callVideoEnabledRef.current) {
+        setTimeout(() => {
+          if (!cancelled) void agoraCallService.ensureLocalVideoPreviewReady();
+        }, 280);
+      }
+    };
+    void resume();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    callMediaResumeNonce,
+    callStateVisible,
+    activeCallId,
+    activeCallChannelName,
+    activeCallMode,
   ]);
 
   const requestSwitchVoiceToVideo = useCallback(() => {
@@ -3181,11 +3891,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
           <BackArrowIcon size={48} />
         </TouchableOpacity>
         <TouchableOpacity activeOpacity={0.8} onPress={openMatchDetails}>
-          {avatar != null ? (
-            <Image source={avatar} style={styles.headerAvatar} resizeMode="cover" />
-          ) : (
-            <View style={styles.headerAvatar} />
-          )}
+          <Image source={partnerDisplaySource} style={styles.headerAvatar} resizeMode="cover" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.headerNameWrap} activeOpacity={0.8} onPress={openMatchDetails}>
           <Text style={styles.headerName} numberOfLines={1}>{name}</Text>
@@ -3252,14 +3958,14 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       </View>
       {incomingCallBannerVisible ? (
         <View style={styles.incomingCallBannerWrap}>
-          <TouchableOpacity
-            style={styles.incomingCallBanner}
-            activeOpacity={0.9}
-            onPress={openIncomingCallFromBanner}
-            accessibilityRole="button"
-            accessibilityLabel="Incoming call notification"
-          >
-            <View style={styles.incomingCallBannerHeaderRow}>
+          <View style={styles.incomingCallBanner}>
+            <TouchableOpacity
+              style={styles.incomingCallBannerHeaderRow}
+              activeOpacity={0.9}
+              onPress={openIncomingCallFromBanner}
+              accessibilityRole="button"
+              accessibilityLabel="Incoming call notification"
+            >
               <View style={styles.incomingCallBannerAvatarWrap}>
                 <Image
                   source={partnerDisplaySource}
@@ -3267,25 +3973,25 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   resizeMode="cover"
                 />
                 <View style={styles.incomingCallBannerAvatarBadge}>
-                  <Image
-                    source={INCOMING_CALL_VIDEO_BADGE_ICON}
-                    style={styles.incomingCallBannerAvatarBadgeIcon}
-                    resizeMode="contain"
-                  />
+                  {incomingCallBannerMode === 'voice' ? (
+                    <CallVoiceIncomingIcon size={10} color={colors.neutral[800]} />
+                  ) : (
+                    <IncomingCallNotificationIcon size={10} color={colors.neutral[800]} />
+                  )}
                 </View>
               </View>
 
-              <View style={{ flex: 1 }}>
+              <View style={styles.incomingCallBannerTextWrap}>
                 <Text style={styles.incomingCallBannerTitle} numberOfLines={1}>
                   {incomingCallBannerMode === 'voice'
-                    ? incomingVoiceCallerName || 'Incoming call'
-                    : incomingVideoCallerName || 'Incoming call'}
+                    ? incomingVoiceCallerName || name || 'Incoming call'
+                    : incomingVideoCallerName || name || 'Incoming call'}
                 </Text>
                 <Text style={styles.incomingCallBannerSubtitle} numberOfLines={1}>
                   {incomingCallBannerMode === 'voice' ? 'Incoming voice call' : 'Incoming video call'}
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
 
             <View style={styles.incomingCallBannerButtonsRow}>
               <TouchableOpacity
@@ -3298,11 +4004,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 style={[styles.incomingCallBannerButtonPill, styles.incomingCallBannerDeclineButton]}
               >
                 <View style={styles.incomingCallBannerButtonPillInner}>
-                  <Image
-                    source={INCOMING_CALL_VIDEO_DECLINE_ICON}
-                    style={styles.incomingCallBannerPillIcon}
-                    resizeMode="contain"
-                  />
+                  <VoiceControlEndIcon size={18} color={colors.white} />
                   <Text style={styles.incomingCallBannerPillText}>Decline</Text>
                 </View>
               </TouchableOpacity>
@@ -3316,16 +4018,16 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                 style={[styles.incomingCallBannerButtonPill, styles.incomingCallBannerAcceptButton]}
               >
                 <View style={styles.incomingCallBannerButtonPillInner}>
-                  <Image
-                    source={INCOMING_CALL_VIDEO_ACCEPT_ICON}
-                    style={styles.incomingCallBannerPillIcon}
-                    resizeMode="contain"
-                  />
+                  {incomingCallBannerMode === 'voice' ? (
+                    <ChatHeaderVoiceCallIcon size={18} color={colors.white} />
+                  ) : (
+                    <ChatHeaderVideoCallIcon size={18} color={colors.white} />
+                  )}
                   <Text style={styles.incomingCallBannerPillText}>Accept</Text>
                 </View>
               </TouchableOpacity>
             </View>
-          </TouchableOpacity>
+          </View>
         </View>
       ) : null}
       <Modal
@@ -3615,6 +4317,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
 
               {!videoCallUiHidden || videoCallUiHidden ? (
                 <View
+                  collapsable={false}
                   style={[
                     styles.videoCallLocalPreview,
                     {
@@ -3628,7 +4331,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
                   {!showVideoPreviewOffSurface ? (
                     AgoraRtcSurfaceView ? (
                       <AgoraRtcSurfaceView
-                        style={styles.videoCallLocalPreviewAvatar}
+                        style={styles.videoCallLocalPreviewSurface}
                         canvas={{ uid: localRtcUid, sourceType: 0, renderMode: 1, mirrorMode: 1 }}
                         zOrderMediaOverlay
                       />

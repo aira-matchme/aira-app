@@ -130,8 +130,21 @@ export const styles = StyleSheet.create({
     flexDirection: 'column',
     padding: 12,
     borderRadius: 24,
-    backgroundColor: colors.neutral[100],
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.neutral[50],
     gap: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   incomingCallBannerTitle: {
     ...typography.bodyMedium,
@@ -147,20 +160,26 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     letterSpacing: 0.48,
-    color: colors.neutral[500],
+    color: colors.neutral[600],
   },
   incomingCallBannerHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    width: '100%',
+  },
+  incomingCallBannerTextWrap: {
+    flex: 1,
+    minWidth: 0,
   },
   incomingCallBannerAvatarWrap: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.neutral[200],
+    backgroundColor: colors.neutral[50],
     overflow: 'hidden',
     position: 'relative',
+    flexShrink: 0,
   },
   incomingCallBannerAvatar: {
     width: 48,
@@ -178,11 +197,6 @@ export const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  incomingCallBannerAvatarBadgeIcon: {
-    width: 10,
-    height: 10,
-    resizeMode: 'contain',
   },
   incomingCallBannerButtonsRow: {
     width: '100%',
@@ -204,15 +218,10 @@ export const styles = StyleSheet.create({
     gap: 8,
   },
   incomingCallBannerDeclineButton: {
-    backgroundColor: '#e50000',
+    backgroundColor: colors.semantic.error,
   },
   incomingCallBannerAcceptButton: {
-    backgroundColor: '#090',
-  },
-  incomingCallBannerPillIcon: {
-    width: 18,
-    height: 18,
-    resizeMode: 'contain',
+    backgroundColor: colors.semantic.success,
   },
   incomingCallBannerPillText: {
     ...typography.bodyMedium,
@@ -1005,6 +1014,11 @@ export const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: '#333333',
+  },
+  /** Agora RtcSurfaceView — no backgroundColor (Android rejects it on video surfaces). */
+  videoCallLocalPreviewSurface: {
+    width: '100%',
+    height: '100%',
   },
   videoCallLocalPreviewOffSurface: {
     width: '100%',

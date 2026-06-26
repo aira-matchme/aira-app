@@ -2,6 +2,7 @@
 import { io, type Socket } from 'socket.io-client';
 import { env } from '../../config/env';
 import { resolveSocketUrl } from '../../utils/socketUrl';
+import { markCallTerminated } from '../call/callSessionRegistry';
 
 export interface JoinPayload {
   chatId: string;
@@ -144,6 +145,7 @@ class SocketService {
   private socket: Socket | null = null;
   private token: string | null = null;
   private userId: string | null = null;
+  private activeChatIds = new Set<string>();
   private connectionListeners = new Set<ConnectionStateListener>();
   private listeners: Partial<Record<SocketEventType, Set<SocketEventListener>>> = {
     join: new Set(),
@@ -276,8 +278,12 @@ class SocketService {
     this.socket.on('connect', () => {
       this.logCallSocket('state', 'connect', { userId: this.userId, socketUrl });
       this.notifyConnectionState(true);
-      const payload = this.userId ? { userId: this.userId } : {};
-      this.send('join', payload);
+      this.rejoinTrackedChats();
+    });
+
+    this.socket.io?.on?.('reconnect', () => {
+      this.logCallSocket('state', 'reconnect', { userId: this.userId });
+      this.rejoinTrackedChats();
     });
 
     this.socket.on('disconnect', (_reason) => {
@@ -542,6 +548,44 @@ class SocketService {
       this.emit('call_ended', payload);
     });
 
+    const emitCallEndedFromRaw = (eventLabel: string, data: unknown) => {
+      this.onSocketReceive(`${eventLabel}(raw)`, data);
+      const payload = handleCallLifecycle(data);
+      const cid = payload.callId.trim();
+      const endedKey = cid
+        ? `call_ended:${cid}`
+        : `call_ended:${payload.callerId ?? ''}:${payload.receiverId ?? ''}:${eventLabel}`;
+      if (this.isDuplicateCallSocketEmit(endedKey, 800)) return;
+      this.emit('call_ended', payload);
+    };
+    const emitCallRejectedFromRaw = (eventLabel: string, data: unknown) => {
+      this.onSocketReceive(`${eventLabel}(raw)`, data);
+      const payload = handleCallLifecycle(data);
+      this.logPartnerRejectDebug(eventLabel, data, payload);
+      const cid = payload.callId.trim();
+      const rejectKey = cid
+        ? `call_rejected:${cid}`
+        : `call_rejected:${payload.callerId ?? ''}:${payload.receiverId ?? ''}:${eventLabel}`;
+      if (this.isDuplicateCallSocketEmit(rejectKey, 800)) return;
+      this.emit('call_rejected', payload);
+    };
+    (
+      [
+        'call_cancel',
+        'call_cancelled',
+        'call_canceled',
+        'call_missed',
+        'incoming_call_cancelled',
+        'call_timeout',
+        'call_timed_out',
+      ] as const
+    ).forEach((eventName) => {
+      this.socket.on(eventName, (data) => emitCallEndedFromRaw(eventName, data));
+    });
+    (['call_declined', 'call_cancelled_by_caller'] as const).forEach((eventName) => {
+      this.socket.on(eventName, (data) => emitCallRejectedFromRaw(eventName, data));
+    });
+
     const handlePartnerAudio = (data: unknown, forceEnabled?: boolean) => {
       const d = (data ?? {}) as Record<string, unknown>;
       const callId = String(d.callId ?? d.call_id ?? d.id ?? '').trim() || undefined;
@@ -679,6 +723,44 @@ class SocketService {
     return this.socket?.connected === true;
   }
 
+  /** Reconnect using the last auth token when the transport dropped (e.g. after screen lock). */
+  ensureConnected(): void {
+    if (!this.token) return;
+    if (this.socket?.connected) return;
+    this.connect(this.token);
+  }
+
+  /** Wait for socket to reconnect (e.g. right after unlocking the device). */
+  async waitForConnection(timeoutMs = 4000): Promise<boolean> {
+    if (this.isConnected()) return true;
+    this.ensureConnected();
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      if (this.isConnected()) return true;
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 200);
+      });
+    }
+    return this.isConnected();
+  }
+
+  /** Re-emit global + chat room joins after connect/reconnect/foreground. */
+  rejoinTrackedChats(): void {
+    if (!this.socket?.connected) return;
+    if (this.userId) {
+      this.send('join', { userId: this.userId });
+    }
+    this.activeChatIds.forEach((chatId) => {
+      this.send('join', { chatId });
+    });
+  }
+
+  leaveChat(chatId: string) {
+    const id = String(chatId ?? '').trim();
+    if (!id) return;
+    this.activeChatIds.delete(id);
+  }
+
   /** Subscribe to connection state changes. Returns unsubscribe. */
   onConnectionChange(listener: ConnectionStateListener): () => void {
     this.connectionListeners.add(listener);
@@ -699,7 +781,10 @@ class SocketService {
 
   /** Join a chat room. Call when user opens a chat. */
   join(chatId: string) {
-    this.send('join', { chatId });
+    const id = String(chatId ?? '').trim();
+    if (!id) return;
+    this.activeChatIds.add(id);
+    this.send('join', { chatId: id });
   }
 
   /** Send typing indicator: sender (current user id), receiver (other user id), isTyping (true/false). */
@@ -738,7 +823,6 @@ class SocketService {
       this.send('join', { userId });
     }
   }
-
   /** Start a call to another user in a chat. */
   callRequest(
     toUserId: string,
@@ -768,14 +852,34 @@ class SocketService {
 
   /** Receiver rejects incoming call. */
   callReject(callId: string) {
+    markCallTerminated(callId);
     this.logCallSocket('emit', 'call_reject(method)', { callId });
     this.send('call_reject', { callId });
   }
 
   /** Any participant ends an ongoing call. */
   callEnd(callId: string) {
+    markCallTerminated(callId);
     this.logCallSocket('emit', 'call_end(method)', { callId });
     this.send('call_end', { callId });
+  }
+
+  /** Caller cancels before the receiver answers (not a completed call). */
+  callCancel(callId: string, reason: 'caller_cancelled' | 'timeout' = 'caller_cancelled') {
+    markCallTerminated(callId);
+    const payload: Record<string, unknown> = { callId, reason };
+    this.logCallSocket('emit', 'call_cancel(method)', payload);
+    this.send('call_cancel', payload);
+    // Fallback: some backends only fan-out `call_end` to the peer.
+    this.send('call_end', { callId, reason: 'cancelled_before_answer' });
+  }
+
+  /** Outgoing ring timed out with no answer. */
+  callTimeout(callId: string) {
+    markCallTerminated(callId);
+    const payload = { callId, reason: 'timeout' };
+    this.logCallSocket('emit', 'call_timeout(method)', payload);
+    this.send('call_timeout', payload);
   }
 
   /** In-call upgrade/downgrade (same channel, same token) — Step 1 requester. */
@@ -818,6 +922,7 @@ class SocketService {
     this.socket?.disconnect();
     this.listeners = {};
     this.connectionListeners.clear();
+    this.activeChatIds.clear();
     this.socket = null;
     this.token = null;
     this.userId = null;

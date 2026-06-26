@@ -14,6 +14,8 @@ import { useApiErrorStore } from '../store/apiError.store';
 import { getPostAuthScreen } from './getPostAuthScreen';
 import { ApiErrorModal } from '../components/ApiErrorModal';
 import ConnectivityWatcher from '../components/ConnectivityWatcher';
+import SocketLifecycleManager from '../components/SocketLifecycleManager';
+import CallLifecycleManager from '../components/CallLifecycleManager';
 import { RequestTimeoutModal } from '../components/RequestTimeoutModal';
 import { StoreUpdatePrompt } from '../components/StoreUpdatePrompt';
 import { WaitlistScreen } from '../screens/WaitlistScreen';
@@ -60,6 +62,8 @@ export const RootNavigator = () => {
   return (
     <NavigationContainer>
       <ConnectivityWatcher />
+      <SocketLifecycleManager />
+      <CallLifecycleManager />
       <ApiErrorModal
         visible={apiErrorVisible}
         onClose={hideApiError}

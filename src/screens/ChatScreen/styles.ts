@@ -307,6 +307,19 @@ export const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  previewCallInner: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  previewCallMissed: {
+    color: colors.semantic.error,
+  },
+  previewCallDefault: {
+    color: colors.neutral[600],
+  },
   previewDraft: {
     color: colors.primary.purple,
   },

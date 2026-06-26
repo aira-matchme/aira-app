@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import type { NetInfoState } from '@react-native-community/netinfo';
 import { useApiErrorStore } from '../store/apiError.store';
+import socketService from '../services/socket/socketService';
+import { useAuthStore } from '../store/auth.store';
 
 function isDeviceOffline(state: NetInfoState): boolean {
   // Only isConnected is reliable for "no network interface".
@@ -39,6 +41,15 @@ export const ConnectivityWatcher = () => {
         const st = useApiErrorStore.getState();
         if (st.visible && st.variant === 'network') {
           st.hideError();
+        }
+        const token = useAuthStore.getState().accessToken;
+        const userId = useAuthStore.getState().user?.id;
+        if (token) {
+          socketService.ensureConnected();
+          if (userId) {
+            socketService.setCurrentUser(userId);
+          }
+          socketService.rejoinTrackedChats();
         }
       }
 

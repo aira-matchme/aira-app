@@ -26,7 +26,32 @@ import { STRINGS } from '../../constants/strings';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { ProfileScreenGradient } from '../../components/ProfileScreenGradient';
+import { CallVideoMissedIcon } from '../../assets/icons/common/CallVideoMissedIcon';
+import { CallVoiceDeclinedIcon } from '../../assets/icons/common/CallVoiceDeclinedIcon';
+import { CallVideoIncomingIcon } from '../../assets/icons/common/CallVideoIncomingIcon';
+import { CallVoiceIncomingIcon } from '../../assets/icons/common/CallVoiceIncomingIcon';
+import type { ChatListCallPreview } from '../../modules/chat/callListPreview';
 import { getChatListApi, getPendingChatsApi, mapChatResponseToItem, pinChatApi, unpinChatApi, deleteChatApi } from '../../modules/chat/api';
+
+const CALL_PREVIEW_ICON_SIZE = 18;
+
+function renderChatListCallIcon(callPreview: ChatListCallPreview) {
+  const isMissed = callPreview.variant === 'missed';
+  const iconColor = isMissed ? colors.semantic.error : colors.neutral[600];
+
+  switch (callPreview.icon) {
+    case 'videoMissed':
+      return <CallVideoMissedIcon size={CALL_PREVIEW_ICON_SIZE} color={iconColor} />;
+    case 'voiceMissed':
+      return <CallVoiceDeclinedIcon size={CALL_PREVIEW_ICON_SIZE} color={iconColor} />;
+    case 'video':
+      return <CallVideoIncomingIcon size={CALL_PREVIEW_ICON_SIZE} color={iconColor} />;
+    case 'voice':
+      return <CallVoiceIncomingIcon size={CALL_PREVIEW_ICON_SIZE} color={iconColor} />;
+    default:
+      return null;
+  }
+}
 
 type ChatItem = {
   id: string;
@@ -35,6 +60,7 @@ type ChatItem = {
   preview: string;
   /** Last message image thumbnail (shown next to preview line when present). */
   previewThumbUri?: string | null;
+  callPreview?: ChatListCallPreview | null;
   previewDraft?: string; // if set, show "Draft: " + this in purple
   time: string;
   unreadCount?: number;
@@ -270,10 +296,12 @@ export const ChatScreen = () => {
 
   const renderItem = ({ item }: { item: ChatItem }, fromRequests = false) => {
     const isDraft = !!item.previewDraft;
+    const showCallPreview = !isDraft && !!item.callPreview;
     const rawPreview = isDraft
       ? `${STRINGS.CHAT.DRAFT_PREFIX} ${item.previewDraft}`
       : item.preview;
     const previewText = typeof rawPreview === 'string' ? rawPreview : '';
+    const callPreviewLabel = item.callPreview?.label ?? previewText;
 
     return (
       <TouchableOpacity
@@ -312,13 +340,32 @@ export const ChatScreen = () => {
                   accessibilityIgnoresInvertColors
                 />
               ) : null}
-              <Text
-                style={[styles.preview, styles.previewText, isDraft && styles.previewDraft]}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {previewText}
-              </Text>
+              {showCallPreview && item.callPreview ? (
+                <View style={styles.previewCallInner}>
+                  {renderChatListCallIcon(item.callPreview)}
+                  <Text
+                    style={[
+                      styles.preview,
+                      styles.previewText,
+                      item.callPreview.variant === 'missed'
+                        ? styles.previewCallMissed
+                        : styles.previewCallDefault,
+                    ]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {callPreviewLabel}
+                  </Text>
+                </View>
+              ) : (
+                <Text
+                  style={[styles.preview, styles.previewText, isDraft && styles.previewDraft]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {previewText}
+                </Text>
+              )}
             </View>
           </View>
           <View style={styles.timeCol}>

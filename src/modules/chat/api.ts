@@ -1,6 +1,8 @@
 import { apiClient } from '../../services/api/client';
 import { endpoints } from '../../services/api/endpoints';
 import { STRINGS } from '../../constants/strings';
+import { resolveChatListCallPreview, type ChatListCallPreview } from './callListPreview';
+import { shouldUseCallSummaryLine } from './callLogLayout';
 
 /** Participant details from API */
 export type ChatParticipantDetails = {
@@ -83,7 +85,6 @@ export type GetChatListResponse = {
   };
 };
 
-/** Always return a string safe for React; API may send lastMessage.text as object { text, type }. */
 function toPreviewString(value: unknown): string {
   if (value == null) return '';
   if (typeof value === 'string') return value;
@@ -97,15 +98,55 @@ function normalizeMessageType(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
+/** Map backend call status + label into a UI-friendly status (missed/cancelled vs completed). */
+function normalizeCallLogStatus(rawStatus: string, durationSec: number, label: string): string {
+  const status = rawStatus.toUpperCase();
+  const lower = label.trim().toLowerCase();
+
+  if (
+    status === 'MISSED' ||
+    status === 'NO_ANSWER' ||
+    status === 'CANCELLED' ||
+    status === 'CANCELED' ||
+    status === 'REJECTED' ||
+    status === 'DECLINED' ||
+    status === 'TIMEOUT' ||
+    status === 'TIMED_OUT'
+  ) {
+    return status;
+  }
+
+  if (lower.includes('missed')) return 'MISSED';
+  if (lower.includes('cancelled') || lower.includes('canceled')) return 'CANCELLED';
+  if (lower.includes('no answer') || lower.includes('unanswered') || lower.includes('not answered')) {
+    return 'NO_ANSWER';
+  }
+  if (lower.includes('declined') || lower.includes('rejected')) return 'REJECTED';
+  if (lower.includes('timeout') || lower.includes('timed out')) return 'TIMEOUT';
+
+  // Ring-only calls are sometimes logged as ENDED with zero duration.
+  if (status === 'ENDED' && durationSec <= 0) {
+    return 'CANCELLED';
+  }
+
+  return status;
+}
+
 /**
  * Derive list preview + optional thumbnail for last message (text vs image, etc.).
  */
 function getLastMessageListPreview(lastMsg: LastMessagePayload | undefined): {
   preview: string;
   previewThumbUri?: string | null;
+  callPreview?: ChatListCallPreview | null;
 } {
   if (!lastMsg || typeof lastMsg !== 'object') {
     return { preview: '' };
+  }
+
+  const callPreview = resolveChatListCallPreview(lastMsg);
+  if (callPreview) {
+    return { preview: callPreview.label, callPreview };
   }
 
   const raw = lastMsg as Record<string, unknown>;
@@ -191,6 +232,7 @@ export function mapChatResponseToItem(
   preview: string;
   /** When last message is an image, URL for a small list thumbnail (optional). */
   previewThumbUri?: string | null;
+  callPreview?: ChatListCallPreview | null;
   time: string;
   unreadCount?: number;
   pinned?: boolean;
@@ -200,7 +242,7 @@ export function mapChatResponseToItem(
   const participant = item.participantDetails ?? {};
   const name = participant.nickName ?? participant.name ?? 'Unknown';
   const lastMsg = item.lastMessage;
-  const { preview, previewThumbUri } = getLastMessageListPreview(lastMsg);
+  const { preview, previewThumbUri, callPreview } = getLastMessageListPreview(lastMsg);
   const time = formatChatTime(item.lastActivityAt || item.updatedAt);
   const photo = participant.profilePhoto as
     | string
@@ -231,6 +273,7 @@ export function mapChatResponseToItem(
     avatar,
     preview,
     previewThumbUri,
+    callPreview,
     time,
     unreadCount: item.myUnreadCount,
     pinned: item.isPinnedForMe,
@@ -780,7 +823,11 @@ export function mapApiMessageToChatMessage(
             : typeof durRaw === 'string'
             ? Number.parseInt(durRaw, 10) || 0
             : 0;
-        const callStatusUpper = String(b.callStatus ?? '').toUpperCase();
+        const callStatusUpper = normalizeCallLogStatus(
+          String(b.callStatus ?? ''),
+          durationSec,
+          firstNonEmptyString(b.textForCaller, b.text_for_caller, b.textForReceiver, b.text_for_receiver) ?? '',
+        );
 
         const textCaller = firstNonEmptyString(b.textForCaller, b.text_for_caller);
         const textReceiver = firstNonEmptyString(b.textForReceiver, b.text_for_receiver);
@@ -798,11 +845,10 @@ export function mapApiMessageToChatMessage(
           if (typeof currentUserId === 'string' && currentUserId.length > 0) {
             if (callerIdResolved != null && callerIdResolved === currentUserId) {
               label = textCaller;
-              /** ENDED: subtitle/duration always from `duration` in UI (`formatCallDurationSec`), not from these strings. */
-              displayAsSummaryLine = callStatusUpper !== 'ENDED';
+              displayAsSummaryLine = shouldUseCallSummaryLine(callStatusUpper, textCaller);
             } else if (receiverIdResolved != null && receiverIdResolved === currentUserId) {
               label = textReceiver;
-              displayAsSummaryLine = callStatusUpper !== 'ENDED';
+              displayAsSummaryLine = shouldUseCallSummaryLine(callStatusUpper, textReceiver);
             } else {
               label = firstNonEmptyString(contentFallback, textCaller, textReceiver) ?? 'Call';
             }
@@ -811,13 +857,14 @@ export function mapApiMessageToChatMessage(
           }
         } else {
           label = firstNonEmptyString(contentFallback, textCaller, textReceiver) ?? 'Call';
+          displayAsSummaryLine = shouldUseCallSummaryLine(callStatusUpper, label);
         }
 
         return {
           type: 'call_log',
           callId,
           callType,
-          callStatus: String(b.callStatus ?? ''),
+          callStatus: callStatusUpper,
           durationSec,
           label,
           displayAsSummaryLine,

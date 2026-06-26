@@ -21,6 +21,7 @@ import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { TabStackParamList } from './types';
 import { colors } from '../theme';
 import socketService, { type IncomingCallPayload } from '../services/socket/socketService';
+import { isCallTerminated } from '../services/call/callSessionRegistry';
 import { useAuthStore } from '../store/auth.store';
 import {
   TabWalkthroughProvider,
@@ -131,6 +132,8 @@ function TabNavigatorInner() {
     const unsubscribeIncomingCall = socketService.on<IncomingCallPayload>('incoming_call', (payload) => {
       if (!payload) return;
       if (currentUserId && payload.receiverId && payload.receiverId !== currentUserId) return;
+      const incomingCallId = payload.callId?.trim();
+      if (incomingCallId && isCallTerminated(incomingCallId)) return;
 
       const currentTabRoute = tabState.routes[tabState.index];
       const currentNestedRouteName =
@@ -152,13 +155,11 @@ function TabNavigatorInner() {
           params: {
             chatId: payload.chatId ?? null,
             name: payload.callerName,
-            avatar: payload.callerAvatar ? { uri: payload.callerAvatar } : undefined,
             otherUserId: payload.senderId,
             incomingCall: {
               mode,
               callId: payload.callId,
               callerName: payload.callerName,
-              callerAvatar: payload.callerAvatar,
               senderId: payload.senderId,
               channelName: payload.channelName,
               rtcToken: payload.rtcToken,

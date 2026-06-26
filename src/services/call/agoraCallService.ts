@@ -17,6 +17,9 @@ type AgoraEngineLike = {
   setDefaultAudioRouteToSpeakerphone?: (speaker: boolean) => Promise<void> | void;
   /** Current-channel speaker toggle (iOS + Android fallback). */
   setEnableSpeakerphone?: (speaker: boolean) => number | Promise<void> | void;
+  setAudioScenario?: (scenario: number) => number | Promise<void> | void;
+  adjustPlaybackSignalVolume?: (volume: number) => number | Promise<void> | void;
+  adjustRecordingSignalVolume?: (volume: number) => number | Promise<void> | void;
   /**
    * Android-only: MODE_IN_COMMUNICATION route — 1 earpiece, 3 speaker, 5 BT, 0 wired headset mic.
    * Prefer over mixing with setEnableSpeakerphone when available.
@@ -40,6 +43,27 @@ type AgoraEngineLike = {
 
 const AGORA_CHANNEL_PROFILE_COMMUNICATION = 0;
 const AGORA_CLIENT_ROLE_BROADCASTER = 1;
+/** Agora 4.x — optimized for 1:1 voice chat (AEC / routing). */
+const AGORA_AUDIO_SCENARIO_CHATROOM = 5;
+
+type JoinVoiceChannelParams = {
+  channelName?: string;
+  token?: string | null;
+  uid?: number;
+  isVideoCall?: boolean;
+  localVideoEnabled?: boolean;
+};
+
+async function releaseVoiceMessageAudioSession() {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires,global-require
+    const audio = require('../../utils/audio');
+    await audio.stopAudio?.().catch?.(() => {});
+    await audio.stopRecording?.().catch?.(() => {});
+  } catch {
+    /* ignore */
+  }
+}
 
 export type AgoraAudioOutputRoute = 'speaker' | 'earpiece' | 'bluetooth' | 'wired';
 
@@ -56,6 +80,9 @@ class AgoraCallService {
   private engine: AgoraEngineLike | null = null;
   private initialized = false;
   private joinedChannelName: string | null = null;
+  private lastJoinParams: JoinVoiceChannelParams | null = null;
+  private lastJoinFingerprint: string | null = null;
+  private preferredAudioRoute: AgoraAudioOutputRoute = 'earpiece';
   private remoteUid: number | null = null;
   private remoteUidListeners = new Set<(uid: number | null) => void>();
   private audioRouteListeners = new Set<(route: AgoraAudioOutputRoute) => void>();
@@ -101,6 +128,29 @@ class AgoraCallService {
     };
     setTimeout(run, 120);
     setTimeout(run, 450);
+  }
+
+  private buildJoinFingerprint(params: JoinVoiceChannelParams): string {
+    const channelName = String(params.channelName ?? '').trim();
+    const uid = typeof params.uid === 'number' ? params.uid : 0;
+    const isVideoCall = params.isVideoCall === true;
+    const localVideoEnabled = params.localVideoEnabled !== false;
+    return `${channelName}|${uid}|${isVideoCall ? 1 : 0}|${localVideoEnabled ? 1 : 0}`;
+  }
+
+  /** Re-bind local camera preview after the RN video view mounts (Android SurfaceView / Modal timing). */
+  async ensureLocalVideoPreviewReady(): Promise<void> {
+    if (!this.engine || !this.lastJoinParams?.isVideoCall) return;
+    if (this.lastJoinParams.localVideoEnabled === false) return;
+    try {
+      await this.engine.enableVideo?.();
+      await this.engine.enableLocalVideo?.(true);
+      await this.engine.muteLocalVideoStream?.(false);
+      await this.engine.startPreview?.();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log('[agora] ensureLocalVideoPreviewReady failed', error);
+    }
   }
 
   private pickUid(...values: unknown[]): number | null {
@@ -163,7 +213,16 @@ class AgoraCallService {
       await engine.setChannelProfile?.(AGORA_CHANNEL_PROFILE_COMMUNICATION);
       await engine.setClientRole?.(AGORA_CLIENT_ROLE_BROADCASTER);
       await engine.enableAudio?.();
+      await engine.setAudioScenario?.(AGORA_AUDIO_SCENARIO_CHATROOM);
       await engine.registerEventHandler?.({
+        onJoinChannelSuccess: () => {
+          void this.applyAudioOutputRoute(this.preferredAudioRoute);
+          void engine.adjustPlaybackSignalVolume?.(100);
+          if (this.lastJoinParams?.isVideoCall && this.lastJoinParams.localVideoEnabled !== false) {
+            void this.ensureLocalVideoPreviewReady();
+          }
+          this.scheduleAudioRouteConsistencyCheck();
+        },
         onUserJoined: (...args: unknown[]) => {
           const uid = this.pickUid(...args);
           if (uid != null) {
@@ -224,26 +283,46 @@ class AgoraCallService {
     }
   }
 
-  async joinVoiceChannel(params: {
-    channelName?: string;
-    token?: string | null;
-    uid?: number;
-    isVideoCall?: boolean;
-    localVideoEnabled?: boolean;
-  }) {
+  async joinVoiceChannel(params: JoinVoiceChannelParams) {
     const channelName = String(params.channelName ?? '').trim();
     if (!channelName) {
       // eslint-disable-next-line no-console
       console.log('[agora] join skipped: missing channel name');
       return;
     }
+    const fingerprint = this.buildJoinFingerprint(params);
+    const token = String(params.token ?? '').trim();
+    const uid = typeof params.uid === 'number' ? params.uid : 0;
+    const isVideoCall = params.isVideoCall === true;
+    const localVideoEnabled = params.localVideoEnabled !== false;
+
+    if (
+      this.joinedChannelName === channelName &&
+      this.lastJoinFingerprint === fingerprint &&
+      this.engine
+    ) {
+      if (isVideoCall && localVideoEnabled) {
+        await this.ensureLocalVideoPreviewReady();
+      }
+      return;
+    }
+
+    await releaseVoiceMessageAudioSession();
     await this.ensureInitialized();
     if (!this.engine || !this.initialized) return;
     try {
-      const token = String(params.token ?? '').trim();
-      const uid = typeof params.uid === 'number' ? params.uid : 0;
-      const isVideoCall = params.isVideoCall === true;
-      const localVideoEnabled = params.localVideoEnabled !== false;
+      this.lastJoinParams = {
+        channelName,
+        token,
+        uid,
+        isVideoCall,
+        localVideoEnabled,
+      };
+      if (this.joinedChannelName && this.joinedChannelName !== channelName) {
+        await this.engine.leaveChannel?.();
+        this.joinedChannelName = null;
+        this.lastJoinFingerprint = null;
+      }
       if (isVideoCall) {
         if (localVideoEnabled) {
           await this.engine.startPreview?.();
@@ -261,6 +340,9 @@ class AgoraCallService {
         publishCameraTrack: isVideoCall && localVideoEnabled,
       });
       this.joinedChannelName = channelName;
+      this.lastJoinFingerprint = fingerprint;
+      await this.applyAudioOutputRoute(this.preferredAudioRoute);
+      await this.engine.adjustPlaybackSignalVolume?.(100);
       this.scheduleAudioRouteConsistencyCheck();
       // eslint-disable-next-line no-console
       console.log('[agora] joined rtc channel', { channelName, uid, isVideoCall, localVideoEnabled, platform: Platform.OS });
@@ -286,17 +368,25 @@ class AgoraCallService {
    * Avoids calling setDefaultAudioRouteToSpeakerphone + setEnableSpeakerphone together — that can mute speaker on some builds.
    */
   async applyAudioOutputRoute(route: AgoraAudioOutputRoute) {
+    this.preferredAudioRoute = route;
     await this.ensureInitialized();
     if (!this.engine) return;
     try {
       if (Platform.OS === 'android') {
         const routeCode =
           route === 'speaker' ? 3 : route === 'bluetooth' ? 5 : route === 'wired' ? 0 : 1;
-        this.engine.setRouteInCommunicationMode?.(routeCode);
+        if (route === 'speaker') {
+          await this.engine.setEnableSpeakerphone?.(true);
+          this.engine.setRouteInCommunicationMode?.(routeCode);
+        } else {
+          // Earpiece / BT / wired — use communication-mode routing only to avoid speaker bleed + echo.
+          await this.engine.setEnableSpeakerphone?.(false);
+          this.engine.setRouteInCommunicationMode?.(routeCode);
+        }
+      } else {
+        await this.engine.setEnableSpeakerphone?.(route === 'speaker');
       }
-      // Always apply loudspeaker toggle; returning early after setRouteInCommunicationMode skipped this
-      // on some builds so Speaker never stuck and callbacks kept overwriting UI as "earpiece".
-      await this.engine.setEnableSpeakerphone?.(route === 'speaker');
+      await this.engine.adjustPlaybackSignalVolume?.(100);
       this.emitAudioRouteToUi(route);
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -383,12 +473,39 @@ class AgoraCallService {
     try {
       await this.engine.leaveChannel?.();
       this.joinedChannelName = null;
+      this.lastJoinParams = null;
+      this.lastJoinFingerprint = null;
       this.audioRouteEmitScheduled = false;
       this.setRemoteUid(null);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log('[agora] leave failed', error);
     }
+  }
+
+  isInChannel(): boolean {
+    return Boolean(this.joinedChannelName);
+  }
+
+  getJoinedChannelName(): string | null {
+    return this.joinedChannelName;
+  }
+
+  /** Re-join the last RTC channel after app resume / transport recovery. */
+  async rejoinLastChannelIfNeeded(): Promise<void> {
+    const params = this.lastJoinParams;
+    if (!params?.channelName) return;
+    this.lastJoinFingerprint = null;
+    if (this.joinedChannelName && this.engine) {
+      try {
+        await this.engine.leaveChannel?.();
+      } catch {
+        /* ignore */
+      }
+      this.joinedChannelName = null;
+      this.setRemoteUid(null);
+    }
+    await this.joinVoiceChannel(params);
   }
 
   onRemoteUidChange(listener: (uid: number | null) => void): () => void {
