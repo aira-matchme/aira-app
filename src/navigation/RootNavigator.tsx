@@ -1,6 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { BackHandler, Platform } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import {
+  CommonActions,
+  NavigationContainer,
+  createNavigationContainerRef,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { AuthNavigator } from './AuthNavigator';
@@ -21,8 +25,12 @@ import { StoreUpdatePrompt } from '../components/StoreUpdatePrompt';
 import { WaitlistScreen } from '../screens/WaitlistScreen';
 import { isWaitlistEnabled } from '../config/env';
 import { useWaitlistStore } from '../store/waitlist.store';
+import type { RootStackParamList } from './types';
 
-const RootStack = createNativeStackNavigator();
+const RootStack = createNativeStackNavigator<RootStackParamList>();
+const rootNavigationRef = createNavigationContainerRef<RootStackParamList>();
+
+type RootAuthDestination = 'AuthStack' | 'Tabs' | 'Waitlist';
 
 export const RootNavigator = () => {
   const { isAuthenticated, isLoading, user, shouldShowEnableNotifications, preferenceFlowCompleted } =
@@ -44,6 +52,51 @@ export const RootNavigator = () => {
     !waitlistGateOpen &&
     (postAuthScreen === 'Likes' || preferenceFlowCompleted);
 
+  const authDestination: RootAuthDestination | null = isLoading
+    ? null
+    : shouldShowWaitlist
+      ? 'Waitlist'
+      : shouldShowTabs
+        ? 'Tabs'
+        : 'AuthStack';
+
+  const lastAuthDestinationRef = useRef<RootAuthDestination | null>(null);
+
+  const applyAuthDestination = useCallback(() => {
+    if (isLoading || !authDestination || !rootNavigationRef.isReady()) {
+      return;
+    }
+
+    const rootState = rootNavigationRef.getRootState();
+    const routeNames = rootState?.routes.map((route) => route.name) ?? [];
+    const hasStaleAuthOverlay = routeNames.some(
+      (name) => name === 'OTPVerification' || name === 'LostAccessEmail',
+    );
+    const destinationChanged = lastAuthDestinationRef.current !== authDestination;
+
+    if (!destinationChanged && !hasStaleAuthOverlay) {
+      return;
+    }
+
+    lastAuthDestinationRef.current = authDestination;
+    rootNavigationRef.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: authDestination }],
+      }),
+    );
+  }, [authDestination, isLoading]);
+
+  useEffect(() => {
+    if (isLoading) {
+      lastAuthDestinationRef.current = null;
+    }
+  }, [isLoading]);
+
+  useEffect(() => {
+    applyAuthDestination();
+  }, [applyAuthDestination]);
+
   useEffect(() => {
     // Disable Android back button behavior
     if (Platform.OS === 'android') {
@@ -60,7 +113,7 @@ export const RootNavigator = () => {
   }, []);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={rootNavigationRef} onReady={applyAuthDestination}>
       <ConnectivityWatcher />
       <SocketLifecycleManager />
       <CallLifecycleManager />
@@ -73,19 +126,19 @@ export const RootNavigator = () => {
       />
       <RequestTimeoutModal />
       <StoreUpdatePrompt />
-      <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {/* Show SplashScreen while checking authentication */}
+      <RootStack.Navigator
+        initialRouteName={isLoading ? 'Splash' : authDestination ?? 'AuthStack'}
+        screenOptions={{ headerShown: false }}
+      >
         {isLoading ? (
           <RootStack.Screen name="Splash" component={SplashScreen} />
         ) : (
           <>
-            {shouldShowWaitlist ? (
+            <RootStack.Screen name="AuthStack" component={AuthNavigator} />
+            <RootStack.Screen name="Tabs" component={TabNavigator} />
+            {waitlistActive ? (
               <RootStack.Screen name="Waitlist" component={WaitlistScreen} />
-            ) : shouldShowTabs ? (
-              <RootStack.Screen name="Tabs" component={TabNavigator} />
-            ) : (
-              <RootStack.Screen name="AuthStack" component={AuthNavigator} />
-            )}
+            ) : null}
             <RootStack.Screen
               name="LostAccessEmail"
               component={LostAccessEmailScreen}
@@ -96,10 +149,7 @@ export const RootNavigator = () => {
               component={OTPVerificationScreen}
               options={{ presentation: 'transparentModal' }}
             />
-            <RootStack.Screen
-              name="MatchDetails"
-              component={MatchDetailsScreen}
-            />
+            <RootStack.Screen name="MatchDetails" component={MatchDetailsScreen} />
           </>
         )}
       </RootStack.Navigator>

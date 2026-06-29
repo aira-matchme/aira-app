@@ -107,6 +107,11 @@ import socketService, {
   type CallSwitchAppliedPayload,
 } from '../../services/socket/socketService';
 import { agoraCallService } from '../../services/call/agoraCallService';
+import {
+  startIncomingCallRing,
+  startOutgoingCallRingback,
+  stopCallRing,
+} from '../../services/call/callRingtoneService';
 import { styles, H_PADDING } from './styles';
 import { TabAICenterIcon } from '../../assets/icons/tabs/TabAICenterIcon';
 import { apiClient } from '../../services/api/client';
@@ -543,6 +548,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   ]);
 
   const dismissIncomingCallUi = useCallback((options?: { clearPendingRtc?: boolean }) => {
+    void stopCallRing();
     const snap = callUiRef.current;
     const incomingId = snap.incomingVideoCallId ?? snap.incomingVoiceCallId;
     const incomingMode: ActiveCallMode | undefined = snap.incomingVideoCallId
@@ -951,11 +957,13 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setIncomingVideoCallerName(incoming.callerName);
       setIncomingVideoCallId(incoming.callId ?? null);
       setIncomingVideoCallVisible(true);
+      void startIncomingCallRing();
       return;
     }
     setIncomingVoiceCallerName(incoming.callerName);
     setIncomingVoiceCallId(incoming.callId ?? null);
     setIncomingVoiceCallVisible(true);
+    void startIncomingCallRing();
   }, []);
 
   const openIncomingCallFromBanner = useCallback(() => {
@@ -996,6 +1004,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setIncomingVoiceCallVisible(false);
       setIncomingVideoCallVisible(false);
       setIncomingCallBannerVisible(true);
+      void startIncomingCallRing();
     },
     [storeIncomingCallRtc],
   );
@@ -1359,6 +1368,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     };
     const onCallAccepted = (payload: CallLifecyclePayload) => {
       if (!payload.callId) return;
+      void stopCallRing();
       const acceptedId = payload.callId.trim();
       if (acceptedId) {
         clearGlobalCallTerminated(acceptedId);
@@ -1414,6 +1424,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
         (failedCallId ? trackedIds.includes(failedCallId) : trackedIds.length > 0);
       if (!applies) return;
 
+      void stopCallRing();
       const normalizedCode = String(payload.code ?? '').toUpperCase();
       if (failedCallId) {
         markGlobalCallTerminated(failedCallId);
@@ -3006,6 +3017,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setCallDurationSec(0);
       setVideoCallUiHidden(false);
       setCallStateVisible(true);
+      void startOutgoingCallRingback(true);
     };
     void start();
   }, [chatId, otherUserId, outgoingCallMeta, ensurePremiumAccess, ensureMicrophoneForCall]);
@@ -3037,6 +3049,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       setCallConnectedAtMs(null);
       setCallDurationSec(0);
       setCallStateVisible(true);
+      void startOutgoingCallRingback(false);
     };
     void start();
   }, [chatId, otherUserId, outgoingCallMeta, ensurePremiumAccess, ensureMicrophoneForCall]);
@@ -3069,6 +3082,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
   }, [callVideoEnabled]);
 
   const cleanupCallSessionLocal = useCallback(() => {
+    void stopCallRing();
     setIncomingCallBannerVisible(false);
     setActiveCallChannelName(null);
     setActiveCallRtcToken(null);
@@ -3105,6 +3119,12 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
       }
     });
   }, [clearOutgoingRingTimer, cleanupCallSessionLocal, dismissIncomingCallUi]);
+
+  useEffect(() => {
+    return () => {
+      void stopCallRing();
+    };
+  }, []);
 
   const endCallLocally = useCallback(
     (params: {
@@ -3654,6 +3674,7 @@ export const ChatDetailScreen = ({ route, navigation }: Props) => {
     if (!callStateVisible || !activeCallId || !activeCallChannelName) return;
     let cancelled = false;
     const join = async () => {
+      await stopCallRing();
       const fallbackUid = getAgoraUidForCurrentUser();
       const tokenPayload = await fetchAgoraRtcToken(activeCallChannelName, fallbackUid);
       const resolvedToken = firstNonEmptyString(activeCallRtcToken, tokenPayload.token);

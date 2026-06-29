@@ -3,6 +3,7 @@ import type { OnboardingQuestion } from '../modules/onboarding/questions.data';
 
 export type RootStackParamList = {
   AuthStack: NavigatorScreenParams<AuthStackParamList> | undefined;
+  Tabs: NavigatorScreenParams<TabStackParamList> | undefined;
   LoginOptionsModal: undefined;
   EmailLogin: undefined;
   LostAccessEmail: undefined;

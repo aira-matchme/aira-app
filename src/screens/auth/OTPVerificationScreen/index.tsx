@@ -221,13 +221,8 @@ export const OTPVerificationScreen: React.FC = () => {
         setTimeout(() => {
           setIsBottomSheetOpen(false);
           setTimeout(() => {
-            // Root navigator switches to Tabs when post-auth landing is Likes.
-            // Resetting to AuthStack->Likes can be unhandled in that state.
             if (screen === 'Likes') {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Tabs' as never }],
-              });
+              // RootNavigator resets to Tabs when auth store updates.
               return;
             }
             navigation.reset({
